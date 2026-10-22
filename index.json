@@ -10,7 +10,8 @@
       "author": "xpilot",
       "description": "Example plugin: warns when driving faster than the resolved speed limit plus a margin. Shows the manifest, store-backed params, a settings row, an alert hook and a relative import.",
       "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/overspeed_warning-1.0.0.tar.gz",
-      "sha256": "0d3b47b7b6241445f75490f06e8dcbc3d418cbbb7e9b8deea6d3527865e4bf8a"
+      "sha256": "0d3b47b7b6241445f75490f06e8dcbc3d418cbbb7e9b8deea6d3527865e4bf8a",
+      "platform": null
     }
   ]
 }

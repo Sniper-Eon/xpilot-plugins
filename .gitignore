@@ -1,1 +1,3 @@
 __pycache__/
+# native build intermediates (build_native.py keeps only the .so files)
+plugins/*/legacy_mpc/acados_ocp_*.json

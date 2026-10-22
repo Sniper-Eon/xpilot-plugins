@@ -22,8 +22,8 @@ tools/build_index.py     builds dist/ and index.json; --check verifies they are 
    `claims` for everything the plugin uses, params with types BOOL/INT/FLOAT/STRING/JSON. Downloaded plugins
    must not reuse built-in ids or param keys; prefix keys with `Ext`.
 3. Use relative imports inside the plugin (`from .logic import x`): installed plugins load as `xpilot_ext.<id>`.
-4. Pure Python only. Compiled code (acados solvers, C extensions) and panda safety plugins cannot be installed
-   from the store.
+4. Prefer pure Python. Compiled code must ship as prebuilt binaries with a `platform` and a `build_native.py`
+   that reproduces them (see Native plugins). panda safety plugins cannot be installed from the store.
 5. Run `python3 tools/build_index.py` and commit `dist/` and `index.json` with the source.
 6. Describe in the PR what the plugin changes on the road, which claims it takes, and how you tested it.
 
@@ -39,6 +39,14 @@ tools/build_index.py     builds dist/ and index.json; --check verifies they are 
 Archives are not signed yet: the sha256 in `index.json` only protects against corrupt or swapped downloads.
 Trust comes from this reviewed repository, so only merge what you have read.
 
-## Example
+## Plugins
 
-`plugins/overspeed_warning`: alerts category, one store-backed setting, an `alert` claim and a relative import.
+- `plugins/overspeed_warning`: example. Alerts category, one store-backed setting, an `alert` claim, a relative import.
+- `plugins/tn_long`: TN longitudinal (TN-NoDEC) as a `long_planner`, with prebuilt acados solvers. See its README.
+
+## Native plugins / 带二进制的插件
+
+Plugins with compiled code ship prebuilt binaries for one platform: `plugin.json` gets
+`"platform": {"machine": "aarch64", "python": "cpython-312"}` (written by the plugin's `build_native.py`, run on the
+target device). Devices only offer and load a native plugin on a matching platform. Binaries cannot be reviewed like
+source: review the build script, and rebuild them yourself on your device before merging.

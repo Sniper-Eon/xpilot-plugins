@@ -50,12 +50,17 @@ def build() -> dict[Path, bytes]:
       raise ValueError(f"{plugin.name}: bad manifest (missing {missing}, id {m.get('id')}, api {m.get('api')})")
     if not (plugin / "__init__.py").is_file():
       raise ValueError(f"{plugin.name}: missing __init__.py")
+    if m.get("platform") is None and any(p.suffix == ".so" or ".so." in p.name for p in plugin.rglob("*")):
+      raise ValueError(f"{plugin.name}: has binaries but no platform (run its build_native.py on the target)")
+    if m.get("platform") is None and (plugin / "build_native.py").exists():
+      print(f"skipped {plugin.name}: native plugin not built yet (run its build_native.py on the target)", file=sys.stderr)
+      continue
     data = archive(plugin)
     name = f"dist/{m['id']}-{m['version']}.tar.gz"
     files[ROOT / name] = data
     entries.append({"id": m["id"], "name": m["name"], "version": m["version"], "api": m["api"], "category": m["category"],
                     "author": m.get("author", ""), "description": m.get("description", ""), "url": f"{RAW}/{name}",
-                    "sha256": hashlib.sha256(data).hexdigest()})
+                    "sha256": hashlib.sha256(data).hexdigest(), "platform": m.get("platform")})
   files[ROOT / "index.json"] = (json.dumps({"api": API, "plugins": entries}, indent=2) + "\n").encode()
   return files
 
