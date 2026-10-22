@@ -1,0 +1,18 @@
+{
+  "id": "overspeed_warning",
+  "name": "Overspeed Warning",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "alerts",
+  "entry": "plugin:OverspeedWarning",
+  "author": "xpilot",
+  "description": "Example plugin: warns when driving faster than the resolved speed limit plus a margin. Shows the manifest, store-backed params, a settings row, an alert hook and a relative import.",
+  "priority": 100,
+  "enable_param": "ExtOverspeedWarning",
+  "claims": ["alert"],
+  "settings": [{"key": "ExtOverspeedMargin", "label": "Margin", "range": [0, 30, 1, "km/h", 1]}],
+  "params": {
+    "ExtOverspeedWarning": {"type": "BOOL", "default": "0"},
+    "ExtOverspeedMargin": {"type": "INT", "default": "5", "note": "km/h over the limit before warning"}
+  }
+}
