@@ -2,6 +2,18 @@
   "api": 1,
   "plugins": [
     {
+      "id": "op_models",
+      "name": "openpilot Model",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "perception_model",
+      "author": "xpilot",
+      "description": "Drive with the model that ships with openpilot (selfdrive/modeld, no downloads). Replaces the SP model manager while on; switch it off to go back.",
+      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/op_models-1.0.0.tar.gz",
+      "sha256": "6f160751d990e1ba11e42b6d42f94eb5b9c4ce10175b87f5aabc3fcaf095a4a1",
+      "platform": null
+    },
+    {
       "id": "overspeed_warning",
       "name": "Overspeed Warning",
       "version": "1.0.0",

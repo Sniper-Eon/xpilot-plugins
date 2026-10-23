@@ -1,0 +1,16 @@
+{
+  "id": "op_models",
+  "name": "openpilot Model",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "perception_model",
+  "entry": "plugin:OpModels",
+  "author": "xpilot",
+  "description": "Drive with the model that ships with openpilot (selfdrive/modeld, no downloads). Replaces the SP model manager while on; switch it off to go back.",
+  "priority": 100,
+  "enable_param": "ExtOpModels",
+  "claims": ["role:perception.model", "process:op_modeld"],
+  "params": {
+    "ExtOpModels": {"type": "BOOL", "default": "0"}
+  }
+}
