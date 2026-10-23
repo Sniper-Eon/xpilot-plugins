@@ -15,6 +15,8 @@ class _Source:
 
 
 class OverspeedWarning(Plugin):
+  SERVICES = ("carState",)  # selfdrived reads carState on its own socket, not through sm
+
   @classmethod
   def alert_source(cls, CP, params):
     return _Source(params)
