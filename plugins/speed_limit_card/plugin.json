@@ -1,0 +1,19 @@
+{
+  "id": "speed_limit_card",
+  "name": "Speed Limit Card",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "ui",
+  "entry": "plugin:SpeedLimitCard",
+  "author": "xpilot",
+  "description": "Big-screen card: the speed limit sunnypilot resolved (longitudinalPlanSP). Display only; on by default.",
+  "priority": 100,
+  "enable_param": "XpilotSpeedLimitCard",
+  "claims": [],
+  "params": {
+    "XpilotSpeedLimitCard": {
+      "type": "BOOL",
+      "default": "1"
+    }
+  }
+}

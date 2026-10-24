@@ -1,0 +1,46 @@
+{
+  "id": "auto_speed",
+  "name": "Auto Speed Limit",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "longitudinal_planning",
+  "entry": "plugin:AutoSpeed",
+  "author": "xpilot",
+  "description": "Sets cruise speed to the car's speed limit plus an offset. Needs openpilot longitudinal and the vehicle bus.",
+  "priority": 100,
+  "enable_param": "TeslaAutoSpeedLimit",
+  "claims": [
+    "can.tx:0x3C2:1"
+  ],
+  "settings": [
+    {
+      "key": "TeslaAutoSpeedLimitOffset",
+      "label": "Speed Limit Offset",
+      "range": [
+        -10,
+        20,
+        1,
+        "km/h|mph",
+        1
+      ]
+    }
+  ],
+  "params": {
+    "TeslaAutoSpeedLimit": {
+      "type": "BOOL",
+      "default": "0"
+    },
+    "TeslaAutoSpeedLimitOffset": {
+      "type": "INT",
+      "default": "0",
+      "note": "car display units"
+    }
+  },
+  "safety": {
+    "header": "auto_speed.h",
+    "param_bit": "0x4000",
+    "tx": [
+      "0x3C2:1"
+    ]
+  }
+}

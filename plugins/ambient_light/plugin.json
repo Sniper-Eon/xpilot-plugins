@@ -1,0 +1,60 @@
+{
+  "id": "ambient_light",
+  "name": "Blindspot Ambient Lights",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "body_comfort",
+  "entry": "plugin:AmbientLight",
+  "author": "xpilot",
+  "description": "Turns the cabin ambient lights red while a car is in the blind spot.",
+  "priority": 100,
+  "enable_param": "TeslaBlindspotAmbientEnabled",
+  "claims": [
+    "can.tx:0x679:1"
+  ],
+  "settings": [
+    {
+      "key": "TeslaBlindspotAmbientDayBrightness",
+      "label": "Day Brightness",
+      "range": [
+        0,
+        100,
+        1,
+        "%",
+        1
+      ]
+    },
+    {
+      "key": "TeslaBlindspotAmbientBrightness",
+      "label": "Night Brightness",
+      "range": [
+        0,
+        100,
+        1,
+        "%",
+        1
+      ]
+    }
+  ],
+  "params": {
+    "TeslaBlindspotAmbientEnabled": {
+      "type": "BOOL",
+      "default": "0"
+    },
+    "TeslaBlindspotAmbientBrightness": {
+      "type": "INT",
+      "default": "30"
+    },
+    "TeslaBlindspotAmbientDayBrightness": {
+      "type": "INT",
+      "default": "100"
+    }
+  },
+  "safety": {
+    "header": "ambient_light.h",
+    "param_bit": "0x2000",
+    "tx": [
+      "0x679:1"
+    ]
+  }
+}

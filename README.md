@@ -1,6 +1,6 @@
 # xpilot-plugins
 
-Plugin repository for [xpilot](https://github.com/onemiless/openpilot/tree/xpilot) (Tesla-only sunnypilot fork).
+Plugin repository for [xpilot](https://github.com/onemiless/xpilot) (Tesla-only sunnypilot fork).
 Devices list this repository under Settings → Plugins → Plugin Store, install while parked, and apply on restart.
 
 插件仓库：xpilot 设备在 设置 → Plugins → Plugin Store 里浏览这里的插件，停车时安装，重启后生效。
@@ -17,13 +17,16 @@ tools/build_index.py     builds dist/ and index.json; --check verifies they are 
 
 ## Submitting a plugin / 提交插件
 
-1. Fork, add `plugins/<id>/`, open a pull request. Read `XPILOT.md` first.
+1. Fork, add `plugins/<id>/`, open a pull request (see `CONTRIBUTING.md`). Read `XPILOT.md` first.
 2. `plugin.json`: `id` equals the directory, `api` is the host's API version (1), a category from `XPILOT.md`,
    `claims` for everything the plugin uses, params with types BOOL/INT/FLOAT/STRING/JSON. Downloaded plugins
-   must not reuse built-in ids or param keys; prefix keys with `Ext`.
+   must not reuse built-in ids or param keys; prefix new keys with `Ext`. The plugins moved here from the xpilot
+   repository keep their original key names so existing device settings stay valid.
 3. Use relative imports inside the plugin (`from .logic import x`): installed plugins load as `xpilot_ext.<id>`.
 4. Prefer pure Python. Compiled code must ship as prebuilt binaries with a `platform` and a `build_native.py`
-   that reproduces them (see Native plugins). panda safety plugins cannot be installed from the store.
+   that reproduces them (see Native plugins). panda safety code is compiled into the firmware and lives in the
+   xpilot repository (`opendbc/safety/plugins/safety.json`). A plugin with `can.tx` claims or a `safety` block
+   installs only if both match that file exactly on the device's xpilot version.
 5. Run `python3 tools/build_index.py` and commit `dist/` and `index.json` with the source.
 6. Describe in the PR what the plugin changes on the road, which claims it takes, and how you tested it.
 
@@ -43,6 +46,15 @@ Trust comes from this reviewed repository, so only merge what you have read.
 
 - `plugins/overspeed_warning`: example. Alerts category, one store-backed setting, an `alert` claim, a relative import.
 - `plugins/tn_long`: TN longitudinal (TN-NoDEC) as a `long_planner`, with prebuilt acados solvers. See its README.
+
+Moved from the xpilot repository (keep their original param keys):
+
+- Display, installed by default on first boot: `speed_card`, `lead_card`, `speed_limit_card`, `car_tile`, `map_tile`,
+  `clock_tile`, `ip_tile`, `blindspot_edges`.
+- `bms`: battery tile. `traffic_light`: traffic light stop/start. `external_compute`: external compute bridge.
+- Safety-backed (need the matching panda firmware entry): `auto_speed` (0x3C2), `ambient_light` (0x679).
+
+Tests: `cd plugins && python3 -m pytest -q .` with an xpilot checkout on `PYTHONPATH` (see `.github/workflows/ci.yml`).
 
 ## Native plugins / 带二进制的插件
 

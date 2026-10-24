@@ -1,0 +1,19 @@
+{
+  "id": "speed_card",
+  "name": "Speed Card",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "ui",
+  "entry": "plugin:SpeedCard",
+  "author": "xpilot",
+  "description": "Big-screen card: ego speed and the set speed. Display only; on by default.",
+  "priority": 100,
+  "enable_param": "XpilotSpeedCard",
+  "claims": [],
+  "params": {
+    "XpilotSpeedCard": {
+      "type": "BOOL",
+      "default": "1"
+    }
+  }
+}

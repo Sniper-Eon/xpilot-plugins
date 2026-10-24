@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW = "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main"
 API = 1
 REQUIRED = ("id", "name", "version", "api", "category", "entry")
-SKIP = {"__pycache__", ".pytest_cache"}
+SKIP = {"__pycache__", ".pytest_cache", "tests"}  # tests run in CI, devices do not need them
 
 
 def archive(plugin: Path) -> bytes:
@@ -43,7 +43,7 @@ def archive(plugin: Path) -> bytes:
 
 def build() -> dict[Path, bytes]:
   files, entries = {}, []
-  for plugin in sorted(p for p in (ROOT / "plugins").iterdir() if p.is_dir()):
+  for plugin in sorted(p.parent for p in (ROOT / "plugins").glob("*/plugin.json")):
     m = json.loads((plugin / "plugin.json").read_text())
     missing = [f for f in REQUIRED if f not in m]
     if missing or m["id"] != plugin.name or m["api"] != API:

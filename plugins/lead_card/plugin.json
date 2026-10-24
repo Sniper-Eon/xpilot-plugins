@@ -1,0 +1,19 @@
+{
+  "id": "lead_card",
+  "name": "Lead Card",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "ui",
+  "entry": "plugin:LeadCard",
+  "author": "xpilot",
+  "description": "Big-screen card: distance and relative speed of the lead car (radarState). Display only; on by default.",
+  "priority": 100,
+  "enable_param": "XpilotLeadCard",
+  "claims": [],
+  "params": {
+    "XpilotLeadCard": {
+      "type": "BOOL",
+      "default": "1"
+    }
+  }
+}

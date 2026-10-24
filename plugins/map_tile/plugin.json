@@ -1,0 +1,19 @@
+{
+  "id": "map_tile",
+  "name": "Map Tile",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "ui",
+  "entry": "plugin:MapTile",
+  "author": "xpilot",
+  "description": "Big-screen tile: speed limit, road name and next maneuver from any map or navigation provider. Display only; on by default.",
+  "priority": 100,
+  "enable_param": "XpilotMapTile",
+  "claims": [],
+  "params": {
+    "XpilotMapTile": {
+      "type": "BOOL",
+      "default": "1"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "clock_tile",
+  "name": "Clock Tile",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "ui",
+  "entry": "plugin:ClockTile",
+  "author": "xpilot",
+  "description": "Big-screen tile: local time and date. Display only; on by default.",
+  "priority": 100,
+  "enable_param": "XpilotClockTile",
+  "claims": [],
+  "params": {
+    "XpilotClockTile": {
+      "type": "BOOL",
+      "default": "1"
+    }
+  }
+}

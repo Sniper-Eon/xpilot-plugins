@@ -1,0 +1,56 @@
+{
+  "id": "traffic_light",
+  "name": "Traffic Light Control (Experimental)",
+  "version": "1.0.0",
+  "api": 1,
+  "category": "longitudinal_planning",
+  "entry": "plugin:TrafficLight",
+  "author": "xpilot",
+  "description": "Stops for red lights seen by the car's own traffic-control perception. Only ever slows down.",
+  "priority": 100,
+  "enable_param": "TeslaTrafficSignalControlEnabled",
+  "claims": [
+    "plan.filter",
+    "process:trafficcontrold"
+  ],
+  "settings": [
+    {
+      "key": "TeslaTrafficStopReference",
+      "label": "Stop Reference",
+      "range": [
+        20,
+        120,
+        5,
+        "m",
+        10
+      ]
+    },
+    {
+      "key": "TeslaTrafficControlMaxSpeed",
+      "label": "Max Speed",
+      "range": [
+        20,
+        120,
+        5,
+        "km/h",
+        1
+      ]
+    }
+  ],
+  "params": {
+    "TeslaTrafficSignalControlEnabled": {
+      "type": "BOOL",
+      "default": "0"
+    },
+    "TeslaTrafficStopReference": {
+      "type": "INT",
+      "default": "50",
+      "note": "decimeters"
+    },
+    "TeslaTrafficControlMaxSpeed": {
+      "type": "INT",
+      "default": "60",
+      "note": "km/h"
+    }
+  }
+}
