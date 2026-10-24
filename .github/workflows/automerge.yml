@@ -1,0 +1,54 @@
+name: auto merge
+
+# After "plugin checks" passes on a pull request: merge it if the author is trusted and tools/pr_risk.py says auto,
+# otherwise mention the owner once with the reasons. Runs the default branch's classifier on the pull request's
+# git objects; never runs pull request code, so the write token is safe here.
+on:
+  workflow_run:
+    workflows: ["plugin checks"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: automerge-${{ github.event.workflow_run.head_sha }}
+
+jobs:
+  decide:
+    if: github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SHA: ${{ github.event.workflow_run.head_sha }}
+      OWNER: onemiless
+      CI: ci.yml
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - name: Merge or ask for review
+      run: |
+        set -euo pipefail
+        pr=$(gh api "repos/$GITHUB_REPOSITORY/pulls?state=open&per_page=100" --jq ".[] | select(.head.sha == \"$SHA\")")
+        [ -n "$pr" ] || { echo "no open pull request at $SHA"; exit 0; }
+        n=$(jq -r .number <<<"$pr"); base=$(jq -r .base.ref <<<"$pr")
+        [ "$(jq -r .draft <<<"$pr")" = false ] || { echo "draft"; exit 0; }
+        git fetch -q origin "pull/$n/head" "$base"
+        python3 tools/pr_risk.py "origin/$base" "$SHA" | tee risk.json
+        case "$(jq -r .author_association <<<"$pr")" in
+          OWNER|MEMBER|COLLABORATOR) ;;
+          *) jq '.auto = false | .reasons += ["author is not a collaborator"]' risk.json > r && mv r risk.json ;;
+        esac
+        if [ "$(jq -r .auto risk.json)" = true ]; then
+          gh pr merge "$n" --squash --match-head-commit "$SHA"
+          gh workflow run "$CI" --ref "$base"  # merges by this token do not trigger push workflows
+          exit 0
+        fi
+        marker="<!-- automerge:$SHA -->"
+        gh api "repos/$GITHUB_REPOSITORY/issues/$n/comments" --paginate --jq '.[].body' | grep -qF "$marker" && exit 0
+        { echo "@$OWNER review needed: checks passed, not merged automatically."; echo
+          jq -r '.reasons[] | "- " + .' risk.json; echo; echo "$marker"; } > body.md
+        gh pr comment "$n" --body-file body.md

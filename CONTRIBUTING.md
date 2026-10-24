@@ -18,3 +18,11 @@ xpilot repository (plugin interfaces, claims, code layout) and this repository's
    CI runs the same and must pass before merge.
 4. In the pull request, describe what the plugin changes on the road, which claims it takes, and how you tested it
    (host tests, device).
+
+## Automatic merge
+
+When CI passes, `.github/workflows/automerge.yml` squash-merges a pull request from a collaborator if `tools/pr_risk.py`
+finds only display plugins (category `ui`/`overlays`, no claims, no safety block, no platform, no binaries, only the UI
+host API and a few stdlib imports, no dynamic code). Anything else, or any outside author, gets one comment asking the
+owner to review. A failing check on `main` after a merge opens an issue. `tools/pr_risk_check.py` lists the failure
+modes the classifier is tested against.

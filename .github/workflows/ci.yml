@@ -6,6 +6,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   checks:
     runs-on: ubuntu-24.04
@@ -27,6 +31,8 @@ jobs:
     - name: Build msgq
       working-directory: xpilot/msgq_repo
       run: scons -j4 msgq/ipc_pyx.so
+    - name: Classifier failure modes
+      run: python3 tools/pr_risk_check.py > /tmp/pr_risk_check.json
     - name: Archives and index match the source
       run: python3 tools/build_index.py --check
     - name: Plugin tests
@@ -34,3 +40,8 @@ jobs:
       run: PYTHONPATH=$X:$X/msgq_repo:$X/opendbc_repo python3 -m pytest -q -p no:cacheprovider .
     - name: Store end to end (install, discover, enable)
       run: PYTHONPATH=$X/msgq_repo python3 $X/tools/sp_tesla_e2e/store_e2e.py --repo .
+    - name: Tell the owner main is broken
+      if: failure() && github.event_name != 'pull_request'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh issue create --title "main checks failed at ${GITHUB_SHA::10}" --body "@onemiless $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
