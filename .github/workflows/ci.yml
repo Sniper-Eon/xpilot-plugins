@@ -23,7 +23,7 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    - run: pip install pyzmq numpy pycapnp pytest zstandard setproctitle cython scons
+    - run: pip install pyzmq numpy pycapnp pytest zstandard setproctitle cython scons setuptools
     - name: Build msgq
       working-directory: xpilot/msgq_repo
       run: scons -j4 msgq/ipc_pyx.so
