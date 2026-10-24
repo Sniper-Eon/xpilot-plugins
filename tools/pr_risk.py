@@ -51,15 +51,15 @@ def code_problems(path: str, src: str) -> list[str]:
   return out
 
 
-def manifest_problems(rev: str, pid: str) -> list[str]:
+def manifest_problems(rev: str, pid: str, side: str) -> list[str]:
   text = show(rev, f"plugins/{pid}/plugin.json")
   if text is None:
-    return [f"{pid}: no plugin.json at {rev[:10]}"]
+    return [f"{pid}: no plugin.json at {side}"]
   m = json.loads(text)
   out = []
   if m.get("category") not in CATEGORIES:
-    out.append(f"{pid}: category {m.get('category')!r} at {rev[:10]}")
-  out += [f"{pid}: has {k} at {rev[:10]}" for k in ("claims", "safety", "platform") if m.get(k)]
+    out.append(f"{pid}: category {m.get('category')!r} at {side}")
+  out += [f"{pid}: has {k} at {side}" for k in ("claims", "safety", "platform") if m.get(k)]
   return out
 
 
@@ -75,9 +75,12 @@ def classify(base: str, head: str) -> list[str]:
     else:
       reasons.append(f"{path}: outside plugins/<id>/, dist/ and index.json")
   for pid in sorted(touched):
+    found = manifest_problems(head, pid, "head")
     if show(base, f"plugins/{pid}/plugin.json") is not None:
-      reasons += manifest_problems(base, pid)
-    reasons += manifest_problems(head, pid)
+      found = manifest_problems(base, pid, "base") + found
+    reasons += found
+    if found:  # not a display plugin: the code scan would only add noise
+      continue
     for path in git("ls-tree", "-r", "--name-only", head, f"plugins/{pid}/").split():
       if not path.endswith(SUFFIXES):
         reasons.append(f"{path}: not .py/.json/.md")
