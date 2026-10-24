@@ -20,7 +20,7 @@
     "can.tx:0x3E9:1"
   ],
   "safety": {
-    "header": "turn_signal.h",
+    "header": "navassist.h",
     "param_bit": "0x8000",
     "tx": ["0x3E9:1"]
   },

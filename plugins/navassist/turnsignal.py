@@ -1,7 +1,7 @@
 """Bounded Tesla DAS_bodyControls (0x3E9, vehicle bus 1) turn-signal requests.
 
 The lamp is cloned from a fresh car frame with turn_request 0; only the turn request, reason, counter and checksum
-change. The panda safety plugin 'turn_signal' re-validates every frame, including the checksum and counter. The
+change. The panda safety plugin 'navassist' re-validates every frame, including the checksum and counter. The
 stock DesireHelper sees the resulting CarState blinker and still applies its blind-spot, road-edge and ALC-mode
 gates; this module never sends steering, acceleration or a lane-change command."""
 from __future__ import annotations

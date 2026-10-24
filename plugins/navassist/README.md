@@ -50,7 +50,8 @@ All keys are store-backed (`plugin.json`): `ExtNavAssistEnabled`, `ExtNavAssistL
 - A single OEM frame never vetoes: the blocker requires two consecutive frames and clears after six.
 - The physical lamp is bounded by panda: idle template only, request 1/2/3, reason 8/4, protected bits equal to
   the template, counter = template + 1, 100 ms rate, 200 frames per 60 s, `controls_allowed` for an active
-  request, and the matching `safety.json` entry/param bit. Cancel is allowed after a disengage.
+  request, and the matching `safety.json` entry/param bit. Cancel (request 3) does not require
+  `controls_allowed` because it only releases the lamp; active requests still do.
 - Driver blinkers, blind spots and the configured ALC mode are still enforced by the stock DesireHelper.
 
 ## Not in 1.0.0

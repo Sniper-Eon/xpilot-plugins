@@ -130,7 +130,7 @@
       "author": "Sniper-Eon",
       "description": "Receives canonical v3 Android/iOS navigation over UDP 4213, shows the next maneuver and lane guidance, lowers the cruise ceiling before a supported turn, and lets Tesla's own lane verdict plus an optional phone blind spot veto a lane change. Requests one bounded physical turn signal on 0x3E9; SP's ALC remains the start authority.",
       "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/navassist-1.0.0.tar.gz",
-      "sha256": "a3141026d8b868ee10ecbbcf7aeda62c07a2b20abf78187ae56b0e7c462924d6",
+      "sha256": "cead7841879f81011a7182700f0051eaad94941255d4dc0346ff73966436f6a7",
       "platform": null
     },
     {
