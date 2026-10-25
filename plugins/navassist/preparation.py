@@ -246,6 +246,19 @@ class LanePreparation:
     if self._plan_recovery_count >= self.PLAN_RECOVERY_MAX_RETRIES:
       return self._abort(event_key, "lanePositionRetryLimit")
     direction = self._candidate[2]
+    conflicting_lamp = (vehicle.left_blinker and vehicle.right_blinker) or (
+      vehicle.right_blinker if direction == LaneIntentDirection.left else vehicle.left_blinker
+    )
+    if conflicting_lamp:
+      return self._abort(event_key, "lanePositionDriverSignal")
+    if now_ns - self._signal_since_ns > self.SIGNAL_WAIT_TIMEOUT_NS:
+      return self._abort(event_key, "crossingWaitTimeout")
+    # A fresh route with briefly unavailable map-to-visual lane position has
+    # the same bounded preparation grace as an unknown neighboring lane.
+    # Keep the physical request, discard readiness, and re-confirm on return.
+    held = self._observe_before_start(now_ns, recovering=False)
+    if held.signal_requested:
+      return held
     self._reset()
     self._plan_recovery_key = event_key
     self._plan_recovery_direction = direction

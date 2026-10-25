@@ -17,6 +17,8 @@ class Run:
   assert i.signal_requested
   return i
  def lost(self):
+  for _ in range(21):
+   i=self.tick(GAP);assert i.signal_requested and not i.lane_change_ready
   i=self.tick(GAP);assert not i.signal_requested and not i.lane_change_ready
   assert i.reason=='lanePositionUnavailable';assert self.c._blocked_key is None
   return i
@@ -25,7 +27,7 @@ class Run:
   assert i.reason=='lanePositionRecovered'
   return self.active()
 
-def test_loss_immediately_removes_lamp_and_permission_then_new_request_needs_feedback():
+def test_long_loss_releases_lamp_and_new_request_still_needs_feedback():
  r=Run();first=r.active();r.lost();second=r.recover()
  assert second.request_id>first.request_id and not second.lane_change_ready
  for _ in range(50):i=r.tick();assert not i.lane_change_ready

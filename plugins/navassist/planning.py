@@ -17,6 +17,8 @@ LEFT_EXIT_LANE_MANEUVERS = frozenset(("exitLeft", "rampLeft", "mergeLeft"))
 RIGHT_EXIT_LANE_MANEUVERS = frozenset(("exitRight", "rampRight", "mergeRight"))
 
 
+MERGE_MANEUVERS = frozenset(("mergeLeft", "mergeRight"))
+
 FORK_NOW_DISTANCE_M = 50.0
 
 
@@ -43,6 +45,17 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     maneuver in LEFT_EXIT_LANE_MANEUVERS | RIGHT_EXIT_LANE_MANEUVERS
     and math.isfinite(distance_m) and 0.0 < distance_m <= FORK_NOW_DISTANCE_M
   )
+
+  if maneuver in MERGE_MANEUVERS:
+    # A merge direction describes route geometry, not proof that the vehicle
+    # still occupies the auxiliary lane. Never repeat an edge search merely
+    # because another merge instruction arrives after entering the main road.
+    if not (nav_valid and lanes and recommended and amap_ego_index is not None
+            and 0 <= amap_ego_index < len(lanes)
+            and 0 <= int(topology.egoLaneIndexFromLeft) < lane_count):
+      return NavLanePlan(False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
+                         len(lanes), (), observation_interrupted=bool(nav_valid and recommended))
+    fallback_side = None  # Only the confirmed absolute mapping below may choose a lane.
 
   if lanes:
     amap_lane_count = len(lanes)
