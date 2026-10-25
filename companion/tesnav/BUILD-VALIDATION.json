@@ -1,0 +1,17 @@
+{
+  "status": "candidate-not-device-installed",
+  "version_code": 18,
+  "version_name": "1.6-xpilot-candidate",
+  "application_id": "com.garan.tesnav.tenengkai.lane",
+  "display_name": "特会开·xpilot测试",
+  "apk_bytes": 321123980,
+  "apk_sha256": "8d10e012a4c84fbacce77cfce6b7900cf47d67a9561e4ec61b62e9603046db9e",
+  "model_sha256": "58ebd0451c4074ee8f54475eaf7be818517521f90eb47c1a15b481ea892a9231",
+  "signer_sha256": "f5ec7f024863d08af62f97d8e64e096b7a7523fc6a1fe484dba8829ae8f1905d",
+  "jvm_tests": {
+    "total": 344,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 1
+  }
+}
