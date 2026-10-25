@@ -47,7 +47,7 @@ not the source tree. See ACCEPTANCE.md for pre-implementation failure modes.
 
 ## Validation status (2026-10-25)
 
-Android compile and signed APK packaging succeeded. Four source contracts and
+Android compile and signed APK packaging succeeded. Five source contracts and
 three JVM telemetry tests pass. Release lint remains **not validated** because
 five lint-tool JARs were unavailable offline (IntelliJ core, lint Kotlin compiler,
 UAST, Kotlin reflect and play-sdk-proto); the online download was incomplete.

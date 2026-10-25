@@ -24,8 +24,11 @@ class ForkContract(unittest.TestCase):
         build = (ROOT / 'app/build.gradle.kts').read_text()
         self.assertIn('applicationId = "com.garan.tesnav.tenengkai.lane"', build)
         self.assertIn('LANETEST_STORE_FILE', build)
-        strings = (ROOT / 'app/src/main/res/values/strings.xml').read_text()
-        self.assertIn('X-Pilot CP导航', strings)
+        for path in (ROOT / 'app/src/main/res').glob('values*/strings.xml'):
+            self.assertIn('X-Pilot CP导航', path.read_text(), str(path))
+
+    def test_no_unrequested_vehicle_defaults(self):
+        self.assertFalse((ROOT / 'app/src/main/res/raw/config.json').exists())
 
     def test_no_upstream_signing_material(self):
         self.assertFalse((ROOT / 'app/release.keystore').exists())

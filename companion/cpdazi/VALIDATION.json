@@ -1,8 +1,8 @@
 {
   "status": "candidate_not_ready_for_deployment",
-  "apk_sha256": "06a46b9ce0fdba88a8e6123ec06c7ee3b171037a9fb15081dad6ba7cd9d1240a",
-  "apk_bytes": 22991503,
-  "apk_source_inputs_sha256": "fc4a9ede83db365873a88c24a499afb7e32af34c4459d3c277703878cafaff7f",
+  "apk_sha256": "7b3fe41e519a9e514ddd97133a85af2653b5d1a454b37b940262ef3489c2ee34",
+  "apk_bytes": 22990198,
+  "apk_source_inputs_sha256": "6f219fe0cf278e44fe6e964c28612279fda1e4ead80f9b738758f35705f0a0da",
   "application_id": "com.garan.tesnav.tenengkai.lane",
   "label": "X-Pilot CP导航",
   "version_code": 20,
@@ -10,7 +10,7 @@
   "signer_sha256": "f5ec7f024863d08af62f97d8e64e096b7a7523fc6a1fe484dba8829ae8f1905d",
   "signature_verified": true,
   "launcher_count": 1,
-  "source_contract_tests_passed": 4,
+  "source_contract_tests_passed": 5,
   "jvm_telemetry_tests_passed": 3,
   "release_lint": "blocked_missing_tool_dependencies_not_passed",
   "lint_tasks_excluded_for_candidate_packaging": [
@@ -26,5 +26,7 @@
   "phone_installed": false,
   "phone_c3_interop_validated": false,
   "road_validated": false,
-  "device_changed_this_phone_fork_step": false
+  "device_changed_this_phone_fork_step": false,
+  "all_locale_labels_verified": true,
+  "unrequested_vehicle_defaults_removed": true
 }
