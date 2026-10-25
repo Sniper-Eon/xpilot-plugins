@@ -39,5 +39,9 @@
   ],
   "activation": "candidate_not_road_validated",
   "cp_limitations": [],
-  "initial_mode": "navigation_observation_no_physical_lamp_lane_change_or_speed_target"
+  "initial_mode": "navigation_observation_no_physical_lamp_lane_change_or_speed_target",
+  "host_validated_commits": [
+    "0b49f127a0f90ecd13fc2c015a7afde3a6e6428e",
+    "991d6d31f6bc1b495ecbdcbcd1cd181914232283"
+  ]
 }

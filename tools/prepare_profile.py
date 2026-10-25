@@ -23,7 +23,13 @@ def prepare(host, profile, destination):
   d = json.loads((ROOT / "profiles" / f"xpilot-{profile}.json").read_text())
   if d["host"] != "Sniper-Eon/xpilot" or not (host / "XPILOT.md").is_file():
     raise ValueError("wrong host")
-  subprocess.run(["git", "merge-base", "--is-ancestor", d["host_min_commit"], "HEAD"], cwd=host, check=True)
+  head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=host, text=True).strip()
+  if head not in d.get("host_validated_commits", []):
+    proof = subprocess.run(
+      ["git", "merge-base", "--is-ancestor", d["host_min_commit"], "HEAD"], cwd=host, capture_output=True
+    )
+    if proof.returncode:
+      raise ValueError("Unverified host ancestry: use a validated host commit or fetch its history first")
   if destination.exists():
     raise ValueError("destination must be new; active folders are never reused")
   # Set isolation before importing host modules. No compiled Params needed.

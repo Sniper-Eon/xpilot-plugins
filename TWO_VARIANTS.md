@@ -8,6 +8,7 @@ Remove stereo/dual-camera ranging and speed experiments, automatic passing and r
 Keep training/drive evidence outside deployment artifacts; Git history remains the rollback record.
 
 Before implementation, required failure cases:
+- A shallow host clone hides the minimum ancestor. Accept only exact validated heads without ancestry; reject unknown unprovable heads before creating a destination.
 - A bundle is accidentally based on old SP or the legacy checkout rather than xpilot.
 - Both phone sources issue turn requests simultaneously or phone-source selection silently falls back.
 - CP protocol accepts replayed, stale, unbound or malformed navigation and creates an active request.
