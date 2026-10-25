@@ -110,6 +110,18 @@
       "platform": null
     },
     {
+      "id": "lean_mici",
+      "name": "lean mici phone inference",
+      "version": "0.5.0",
+      "api": 1,
+      "category": "perception_model",
+      "author": "xpilot",
+      "description": "BGM1 v4 Walnut V3 phone inference with a calibrated control envelope and local fallback. Uses the system engaged bounded-wait contract.",
+      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/lean_mici-0.5.0.tar.gz",
+      "sha256": "d595c3919840dce4e5a239056c843c98c8132bf80c74efa75593268dfc4adc1d",
+      "platform": null
+    },
+    {
       "id": "map_tile",
       "name": "Map Tile",
       "version": "1.0.2",
