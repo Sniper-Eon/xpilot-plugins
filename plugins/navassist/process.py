@@ -13,7 +13,6 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.tesla import plugins
 
 from .can_input import can_batches
-from .closingd import read_packet
 from .network import NavigationTransports
 from .phone import PhoneBlindspotAssist
 from .plugin import NavAssist
@@ -35,12 +34,21 @@ def main():
   params = plugins.view(Params())
   settings = read_settings(params)
   runtime = NavigationRuntime(settings)
-  store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
+  source = params.get('ExtNavAssistSource', return_default=True)
+  if source not in (b'0', b'1', '0', '1', 0, 1):
+    raise ValueError('Unsupported navigation source; restart after selecting a profile')
+  cp_source = source in (b'1', '1', 1)
+  if cp_source:
+    from .cpnav import CPStore
+    from .cpnetwork import CPTransports
+    store = CPStore()
+  else:
+    store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
   sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState', 'deviceMotion'])
   can_socket = messaging.sub_sock('can', conflate=False)
   pm = messaging.PubMaster(['pluginMsg'])
   state = {'offroad': False}
-  transports = NavigationTransports(store, params, lambda: state['offroad'])
+  transports = (CPTransports if cp_source else NavigationTransports)(store, params, lambda: state['offroad'])
   phone = PhoneBlindspotAssist(mode='assist' if settings.phone_assist_enabled else 'shadow')
   recorder = Recorder()
   rk = Ratekeeper(PUBLISH_HZ)
@@ -57,7 +65,7 @@ def main():
         settings = read_settings(params)
         runtime.settings = settings
         phone.mode = 'assist' if settings.phone_assist_enabled else 'shadow'
-        if state['offroad'] and params.get_bool('ExtNavAssistPairingReset'):
+        if not cp_source and state['offroad'] and params.get_bool('ExtNavAssistPairingReset'):
           transports.pairing.reset()
           params.put_bool('ExtNavAssistPairingReset', False)
       model_good = healthy(sm, ['modelV2'], now, 150_000_000)
@@ -67,15 +75,16 @@ def main():
       pose_ok = healthy(sm, ['deviceMotion'], now, 500_000_000) and sm['deviceMotion'].inputsOK
       cs, cc = sm['carState'], sm['carControl']
       curvature = float(sm['controlsState'].desiredCurvature) if vehicle_fresh else 0.
+      if cp_source and healthy(sm, ['carState'], now):
+        transports.metadata.update(cs, int(sm.logMonoTime['carState']))
       result = runtime.tick(store.current(now), model, int(sm.logMonoTime['modelV2']), cs, cc, now,
         can_list=can_batches(messaging.drain_sock(can_socket)), vehicle_fresh=vehicle_fresh,
         left_phone=bool(phone_sides and phone_sides[0].blocked), right_phone=bool(phone_sides and phone_sides[1].blocked),
-        phone_packet=read_packet(), turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
+        turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
         localization_valid=bool(pose_ok))
       publish_position(result['position'])
       for key, kind, ttl in [('nav', 'nav.state', 1000), ('topology', 'lanes.topology', 150),
-                            ('intent', 'lanes.intent', 200), ('oem', 'oem.lanes', 500),
-                            ('closing', 'vision.closing', 800)]:
+                            ('intent', 'lanes.intent', 200), ('oem', 'oem.lanes', 500)]:
         plugins.send_msg(pm, NavAssist, kind, result[key], ttl)
       if now >= next_record:
         next_record = now+100_000_000

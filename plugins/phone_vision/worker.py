@@ -36,7 +36,7 @@ def main():
       if not store.frame_requested.wait(.5):
         continue
       try:
-        capture(store, roi, 4, width, 75, 'wide', None)
+        capture(store, roi, 4, width, 75, 'wide')
       except Exception:
         store.new_stream()
         time.sleep(1)

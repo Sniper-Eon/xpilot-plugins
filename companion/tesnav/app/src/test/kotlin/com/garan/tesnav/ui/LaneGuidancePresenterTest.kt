@@ -165,10 +165,10 @@ class LaneGuidancePresenterTest {
                 vehicleStateValid = true, radarValid = true, blindspotValid = true,
                 lateralActive = true, leadPresent = true, egoSpeedKph = 60f,
                 leadDistanceM = 35f, leadRelativeSpeedKph = -10f, receivedAtMs = 1L,
-                c3LaneDecision = C3LaneDecision("efficiencySafetyBlocked", false, "none"),
+                c3LaneDecision = C3LaneDecision("oem399LeftDenied", false, "none"),
             ),
         )!!
-        assertEquals("C3 超车：盲区或原车安全条件阻止", presentation.title)
+        assertEquals("C3 变道：原车否决左侧变道", presentation.title)
         assertEquals(LaneRecommendationSide.NONE, presentation.recommendationSide)
         assertTrue(presentation.items.isEmpty())
     }
@@ -294,7 +294,6 @@ class LaneGuidancePresenterTest {
             "heuristicSignaling" to "已请求打灯",
             "heuristicReady" to "等待模型启动",
             "heuristicChanging" to "报告执行中",
-            "efficiency:heuristicChanging" to "报告执行中",
             "laneChangeComplete" to "变道完成",
             "laneChangeCancelled" to "已取消",
             "oem399LeftDenied" to "否决左侧",
@@ -304,7 +303,7 @@ class LaneGuidancePresenterTest {
                 c3LaneDecision = C3LaneDecision(reason, true, "left"))
             val noLanes = LaneGuidancePresenter.present(state, oem)!!
             assertTrue("$reason: ${noLanes.title}", noLanes.title.contains(expected))
-            assertEquals(reason.startsWith("efficiency"), noLanes.title.contains("C3 超车"))
+            assertFalse(noLanes.title.contains("C3 超车"))
             val lanes = LaneGuidancePresenter.present(state.copy(
                 lanes = listOf(lane(0, true, LaneAction.LEFT)), unkeyedRouteFactsConfirmed = true), oem)!!
             assertTrue(lanes.currentLaneStatus!!.contains(expected))

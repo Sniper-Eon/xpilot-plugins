@@ -1,0 +1,43 @@
+{
+  "id": "xpilot-tesnav",
+  "host": "Sniper-Eon/xpilot",
+  "host_branch": "xpilot",
+  "host_min_commit": "0b49f127a0f90ecd13fc2c015a7afde3a6e6428e",
+  "source": "tesnav",
+  "companion": "com.garan.tesnav.tenengkai.lane",
+  "plugins": [
+    "navassist",
+    "ambient_light",
+    "auto_speed",
+    "blindspot_edges",
+    "bms",
+    "car_tile",
+    "clock_tile",
+    "external_compute",
+    "ip_tile",
+    "lead_card",
+    "map_tile",
+    "op_models",
+    "overspeed_warning",
+    "phone_vision",
+    "speed_card",
+    "speed_limit_card",
+    "tn_long",
+    "traffic_light"
+  ],
+  "params": {
+    "ExtNavAssistSource": "0",
+    "ExtNavAssistEnabled": "1",
+    "ExtNavAssistLaneChange": "0",
+    "ExtNavAssistTurnSignal": "0",
+    "ExtPhoneVisionEnabled": "0",
+    "ExtNavAssistTurnSlowdown": "0"
+  },
+  "removed": [
+    "stereo",
+    "automatic_overtaking"
+  ],
+  "activation": "candidate_not_road_validated",
+  "cp_limitations": [],
+  "initial_mode": "navigation_observation_no_physical_lamp_lane_change_or_speed_target"
+}

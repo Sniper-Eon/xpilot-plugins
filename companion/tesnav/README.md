@@ -1,15 +1,15 @@
 # 特会开 / TesNav — xpilot companion
 
-本目录迁自用户原分支，保留手机导航、侧方车辆模型、协议和历史双相机实验源码。
+本目录迁自用户原分支，保留手机导航、原有单目侧方车辆模型和协议。双目测距/测速和自动超车项目已从应用移除。
 配对系统：[Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot)，`xpilot` 分支；
 设备导航和取图分别由 `navassist`、`phone_vision` 商店插件提供。
 
-本次候选版版本号 18 / `1.6-xpilot-candidate`，名称“特会开·xpilot测试”。
+本次候选版版本号 19 / `1.7-xpilot-tesnav`，名称“特会开·X-Pilot”。
 包名仍为 `com.garan.tesnav.tenengkai.lane`，使用原签名覆盖更新，不创建分身。
 安装包不放进 Git；发布时作为 GitHub Release 附件。源码不包含签名密钥或 API 凭据。
 
 视觉推理仍在手机；C3 的图像读取与编码仍有开销，所以候选取图插件默认关闭，单路 640、4 Hz。
-双目代码仅保留研究用途，未通过这次迁移启用。导航 UDP 不需要视觉连接码；
+双目代码及 OpenCV 手机依赖已删除。导航 UDP 不需要视觉连接码；
 视觉连接码来自设备本地私有配置，不是 GitHub 地址，也不是人人通用的固定码。
 
 构建：Java 17 + Android SDK，用 `./gradlew :app:testDebugUnitTest :app:assembleTenengkai`。

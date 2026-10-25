@@ -57,7 +57,7 @@ def output_frame_size(width, height, max_width=640):
   return max(1, round(width*scale)), max(1, round(height*scale))
 
 
-def capture(store, roi_path, hz, max_width=640, jpeg_quality=75, camera_name='wide', dual_store=None):
+def capture(store, roi_path, hz, max_width=640, jpeg_quality=75, camera_name='wide'):
   from .dependencies import load_opencv
   cv2 = load_opencv()
   import numpy as np
@@ -81,13 +81,11 @@ def capture(store, roi_path, hz, max_width=640, jpeg_quality=75, camera_name='wi
     device_id = hashlib.sha256(Path('/etc/machine-id').read_bytes().strip()).hexdigest()[:24]
   except OSError:
     device_id = None
-  demand = store.frame_requested.is_set if camera_name == 'wide' and dual_store is None else None
+  demand = store.frame_requested.is_set if camera_name == 'wide' else None
   for client, buf in camera_frames(make_client, requested=demand):
     if client is not previous_client:
       if camera_name == 'wide':
         store.new_stream()
-      if dual_store is not None:
-        dual_store.reset()
       previous_client = client
     started = time.monotonic()
     capture_ns = int(client.timestamp_eof)
@@ -100,8 +98,7 @@ def capture(store, roi_path, hz, max_width=640, jpeg_quality=75, camera_name='wi
     if started-last_encoded < 1/hz:
       continue
     single_requested = camera_name == 'wide' and store.claim_capture(started, hz)
-    dual_requested = dual_store is not None and dual_store.claim_capture(camera_name, started, hz)
-    if not single_requested and not dual_requested:
+    if not single_requested:
       continue
     last_encoded = started
     sm.update(0)
@@ -162,9 +159,7 @@ def capture(store, roi_path, hz, max_width=640, jpeg_quality=75, camera_name='wi
                          camera_id=camera_name, calibration_id=calibration_id, device_id=device_id,
                          camera_matrix=intrinsics, view_rotation=view_rotation,
                          view_from_calib=view_from_calib,
-                         source_width=w, source_height=h, stereo_calibrated=False)
+                         source_width=w, source_height=h)
       if single_requested:
         store.publish(packet)
-      if dual_requested:
-        dual_store.publish(camera_name, packet)
 

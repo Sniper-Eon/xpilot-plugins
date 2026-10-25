@@ -197,8 +197,7 @@ object LaneGuidancePresenter {
 
     fun decisionText(oem: OemVehicleLaneState): String? {
         val decision = oem.c3LaneDecision ?: return null
-        val efficiency = decision.reason.startsWith("efficiency")
-        val raw = decision.reason.removePrefix("efficiency:").removePrefix("efficiency").removePrefix("heuristic")
+        val raw = decision.reason.removePrefix("heuristic")
         val reason = raw.replaceFirstChar { it.lowercase() }
         val stage = when (reason) {
             "signaling" -> "已请求打灯 · 等待实体灯和跨线许可"
@@ -217,7 +216,7 @@ object LaneGuidancePresenter {
             "neighborUnknown", "neighborSpaceUnknown" -> "邻道空间未确认"
             "neighborObservationHold", "observing" -> "正在观测邻道空间"
             "neighborObservationPaused" -> "邻道观测暂停"
-            "stabilizingLaneAlignment", "benefitStabilizing" -> "正在确认车道或收益"
+            "stabilizingLaneAlignment" -> "正在确认车道或收益"
             "navigationPriority", "turnApproachHandoff", "turnApproach", "turnApproachGrace" -> "导航转弯优先"
             "turnCompletion" -> "转弯结束 · 等待落位"
             "oem399LeftDenied" -> "原车否决左侧变道"
@@ -226,7 +225,6 @@ object LaneGuidancePresenter {
             "safetyBlocked" -> "盲区或原车安全条件阻止"
             "gapLost" -> "邻道距离或接近时间不足"
             "targetUnknown" -> "邻道目标不明"
-            "noConfirmedBenefit", "benefitLost" -> "超车收益不足或已消失"
             "laneGeometryUnknown", "topologyTransition" -> "车道几何或目标归属待确认"
             "request" -> "已提出候选 · 等待变道协调"
             "cooldown" -> "等待再次评估"
@@ -235,7 +233,7 @@ object LaneGuidancePresenter {
             "directionMismatch" -> "模型方向与请求不一致 · 已取消"
             "noRecommendedLane" -> "当前没有推荐车道"
             "health" -> "控制或输入资格未满足"
-            "unavailable" -> "超车资格未满足"
+            "unavailable" -> "变道资格未满足"
             "idle" -> "当前没有选道动作"
             "visualNoLeftNeighbor" -> "视觉未确认左侧邻道"
             "visualNoRightNeighbor" -> "视觉未确认右侧邻道"
@@ -245,7 +243,6 @@ object LaneGuidancePresenter {
         }
         val direction = when (decision.direction) { "left" -> "向左 · "; "right" -> "向右 · "; else -> "" }
         val category = when {
-            efficiency -> "超车"
             decision.reason.startsWith("heuristic") || reason in setOf("signaling", "ready", "changing",
                 "edgeConfirmed", "waitingCrossing", "alreadyInRecommendedLane", "noRecommendedLane",
                 "turnApproach", "turnApproachGrace", "turnApproachHandoff", "turnCompletion", "forkCompleted") -> "导航选道"

@@ -192,7 +192,6 @@ def test_complete_runtime_retains_preparation_on_reliable_oem_boundary_veto():
   assert result['intent']['signalRequested']
   assert not result['intent']['spLaneChangeReady']
   assert result['oem']['rightBlocked']
-  assert result['closing']['control_eligible'] is False
 
 
 def test_missing_speed_control_context_cannot_request_a_maneuver_ceiling():

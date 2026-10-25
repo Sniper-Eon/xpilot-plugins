@@ -124,13 +124,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.1.1",
+      "version": "1.2.0",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
-      "description": "Receives canonical v3 Android/iOS navigation over UDP 4213, shows the next maneuver and lane guidance, lowers the cruise ceiling before a supported turn, and lets Tesla's own lane verdict plus an optional phone blind spot veto a lane change. Requests one bounded physical turn signal on 0x3E9; SP's ALC remains the start authority.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.1.1.tar.gz",
-      "sha256": "7e9f67f588c7db4e3104a12cb6d7ab0c99da39a1c56d999eca7e69bd1ca7bd9c",
+      "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.2.0.tar.gz",
+      "sha256": "752291949b07160911cbbda85a807d17c2bf00260feda41952e30afc5b8e3e92",
       "platform": null
     },
     {
@@ -160,13 +160,13 @@
     {
       "id": "phone_vision",
       "name": "Phone side-vehicle vision",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "api": 1,
       "category": "data_source",
       "author": "Sniper-Eon",
-      "description": "Opt-in single wide-camera transport to the existing TesNav phone model. 640 pixels, maximum 4 Hz; no camera process while disabled. Dual experiments are not enabled.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.0.1.tar.gz",
-      "sha256": "743778a42b3994c17a1983fb183e3eeb14fa026c61fce0a5e374a5295f663378",
+      "description": "Optional original single wide-camera vehicle detection transport,640pixels,max4Hz; no camera while disabled.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.1.0.tar.gz",
+      "sha256": "fdd4b6d05ddbd90617d9a450ad1e7006a3ca643cb77c8dbdaaf27b2173731e3a",
       "platform": null
     },
     {
@@ -192,6 +192,21 @@
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_limit_card-1.0.0.tar.gz",
       "sha256": "475fa2be0271a79387aa497e0e86bfc5640f4ed2f0960c588fcb5ad8f0d3acc5",
       "platform": null
+    },
+    {
+      "id": "tn_long",
+      "name": "TN Longitudinal (TN-NoDEC)",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "longitudinal_planning",
+      "author": "xpilot",
+      "description": "Replaces SP's longitudinal plan, including lead following, with the TN-NoDEC planner (legacy cruise-obstacle MPC and TN acceleration controller). Prebuilt acados solvers: installs only on the platform it was built for. TN's stopping policy in controlsd is not included.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tn_long-1.0.0.tar.gz",
+      "sha256": "a7f7e9aef93a1ae3a23e5014527b6f46a72284c519a5f9ccd90dbf0c9c2d109d",
+      "platform": {
+        "machine": "aarch64",
+        "python": "cpython-312"
+      }
     },
     {
       "id": "traffic_light",

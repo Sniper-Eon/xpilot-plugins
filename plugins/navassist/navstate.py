@@ -33,6 +33,9 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   """Control-valid only for a fresh, matched realtime Android/iOS route with guidance."""
   if current is None:
     return empty_state()
+  from .cpnav import CPStore
+  if isinstance(current, CPStore):
+    return current.normalized(now_ns)
   snapshot = current.snapshot
   stale = current.is_stale(now_ns)
   lane_guidance_age_ms = snapshot.source_wall_time_ms - snapshot.lane_guidance_observed_at_ms

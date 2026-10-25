@@ -7,10 +7,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 class BridgeServer(ThreadingHTTPServer):
   daemon_threads = True
-  def __init__(self, address, token, store, dual_store=None, start_dual=None):
+  def __init__(self, address, token, store):
     super().__init__(address, Handler)
     self.token, self.store = token, store
-    self.dual_store, self.start_dual = dual_store, start_dual
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -27,7 +26,7 @@ class Handler(BaseHTTPRequestHandler):
   def respond(self, status, data):
     body = json.dumps(data, allow_nan=False).encode()
     # Explicit app opt-in: older clients require a known decoded Content-Length.
-    camera_response = status == 200 and self.path in ('/v1/frame', '/v2/pair')
+    camera_response = status == 200 and self.path == '/v1/frame'
     compressed = (camera_response and len(body) >= 16_384 and
                   self.headers.get('X-Phone-Vision-Encoding') == 'gzip-v1' and
                   'gzip' in [item.strip().lower() for item in self.headers.get('Accept-Encoding', '').split(',')])
@@ -58,13 +57,6 @@ class Handler(BaseHTTPRequestHandler):
   def do_GET(self):
     if not self.authorized():
       return self.respond(401, {'error': 'authentication'})
-    if self.path == '/v2/pair' and self.server.dual_store is not None:
-      try:
-        if self.server.start_dual is not None:
-          self.server.start_dual()
-        return self.respond(200, self.server.dual_store.issue())
-      except ValueError as e:
-        return self.respond(503, {'error': str(e)})
     if self.path != '/v1/frame':
       return self.respond(404, {'error': 'not_found'})
     try:
@@ -75,8 +67,7 @@ class Handler(BaseHTTPRequestHandler):
   def do_POST(self):
     if not self.authorized():
       return self.respond(401, {'error': 'authentication'})
-    dual = self.path == '/v2/observation' and self.server.dual_store is not None
-    if self.path != '/v1/observation' and not dual:
+    if self.path != '/v1/observation':
       return self.respond(404, {'error': 'not_found'})
     try:
       length = int(self.headers.get('Content-Length', '0'))
@@ -85,7 +76,7 @@ class Handler(BaseHTTPRequestHandler):
       data = json.loads(self.rfile.read(length))
       if not isinstance(data, dict):
         raise ValueError('body_type')
-      (self.server.dual_store if dual else self.server.store).accept(data)
+      self.server.store.accept(data)
       self.respond(200, {'accepted': True, 'control_eligible': False})
     except (ValueError, TypeError) as e:
       self.respond(400, {'error': str(e)})

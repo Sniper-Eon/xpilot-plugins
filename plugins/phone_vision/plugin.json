@@ -1,12 +1,12 @@
 {
   "id": "phone_vision",
   "name": "Phone side-vehicle vision",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "api": 1,
   "category": "data_source",
   "entry": "plugin:PhoneVision",
   "author": "Sniper-Eon",
-  "description": "Opt-in single wide-camera transport to the existing TesNav phone model. 640 pixels, maximum 4 Hz; no camera process while disabled. Dual experiments are not enabled.",
+  "description": "Optional original single wide-camera vehicle detection transport,640pixels,max4Hz; no camera while disabled.",
   "priority": 100,
   "enable_param": "ExtPhoneVisionEnabled",
   "claims": [

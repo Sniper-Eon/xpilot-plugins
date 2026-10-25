@@ -54,7 +54,7 @@ class PhoneVisionService : Service() {
         val open = PendingIntent.getActivity(this, 0, Intent(this, PhoneVisionActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val stop = PendingIntent.getService(this, 1, Intent(this, PhoneVisionService::class.java).setAction("stop"), PendingIntent.FLAG_IMMUTABLE)
         startForeground(8767, Notification.Builder(this, "phone_vision").setSmallIcon(android.R.drawable.ic_menu_view)
-            .setContentTitle("特会开 · 手机视觉运行中").setContentText("侧方车辆识别与速度估计").setContentIntent(open)
+            .setContentTitle("特会开 · 手机视觉运行中").setContentText("侧方车辆识别").setContentIntent(open)
             .addAction(Notification.Action.Builder(null, "停止", stop).build()).build())
         wakeLock = (getSystemService(POWER_SERVICE) as PowerManager).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "TesNav:PhoneVision")
             .apply { acquire(10 * 60 * 1000L) }
@@ -71,9 +71,7 @@ class PhoneVisionService : Service() {
         }
         job = scope.launch {
             try {
-                if (settings.getBoolean("dual_camera", false)) {
-                    DualCameraSession(this@PhoneVisionService, host, token, cpuThreads, availability) { lastTimingReport=it }.run()
-                } else runVision(host, token)
+                runVision(host, token)
             }
             catch (e: Exception) { availability.unavailable(e.message ?: e.javaClass.simpleName) }
             finally { stopSelf() }

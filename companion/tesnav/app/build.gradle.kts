@@ -2,23 +2,6 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
-// Keep the navigation SDK's existing libc++ runtime instead of resolving a
-// duplicate by archive order. Native-symbol/APK checks accompany this change.
-val phoneStereoCvArchive by configurations.creating {
-    isCanBeConsumed = false
-    isTransitive = false
-}
-dependencies { add(phoneStereoCvArchive.name, "org.opencv:opencv:4.13.0@aar") }
-val preparePhoneStereoCv by tasks.registering(Zip::class) {
-    archiveFileName.set("opencv-4.13.0-navigation-stl.aar")
-    destinationDirectory.set(layout.buildDirectory.dir("phone-stereo"))
-    from(phoneStereoCvArchive.map { zipTree(it) }) {
-        exclude("jni/**/libc++_shared.so")
-        // Match the navigation SDK's existing ARM ABIs; do not add desktop ABIs.
-        exclude("jni/x86/**", "jni/x86_64/**", "jni/riscv64/**")
-    }
-}
-
 fun String.asBuildConfigString(): String =
     "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
@@ -38,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 18
-        versionName = "1.6-xpilot-candidate"
+        versionCode = 19
+        versionName = "1.7-xpilot-tesnav"
 
         manifestPlaceholders["AMAP_API_KEY"] =
             providers.gradleProperty("AMAP_API_KEY").orNull ?: ""
@@ -85,7 +68,7 @@ android {
             matchingFallbacks += listOf("debug")
             signingConfig = signingConfigs.getByName("laneTest")
             buildConfigField("boolean", "EXTENDED_NAV_SOURCES", "true")
-            manifestPlaceholders["APP_NAME"] = "特会开·xpilot测试"
+            manifestPlaceholders["APP_NAME"] = "特会开·X-Pilot"
             manifestPlaceholders["AMAP_API_KEY"] =
                 providers.gradleProperty("LANETEST_AMAP_API_KEY").orNull
                     ?: providers.gradleProperty("TENENGKAI_AMAP_API_KEY").orNull
@@ -116,7 +99,6 @@ androidComponents.beforeVariants(androidComponents.selector().withBuildType("ten
 
 dependencies {
     implementation(libs.amap.navi)
-    implementation(files(preparePhoneStereoCv))
     implementation(files("libs/onnxruntime-android-1.23.2.aar"))
     add("tenengkaiImplementation", "dev.rikka.shizuku:api:13.1.5")
     add("tenengkaiImplementation", "dev.rikka.shizuku:provider:13.1.5")

@@ -1,6 +1,6 @@
 # xpilot-plugins
 
-Plugin repository for [xpilot](https://github.com/onemiless/xpilot) (Tesla-only sunnypilot fork).
+Plugin repository for [xpilot](https://github.com/Sniper-Eon/xpilot) (Tesla-only sunnypilot fork).
 Devices list this repository under Settings → Plugins → Plugin Store, install while parked, and apply on restart.
 
 插件仓库：xpilot 设备在 设置 → Plugins → Plugin Store 里浏览这里的插件，停车时安装，重启后生效。
@@ -64,3 +64,12 @@ Plugins with compiled code ship prebuilt binaries for one platform: `plugin.json
 `"platform": {"machine": "aarch64", "python": "cpython-312"}` (written by the plugin's `build_native.py`, run on the
 target device). Devices only offer and load a native plugin on a matching platform. Binaries cannot be reviewed like
 source: review the build script, and rebuild them yourself on your device before merging.
+
+## 两个 X-Pilot 候选配置
+
+见 [TWO_VARIANTS.md](TWO_VARIANTS.md) 和 `profiles/`：CP搭子版、特会开版均使用
+Sniper-Eon/xpilot 的 xpilot 分支，插件基础相同，仅导航来源独占选择不同。
+双目测距/测速、自动超车与自动回原车道已从本项目当前应用和服务中移除。
+两版初始为导航观察模式，物理打灯、导航变道和取图关闭；不是已完成路测的安装版。
+CP版目前支持导航v2接收和原车盲区状态回传，尚未完成真实CP App联调，其他CP专有接口见兼容清单。
+原有单目手机识别代码保留为可选功能，开启前仍须完成取图负载验证。

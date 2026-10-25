@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from .blocker import LaneChangeBlocker
-from .closing import ClosingRiskObserver
 from .intent import LaneIntentCoordinator, TurnSignalCoordinator, build_intent
 from .navstate import build as build_nav_state
 from .oem import OemLaneSignals
@@ -18,10 +17,9 @@ class NavigationRuntime:
     self.position = AbsolutePosition()
     self.turns = TurnSignalCoordinator()
     self.lanes = LaneIntentCoordinator(max_changes=settings.max_lane_changes)
-    self.closing = ClosingRiskObserver()
 
   def tick(self, current, model, model_ns, car, cc, now_ns, *, can_list=(), vehicle_fresh=False,
-           left_phone=False, right_phone=False, phone_packet=None, turn_geometry_active=False,
+           left_phone=False, right_phone=False, turn_geometry_active=False,
            localization_valid=True):
     self.oem.update(can_list, now_ns)
     oem = self.oem.payload(now_ns)
@@ -55,5 +53,4 @@ class NavigationRuntime:
       model_state=str(getattr(meta, 'laneChangeState', 'off')),
       model_direction=str(getattr(meta, 'laneChangeDirection', 'none')), turn_geometry_active=turn_geometry_active,
       turns=self.turns, lanes=self.lanes)
-    closing = self.closing.update(phone_packet, now_ns)
-    return dict(nav=nav, topology=topology, intent=intent, oem=oem, position=position, closing=closing)
+    return dict(nav=nav, topology=topology, intent=intent, oem=oem, position=position)
