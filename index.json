@@ -124,13 +124,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Receives canonical v3 Android/iOS navigation over UDP 4213, shows the next maneuver and lane guidance, lowers the cruise ceiling before a supported turn, and lets Tesla's own lane verdict plus an optional phone blind spot veto a lane change. Requests one bounded physical turn signal on 0x3E9; SP's ALC remains the start authority.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.1.0.tar.gz",
-      "sha256": "88800abe3ab9e8457dd6d41b8f8e7fa20ec5b64f38d67c8092937f30c4f55a7f",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.1.1.tar.gz",
+      "sha256": "7e9f67f588c7db4e3104a12cb6d7ab0c99da39a1c56d999eca7e69bd1ca7bd9c",
       "platform": null
     },
     {

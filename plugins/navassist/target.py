@@ -41,5 +41,5 @@ class NavSpeedTarget:
       planner_ready = bool(cc.enabled)
     except (KeyError, AttributeError):
       override, planner_ready = True, False
-    return self.ceiling.update(self._fresh(), v_ego=v_ego, v_cruise=v_cruise, enabled=True,
+    return self.ceiling.update(self._fresh(), v_ego=v_ego, v_cruise=v_cruise, enabled=self.settings.enabled,
                                driver_override=override, planner_ready=planner_ready)

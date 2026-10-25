@@ -7,6 +7,7 @@
   authority and still checks the blind spot, road edge and configured automatic mode.
 - No new cereal messages, no steering/acceleration command, no phone curvature."""
 from openpilot.tesla.plugin import Plugin
+from openpilot.tesla.lane_policy import LaneChangeLimits  # noqa: F401; refuse hosts without the required lane context
 
 from .settings import read as read_settings
 from .turnsignal import TurnSignalController

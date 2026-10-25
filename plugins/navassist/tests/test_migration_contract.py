@@ -274,3 +274,24 @@ def test_phone_extra_veto_uses_plugin_switch_not_legacy_config(monkeypatch):
   from navassist.policy import NavLanePolicy
   monkeypatch.setattr('navassist.phone.load_mode', lambda: 'assist')
   assert not NavLanePolicy(Params())._phone.enabled
+
+
+def test_disabled_plugin_cannot_begin_a_new_maneuver_speed_ceiling():
+  from navassist.target import NavSpeedTarget
+  class Disabled(Params):
+    def get_bool(self, key, **kw):
+      return key != 'ExtNavAssistEnabled'
+  target = NavSpeedTarget(Disabled())
+  target._fresh = lambda: {'valid': True, 'stale': False, 'maneuver': 'turn_right', 'distanceM': 50.,
+                           'sessionId': 's', 'routeRevision': 1, 'maneuverEventId': 3}
+  sm = {'carState': N(gasPressed=False, brakePressed=False),
+        'carControl': N(enabled=True, cruiseControl=N(override=False))}
+  assert target.update(sm, 10., 15.) is None
+
+
+def test_plugin_discovery_refuses_a_host_without_lane_context_capability():
+  import subprocess
+  import sys
+  code = "import sys; sys.modules['openpilot.tesla.lane_policy'] = None; import navassist.plugin"
+  result = subprocess.run([sys.executable, '-c', code], capture_output=True, text=True)
+  assert result.returncode != 0 and 'lane_policy' in result.stderr

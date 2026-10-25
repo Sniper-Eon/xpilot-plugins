@@ -24,7 +24,7 @@ runtime validation remain required before activation.
 
 Local evidence:
 
-- 536 plugin tests passed, including legacy coordinator/protocol and new migration contracts.
+- 538 plugin tests passed, including legacy coordinator/protocol and new migration contracts.
 - 16 host/generated/store/fork checks passed; 17 packaged plugins installed and discovered without load errors.
 - Android: 344 JVM tests, zero failures/errors, one skip; signed candidate APK v18 built with the original
   package/certificate. See `companion/tesnav/BUILD-VALIDATION.json`. iOS source retained, not rebuilt.
