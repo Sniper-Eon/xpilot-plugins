@@ -30,7 +30,10 @@ class NavAssist(Plugin):
     # The panda plugin only activates when the car initialized with the vehicle-bus harness and this bit is set.
     from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
     if CP_SP.flags & TeslaFlagsSP.HAS_VEHICLE_BUS:
-      CP_SP.safetyParam |= int(self.MANIFEST.safety["param_bit"], 0)
+      # CarParamsSP uses Int16; pandad restores uint16_t before Panda receives it.
+      # Preserve bit 15 and OEM bits without overflowing the signed serializer.
+      bits = (CP_SP.safetyParam | int(self.MANIFEST.safety["param_bit"], 0)) & 0xffff
+      CP_SP.safetyParam = bits if bits < 0x8000 else bits - 0x10000
 
   def service_params(self, params) -> None:
     self.params = params

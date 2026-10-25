@@ -21,7 +21,8 @@ def _plugin():
 def test_setup_sets_bit_with_vehicle_bus():
   cp_sp = SimpleNamespace(flags=TeslaFlagsSP.HAS_VEHICLE_BUS, safetyParam=0)
   _plugin().setup(cp_sp)
-  assert cp_sp.safetyParam == BIT
+  assert cp_sp.safetyParam & 0xffff == BIT
+  assert cp_sp.safetyParam < 0  # signed CarParamsSP Int16, identical Panda bits
 
 
 def test_setup_without_vehicle_bus_leaves_bit_clear():
