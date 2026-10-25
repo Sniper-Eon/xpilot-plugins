@@ -1,0 +1,220 @@
+import java.util.Properties
+
+plugins {
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+}
+
+
+android {
+    namespace = "com.jixiexiaoge.drivingassist"
+    compileSdk { version = release(37) }
+
+    val navAbiList: List<String> =
+        (project.findProperty("navipilot.abis") as String?)
+            ?.split(",")
+            ?.map { it.trim() }
+            ?.filter { it.isNotEmpty() }
+            ?: listOf("arm64-v8a")
+
+    defaultConfig {
+        applicationId = "com.garan.tesnav.tenengkai.lane"
+        minSdk = 29
+        targetSdk = 35
+        versionCode = 20
+        versionName = "1.0-xpilot-cp-candidate"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // GitHub OAuth Client ID（从 local.properties 读取，不硬编码）
+        val props = Properties()
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) props.load(localPropsFile.inputStream())
+        buildConfigField("String", "GITHUB_CLIENT_ID", "\"${props.getProperty("GITHUB_CLIENT_ID", "")}\"")
+
+        ndk {
+            abiFilters.clear()
+            abiFilters.addAll(navAbiList)
+        }
+    }
+
+
+    signingConfigs {
+        create("owner") {
+            storeFile = providers.gradleProperty("LANETEST_STORE_FILE").orNull?.let { file(it) }
+            storePassword = providers.gradleProperty("LANETEST_STORE_PASSWORD").orNull
+            keyAlias = "tesnavtest"
+            keyPassword = providers.gradleProperty("LANETEST_STORE_PASSWORD").orNull
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = false
+            isJniDebuggable = false
+            isPseudoLocalesEnabled = false
+            isCrunchPngs = true
+            signingConfig = signingConfigs.getByName("owner")
+        }
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+            isDebuggable = true
+            isJniDebuggable = false
+            isPseudoLocalesEnabled = false
+            isCrunchPngs = false
+            packaging {
+                jniLibs {
+                    pickFirsts += listOf("**/libc++_shared.so")
+                    keepDebugSymbols += setOf(
+                        "*/libc++_shared.so",
+                        "*/libnavicore.so",
+                        "*/libsynthesizer.so",
+                        "*/libtxmapvis.so"
+                    )
+                }
+            }
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
+    }
+    
+    // Kotlin JVM 目标版本（必须与 Java compileOptions 一致）
+
+    
+    // Kotlin Compose Compiler配置（Gradle 9.x + Kotlin 2.1）
+    composeCompiler {
+        // 启用强跳过模式以提升性能
+        // enableStrongSkippingMode = true  // 已废弃，使用featureFlags
+    }
+
+    // Google Navigation SDK 需要较大的 heap（Gradle 9.x 已移除 dexOptions javaMaxHeapSize）
+
+    buildFeatures {
+        compose = true
+        buildConfig = true  // 启用BuildConfig生成
+    }
+
+    lint {
+        disable += "DuplicateNamespace"
+        disable += "PackagedPrivateKey"
+    }
+
+    // R8优化配置
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/ASL2.0",
+                "META-INF/*.kotlin_module",
+                "META-INF/*.version",
+                "META-INF/proguard/*",
+                "META-INF/com.android.tools/*",
+                "META-INF/gradle-plugins/*",
+                "META-INF/versions/*",
+                "META-INF/INDEX.LIST",
+                "META-INF/io.netty.versions.properties",
+            )
+        }
+        jniLibs {
+            pickFirsts += listOf(
+                "**/libc++_shared.so",
+            )
+        }
+    }
+    
+    
+    // 启用资源混淆（使用新的 androidResources API）
+    androidResources {
+        noCompress += setOf("tflite", "lite")
+        ignoreAssetsPattern += setOf("!.svn", "!.git", "!.ds_store", "!*.scc", ".*", "<dir>_*", "!CVS", "!thumbs.db", "!picasa.ini", "!*~")
+    }
+}
+
+
+
+dependencies {
+
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation("androidx.compose.foundation:foundation:1.7.8")
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+
+    // Material View层组件 - 已移除（原为腾讯导航SDK提供主题属性）
+
+    // AppCompat - 已移除（原为腾讯SDK drawable主题解析）
+
+    // HTTP客户端 - 用于导航确认API请求和反馈提交
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    debugImplementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    
+    // ExoPlayer - 用于视频播放
+    // 已移除（无代码使用）
+    // implementation("androidx.media3:media3-exoplayer:1.2.1")
+    // implementation("androidx.media3:media3-ui:1.2.1")
+    // implementation("androidx.media3:media3-common:1.2.1")
+    
+
+    
+    // Koin依赖注入 - 已移除（无使用）
+    // implementation("io.insert-koin:koin-android:3.5.3")
+    // implementation("io.insert-koin:koin-androidx-compose:3.5.3")
+    // implementation("io.insert-koin:koin-androidx-navigation:3.5.3")
+    
+    // Timber日志库 - P2 代码质量优化
+    implementation("com.jakewharton.timber:timber:5.0.1")
+    
+    // DataStore - P3 功能增强（示例）
+    // 已移除（无代码使用）
+    // implementation("androidx.datastore:datastore-preferences:1.0.0")
+    
+    // 🆕 安全存储（EncryptedSharedPreferences）
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // ZeroMQ - 已移除（无使用）
+    // implementation("org.zeromq:jeromq:0.6.0")
+
+    // SSH - 用于远程连接 comma3 设备
+    // 已移除（SshConnectionManager 已删除）
+    // implementation("com.hierynomus:sshj:0.38.0")
+    //
+    // SLF4J - SSHJ依赖的日志框架
+    // implementation("org.slf4j:slf4j-api:2.0.9")
+    // implementation("com.github.tony19:logback-android:3.0.0")
+    //
+    // BouncyCastle - 用于解析 RSA 私钥（SSHJ需要）
+    // implementation("org.bouncycastle:bcprov-jdk18on:1.77")
+    // BouncyCastle - 已移除（SSH 已删除）
+    // implementation("org.bouncycastle:bcpkix-jdk18on:1.77")
+
+    // 测试框架 - P0 优先级优化
+    testImplementation(libs.junit)
+    
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
+}

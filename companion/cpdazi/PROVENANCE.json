@@ -1,0 +1,9 @@
+{
+  "upstream_repository": "https://github.com/jixiexiaoge/navipilot",
+  "upstream_branch": "Amapauto",
+  "upstream_commit": "3f1af5f50bfb3c414aa40b9ab48a2fe6cf5afbda",
+  "supplied_apk_version": "8.0.20",
+  "supplied_apk_revision": "c0ced663b5cbc6c3fc4a28f369c6805751067eed",
+  "matches_supplied_8_0_20": false,
+  "status": "source candidate, not phone/C3 validated"
+}
