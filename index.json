@@ -124,13 +124,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.2.1",
+      "version": "1.2.2",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.2.1.tar.gz",
-      "sha256": "272f7bbe7764eef9a9e062e772a925cf31602acbb3ccf3e51bd2f29e6e75626d",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.2.2.tar.gz",
+      "sha256": "91a49a5781814aaa09f61b78940937ef2dbfdd305ec5cf693b26d93989f4085b",
       "platform": null
     },
     {

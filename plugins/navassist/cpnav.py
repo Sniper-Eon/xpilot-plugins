@@ -27,6 +27,8 @@ class CPStore:
       self.handles = {name: i + 1 for i, name in enumerate(JSON_STREAMS)}
       self.rows = {}
       self.sequences = {}
+      self.observation_stamps = {}
+      self.withdrawn = set()
       self._event_key = None
       self._route_key = None
       self._distance = None
@@ -71,9 +73,19 @@ class CPStore:
       value = d.get("value")
       if type(present) is not bool or (present and not isinstance(value, dict)):
         raise ValueError("invalid_value")
-      old = self.rows.get(name)
-      if old and stamp < old[1]:
+      # An absent envelope is timed at withdrawal, not at sensor acquisition.
+      # Compare observations with observations; a new GPS sample may legitimately
+      # predate the administrative withdrawal while advancing the real sensor.
+      previous = self.observation_stamps.get(name)
+      if present and previous is not None and (
+        stamp < previous or (name in self.withdrawn and stamp == previous)
+      ):
         raise ValueError("source_time_regression")
+      if present:
+        self.observation_stamps[name] = stamp
+        self.withdrawn.discard(name)
+      else:
+        self.withdrawn.add(name)
       self.sequences[name] = seq
       self.rows[name] = (copy.deepcopy(value) if present else None, stamp, self.mono(), max(0, now - stamp))
       return {"type": "item_ack", "sequence": seq, "name": name, "accepted": True}
