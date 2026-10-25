@@ -1,12 +1,12 @@
 # Contributing to xpilot-plugins
 
-This repository holds the store plugins for [xpilot](https://github.com/onemiless/xpilot). Read `XPILOT.md` in the
+This repository holds the store plugins for [xpilot](https://github.com/Sniper-Eon/xpilot). Read `XPILOT.md` in the
 xpilot repository (plugin interfaces, claims, code layout) and this repository's `README.md` first.
 
 ## Which repository
 
 - **Here**: plugin code (`plugins/<id>/`), its tests, `dist/` and `index.json`.
-- **onemiless/xpilot**: the host, the store, the UI, the core plugins, panda safety code and `safety.json`.
+- **Sniper-Eon/xpilot**: the host, the store, the UI, the core plugins, panda safety code and `safety.json`.
   A plugin that sends CAN needs its panda safety plugin merged there first; the store refuses to install it until the
   device runs a system whose `safety.json` declares it.
 

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class NavSettings:
+  enabled: bool = True
   lane_change_enabled: bool = True
   turn_signal_enabled: bool = True
   turn_slowdown_enabled: bool = True
@@ -14,6 +15,8 @@ class NavSettings:
   signal_lead_time_s: int = 8
   turn_speed_kph: int = 18
   max_lane_changes: int = 5
+  phone_assist_enabled: bool = False
+  beep_enabled: bool = True
 
 
 def _int(params, key: str, default: int, low: int, high: int) -> int:
@@ -33,6 +36,7 @@ def _bool(params, key: str, default: bool) -> bool:
 
 def read(params) -> NavSettings:
   return NavSettings(
+    enabled=_bool(params, "ExtNavAssistEnabled", False),
     lane_change_enabled=_bool(params, "ExtNavAssistLaneChange", True),
     turn_signal_enabled=_bool(params, "ExtNavAssistTurnSignal", True),
     turn_slowdown_enabled=_bool(params, "ExtNavAssistTurnSlowdown", True),
@@ -41,4 +45,6 @@ def read(params) -> NavSettings:
     signal_lead_time_s=_int(params, "ExtNavAssistSignalLead", 8, 3, 12),
     turn_speed_kph=_int(params, "ExtNavAssistTurnSpeed", 18, 10, 30),
     max_lane_changes=_int(params, "ExtNavAssistMaxChanges", 5, 1, 5),
+    phone_assist_enabled=_bool(params, "ExtNavAssistPhoneBlindspot", False),
+    beep_enabled=_bool(params, "ExtNavAssistBeep", True),
   )

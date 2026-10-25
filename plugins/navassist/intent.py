@@ -1,232 +1,152 @@
-"""Navigation lane target and physical-lamp request, bounded to one visible lane at a time.
+"""Adapt plugin messages to the verified legacy preparation state machines.
 
-Phone LaneInfo indices are absolute road lanes. This module only maps them to the local visible index when the
-phone's total count equals the visible count and the recommendation touches the maneuver-side road edge. The
-fallback (no LaneInfo) only asks for the extreme visible lane for a supported turn/exit/ramp inside its
-lookahead window. It never supplies curvature or acceleration."""
+Only fresh absolute evidence translates map indices. Same-direction edge fallback
+remains separate evidence and inherits the bounded source-continuity checks.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace as N
 
-MANEUVER_DIRECTIONS = {
-  "slight_left": "left", "turn_left": "left", "sharp_left": "left", "u_turn_left": "left",
-  "exit_left": "left", "ramp_left": "left", "merge_left": "left",
-  "slight_right": "right", "turn_right": "right", "sharp_right": "right", "u_turn_right": "right",
-  "exit_right": "right", "ramp_right": "right", "merge_right": "right",
-}
-EDGE_MANEUVERS = frozenset(("turn_left", "turn_right", "sharp_left", "sharp_right", "u_turn_left", "u_turn_right",
-                            "exit_left", "exit_right", "ramp_left", "ramp_right", "merge_left", "merge_right",
-                            "roundabout"))
-MIN_LANE_CHANGE_SPEED_MPS = 20 * 0.44704
-MAX_LANE_CHANGE_SPEED_MPS = 33.33
-MAX_LANE_CHANGES_PER_EVENT = 5
+from .coordinator import NavLaneIntentCoordinator, NavTurnSignalCoordinator
+from .intent_types import LaneIntentDirection, LaneTopologyInput, LaneVehicleInput, NavTurnPlan, ObservedLaneChangeState
+from .planning import build_lane_plan, lane_alignment_may_start
 
 
-def maneuver_direction(maneuver: str) -> str:
-  return MANEUVER_DIRECTIONS.get(maneuver, "none")
+def camel(name):
+  first, *rest = str(name).split('_')
+  return first+''.join(p[:1].upper()+p[1:] for p in rest)
+
+
+def navigation(nav):
+  items = nav.get('lanes') or []
+  count = nav.get('laneTotalCount', -1)
+  if type(count) is not int or not 1 <= count <= 16:
+    count = max((int(l.get('index', -1))+1 for l in items), default=0)
+  if not items:
+    count = 0
+  by_index = {int(l['index']): l for l in items if type(l.get('index')) is int}
+  return N(valid=bool(nav.get('valid')), stale=bool(nav.get('stale', False)),
+           sessionId=str(nav.get('sessionId', '')), routeRevision=int(nav.get('routeRevision', 0)),
+           maneuverEventId=int(nav.get('maneuverEventId', 0)), maneuver=camel(nav.get('maneuver', 'none')),
+           maneuverDistanceM=float(nav.get('distanceM', 0)),
+           lanes=[N(index=i, recommended=by_index.get(i, {}).get('recommended') is True) for i in range(count)])
 
 
 @dataclass
 class LanePlan:
-  direction: str = "none"
+  direction: str = 'none'
   target_lane: int = -1
   absolute_target: int = -1
-  reason: str = "idle"
+  reason: str = 'idle'
   edge_anchored: bool = False
+  core: object = None
+  topology: object = None
+  speed: float = 0.
 
 
-def lane_plan(nav: dict, topology: dict, settings, *, v_ego: float) -> LanePlan:
-  """Target one visible lane toward the maneuver; -1 when the data cannot justify a request."""
-  if not nav.get("valid") or nav.get("stale") or not settings.lane_change_enabled:
-    return LanePlan(reason="navUnavailable")
-  if not topology.get("valid"):
-    return LanePlan(reason="topologyUnavailable")
-  maneuver = str(nav.get("maneuver", "none"))
-  direction = maneuver_direction(maneuver)
-  if direction == "none" or int(nav.get("maneuverEventId", 0)) == 0:
-    return LanePlan(reason="noDirectionalManeuver")
-  distance = float(nav.get("distanceM", 0.0))
-  lookahead = (settings.exit_lane_lookahead_m if maneuver.startswith(("exit", "ramp", "merge"))
-               else settings.turn_lane_lookahead_m)
-  if not 0.0 < distance <= lookahead:
-    return LanePlan(reason="outsideLaneWindow")
-  if not MIN_LANE_CHANGE_SPEED_MPS <= v_ego <= MAX_LANE_CHANGE_SPEED_MPS:
-    return LanePlan(reason="speed")
-  visible = int(topology.get("visibleLaneCount", 0))
-  ego = int(topology.get("egoLaneIndexFromLeft", -1))
-  if visible < 2 or not 0 <= ego < visible:
-    return LanePlan(reason="topologyUnavailable")
-  # Edge fallback: ask for the extreme visible lane in the maneuver direction.
-  target = 0 if direction == "left" else visible - 1
-  plan = LanePlan(direction=direction, target_lane=target, reason="edgeFallback")
-  # Trust phone LaneInfo only when its absolute count matches the local visible count and the
-  # recommendation is on the maneuver-side edge. Otherwise the indices are not comparable.
-  total = int(nav.get("laneTotalCount", -1))
-  lanes = nav.get("lanes") or []
-  if total == visible:
-    recommended = [int(lane["index"]) for lane in lanes if lane.get("recommended")]
-    if direction == "left" and 0 in recommended:
-      plan = LanePlan(direction=direction, target_lane=0, absolute_target=1, reason="phoneEdge", edge_anchored=True)
-    elif direction == "right" and (total - 1) in recommended:
-      plan = LanePlan(direction=direction, target_lane=visible - 1, absolute_target=total,
-                      reason="phoneEdge", edge_anchored=True)
-  if plan.target_lane == ego:
-    return LanePlan(reason="alreadyInTargetLane")
-  plan.direction = "left" if plan.target_lane < ego else "right"
-  if abs(plan.target_lane - ego) > 1:
-    plan.target_lane = ego + (-1 if plan.direction == "left" else 1)
-  return plan
+def lane_plan(nav, topology, settings, *, v_ego):
+  n = navigation(nav)
+  count, ego = int(topology.get('visibleLaneCount', 0)), int(topology.get('egoLaneIndexFromLeft', -1))
+  absolute = topology.get('absoluteEgoIndex')
+  if type(absolute) is not int:
+    absolute = None
+  core = build_lane_plan(n, N(visibleLaneCount=count, egoLaneIndexFromLeft=ego),
+                         healthy=True, settings=settings, amap_ego_index=absolute)
+  target = NavLaneIntentCoordinator._target(core, ego) if core.valid else None
+  direction = (NavLaneIntentCoordinator._relative_direction(core) or
+               NavLaneIntentCoordinator._direction(ego, target)) if target is not None else LaneIntentDirection.none
+  # The facade's target is adjacent; the core retains the actual route target.
+  adjacent = NavLaneIntentCoordinator._adjacent_target_index(ego, direction) if direction else -1
+  return LanePlan('left' if direction == LaneIntentDirection.left else 'right' if direction else 'none',
+                  adjacent, -1, 'edgeFallback' if core.heuristic else 'absoluteLane', absolute is not None,
+                  core, topology, v_ego)
+
+
+def payload(intent, nav):
+  return dict(valid=bool(nav.get('linked', nav.get('valid'))), sessionId=str(nav.get('sessionId', '')),
+              routeRevision=int(nav.get('routeRevision', 0)), maneuverEventId=int(nav.get('maneuverEventId', 0)),
+              signalRequested=intent.signal_requested, direction=intent.direction.name,
+              targetLaneIndex=intent.target_lane_index, spLaneChangeReady=intent.lane_change_ready,
+              laneChangeAllowed=intent.lane_change_ready, reason=intent.reason, requestId=intent.request_id,
+              forkNow=False, allowUnknownCrossing=False, ignoreSolidBoundary=False)
 
 
 class TurnSignalCoordinator:
-  """Requests the physical lamp for a route turn without authorizing a lane change."""
-  SIGNAL_TIMEOUT_NS = 60_000_000_000
-  PLAN_GAP_GRACE_NS = 1_500_000_000
-  MIN_LOOKAHEAD_M = 40.0
-  MAX_LOOKAHEAD_M = 250.0
-  LOOKAHEAD_MARGIN_M = 20.0
-  TURN_CLEAR_STABLE_NS = 500_000_000
+  def __init__(self):
+    self.core = NavTurnSignalCoordinator()
 
-  def __init__(self) -> None:
-    self._key = None
-    self._direction = "none"
-    self._since_ns = 0
-    self._gap_since_ns = None
-    self._completion_hold = False
-    self._clear_since_ns = 0
+  def reset(self):
+    self.core = NavTurnSignalCoordinator()
 
-  def reset(self) -> None:
-    self._key = None
-    self._direction = "none"
-    self._since_ns = 0
-    self._gap_since_ns = None
-    self._completion_hold = False
-    self._clear_since_ns = 0
-
-  def update(self, nav: dict, *, speed_mps: float, now_ns: int, lookahead_time_s: float = 8.0) -> dict:
-    direction = maneuver_direction(str(nav.get("maneuver", "none")))
-    key = (str(nav.get("sessionId", "")), int(nav.get("routeRevision", 0)), int(nav.get("maneuverEventId", 0)))
-    if self._key is not None:
-      if now_ns - self._since_ns > self.SIGNAL_TIMEOUT_NS:
-        self.reset()
-        return {"signalRequested": False, "direction": "none", "targetLaneIndex": -1, "reason": "turnSignalTimeout"}
-      if key != self._key or direction != self._direction:
-        if key[:2] != self._key[:2]:
-          self.reset()
-          return {"signalRequested": False, "direction": "none", "targetLaneIndex": -1, "reason": "turnChanged"}
-        return {"signalRequested": True, "direction": self._direction, "targetLaneIndex": -1,
-                "reason": "turnCompletion", "requestId": key[2]}
-      if not nav.get("valid"):
-        if self._gap_since_ns is None:
-          self._gap_since_ns = now_ns
-        if now_ns - self._gap_since_ns <= self.PLAN_GAP_GRACE_NS:
-          return {"signalRequested": True, "direction": self._direction, "targetLaneIndex": -1,
-                  "reason": "turnApproachGrace", "requestId": key[2]}
-        self.reset()
-        return {"signalRequested": False, "direction": "none", "targetLaneIndex": -1, "reason": "turnUnavailable"}
-      self._gap_since_ns = None
-      return {"signalRequested": True, "direction": self._direction, "targetLaneIndex": -1,
-              "reason": "turnApproach", "requestId": key[2]}
-    if not nav.get("valid") or direction == "none" or key[2] == 0:
-      return {"signalRequested": False, "direction": "none", "targetLaneIndex": -1, "reason": "turnUnavailable"}
-    lookahead = max(self.MIN_LOOKAHEAD_M, min(self.MAX_LOOKAHEAD_M,
-                                              max(0.0, speed_mps) * lookahead_time_s + self.LOOKAHEAD_MARGIN_M))
-    distance = float(nav.get("distanceM", 0.0))
-    if not 0.0 < distance <= lookahead:
-      return {"signalRequested": False, "direction": "none", "targetLaneIndex": -1, "reason": "outsideTurnWindow"}
-    self._key, self._direction, self._since_ns = key, direction, now_ns
-    self._gap_since_ns = None
-    return {"signalRequested": True, "direction": direction, "targetLaneIndex": -1,
-            "reason": "turnApproach", "requestId": key[2]}
+  def update(self, nav, *, speed_mps, now_ns, lookahead_time_s=8., turn_geometry_active=False):
+    n = navigation(nav)
+    plan = NavTurnPlan(bool(nav.get('linked', nav.get('valid', False))) and not nav.get('stale', False),
+                       n.sessionId, n.routeRevision, n.maneuverEventId, n.maneuver, n.maneuverDistanceM)
+    return payload(self.core.update(plan, speed_mps=speed_mps, now_ns=now_ns,
+                                   lookahead_time_s=lookahead_time_s,
+                                   turn_geometry_active=turn_geometry_active), nav)
 
 
 class LaneIntentCoordinator:
-  """Debounces lane requests, caps them per maneuver, and never requests while a side is vetoed."""
-  COOLDOWN_NS = 750_000_000
-
-  def __init__(self, *, max_changes: int = MAX_LANE_CHANGES_PER_EVENT) -> None:
+  def __init__(self, *, max_changes=5):
     self.max_changes = max_changes
-    self._event_key = None
-    self._changes = 0
-    self._last_request_ns = 0
-    self._request_id = 0
-    self._target = -1
+    self.core = NavLaneIntentCoordinator(max_changes=max_changes)
 
-  def reset(self) -> None:
-    self._event_key = None
-    self._changes = 0
-    self._last_request_ns = 0
-    self._request_id = 0
-    self._target = -1
+  def reset(self):
+    self.core = NavLaneIntentCoordinator(max_changes=self.max_changes)
 
-  def update(self, nav: dict, plan: LanePlan, *, now_ns: int, topology_valid: bool,
-             left_blocked: bool, right_blocked: bool, blindspot_left: bool, blindspot_right: bool,
-             lateral_active: bool) -> dict:
-    event_key = (str(nav.get("sessionId", "")), int(nav.get("routeRevision", 0)),
-                 int(nav.get("maneuverEventId", 0)))
-    if event_key != self._event_key:
-      self._event_key = event_key
-      self._changes = 0
-      self._target = -1
-    base = {"valid": bool(nav.get("valid")), "sessionId": event_key[0], "routeRevision": event_key[1],
-            "maneuverEventId": event_key[2], "signalRequested": False, "direction": "none",
-            "targetLaneIndex": -1, "spLaneChangeReady": False, "reason": plan.reason,
-            "requestId": self._request_id, "laneChangeAllowed": False,
-            "forkNow": False, "allowUnknownCrossing": False, "ignoreSolidBoundary": False}
-    if not nav.get("valid") or plan.direction == "none" or plan.target_lane < 0:
-      return base
-    side_blocked = left_blocked if plan.direction == "left" else right_blocked
-    side_blindspot = blindspot_left if plan.direction == "left" else blindspot_right
-    if side_blocked:
-      return base | {"reason": "boundaryVeto"}
-    if side_blindspot:
-      return base | {"reason": "blindspot"}
-    if not topology_valid:
-      return base | {"reason": "topologyUnavailable"}
-    if not lateral_active:
-      return base | {"reason": "lateralInactive"}
-    if plan.target_lane == self._target and self._request_id > 0:
-      # Hold the same lamp through SP's own lane-change cycle; do not open a new request.
-      return base | {"signalRequested": True, "direction": plan.direction,
-                     "targetLaneIndex": plan.target_lane, "spLaneChangeReady": True,
-                     "reason": plan.reason, "laneChangeAllowed": True}
-    if self._changes >= self.max_changes:
-      return base | {"reason": "changeLimit"}
-    if now_ns - self._last_request_ns < self.COOLDOWN_NS:
-      return base | {"reason": "cooldown"}
-    # Only the lamp is requested here; SP's own DesireHelper/ALC still requires its physical-lamp feedback,
-    # blind-spot check and configured automatic lane-change mode before any lateral motion.
-    self._request_id += 1
-    self._last_request_ns = now_ns
-    self._changes += 1
-    self._target = plan.target_lane
-    return base | {"signalRequested": True, "direction": plan.direction, "targetLaneIndex": plan.target_lane,
-                   "spLaneChangeReady": True, "reason": plan.reason, "requestId": self._request_id,
-                   "laneChangeAllowed": True}
+  def update(self, nav, plan, *, now_ns, topology_valid, left_blocked, right_blocked,
+             blindspot_left, blindspot_right, lateral_active, left_blinker=False, right_blinker=False,
+             brake_pressed=False, gas_pressed=False, steering_pressed=False,
+             model_state='off', model_direction='none', allow_new_lane_change=True):
+    t = plan.topology or {}
+    count, ego = int(t.get('visibleLaneCount', 0)), int(t.get('egoLaneIndexFromLeft', -1))
 
-  def note_completed(self) -> None:
-    if self._event_key is not None:
-      self._changes = min(self._changes + 1, self.max_changes + 1)
+    def neighbor(side, present):
+      if not topology_valid:
+        return None
+      return True if t.get(side+'NeighborExists', present) else False if t.get(side+'RoadEdge') else None
+
+    topology = LaneTopologyInput(topology_valid, count, ego, neighbor('left', ego > 0),
+      neighbor('right', 0 <= ego < count-1),
+      bool(t.get('leftCrossingAllowed') or plan.core.allow_unknown_crossing) and not left_blocked and not t.get('leftRoadEdge'),
+      bool(t.get('rightCrossingAllowed') or plan.core.allow_unknown_crossing) and not right_blocked and not t.get('rightRoadEdge'))
+    state = {'off': ObservedLaneChangeState.off, 'preLaneChange': ObservedLaneChangeState.pre,
+             'laneChangeStarting': ObservedLaneChangeState.starting,
+             'laneChangeFinishing': ObservedLaneChangeState.finishing}.get(str(model_state), ObservedLaneChangeState.off)
+    direction = {'none': LaneIntentDirection.none, 'left': LaneIntentDirection.left,
+                 'right': LaneIntentDirection.right}.get(str(model_direction), LaneIntentDirection.none)
+    vehicle = LaneVehicleInput(lateral_active, plan.speed, blindspot_left, blindspot_right,
+      left_blinker, right_blinker, brake_pressed, gas_pressed, steering_pressed, state, direction)
+    result = self.core.update(plan.core, topology, vehicle, now_ns=now_ns,
+                              allow_new_lane_change=allow_new_lane_change)
+    return payload(result, nav)
 
 
-def build_intent(nav: dict, topology: dict, *, settings, v_ego: float, now_ns: int,
-                 left_blocked: bool, right_blocked: bool, blindspot_left: bool, blindspot_right: bool,
-                 lateral_active: bool, turns: TurnSignalCoordinator, lanes: LaneIntentCoordinator) -> dict:
-  """Align to the maneuver-side lane first; request the turn lamp once no lane change is needed."""
-  out = {}
+def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
+                 blindspot_left, blindspot_right, lateral_active, turns, lanes,
+                 left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
+                 steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False):
+  turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns, lookahead_time_s=settings.signal_lead_time_s,
+                      turn_geometry_active=turn_geometry_active)
+  n = navigation(nav)
+  intersection = n.maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'turnRight', 'sharpRight', 'uTurnRight')
+  approaching = bool(intersection and turn['signalRequested'])
   plan = lane_plan(nav, topology, settings, v_ego=v_ego)
-  if plan.direction != "none" and plan.target_lane >= 0:
-    out = lanes.update(nav, plan, now_ns=now_ns, topology_valid=bool(topology.get("valid")),
-                       left_blocked=left_blocked, right_blocked=right_blocked,
-                       blindspot_left=blindspot_left, blindspot_right=blindspot_right,
-                       lateral_active=lateral_active)
-    if out.get("signalRequested"):
+  out = lanes.update(nav, plan, now_ns=now_ns, topology_valid=bool(topology.get('valid')),
+    left_blocked=left_blocked, right_blocked=right_blocked,
+    blindspot_left=blindspot_left, blindspot_right=blindspot_right, lateral_active=lateral_active,
+    left_blinker=left_blinker, right_blinker=right_blinker, brake_pressed=brake_pressed,
+    gas_pressed=gas_pressed, steering_pressed=steering_pressed, model_state=model_state,
+    model_direction=model_direction, allow_new_lane_change=n.maneuverDistanceM > 0 and not approaching)
+  if out['signalRequested']:
+    return out
+  if settings.turn_signal_enabled and turn['signalRequested']:
+    if not intersection and (topology.get('absoluteEgoIndex') is None or
+        out['reason'] in ('alreadyInRecommendedLane', 'noNeighbor')):
       return out
-  turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns,
-                      lookahead_time_s=float(settings.signal_lead_time_s))
-  if turn.get("signalRequested"):
-    return turn | {"valid": bool(nav.get("valid")), "sessionId": str(nav.get("sessionId", "")),
-                   "routeRevision": int(nav.get("routeRevision", 0)),
-                   "maneuverEventId": int(nav.get("maneuverEventId", 0)),
-                   "spLaneChangeReady": False, "laneChangeAllowed": False}
-  return out | {"reason": plan.reason}
+    return turn
+  if out['reason'] in ('routeChanged', 'neighborObservationPaused', 'crossingWaitTimeout') or out['reason'].startswith('lanePosition'):
+    return out
+  return turn if settings.turn_signal_enabled else out

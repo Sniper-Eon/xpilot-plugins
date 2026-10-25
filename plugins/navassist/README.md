@@ -1,76 +1,62 @@
-# Navigation Assist (navassist)
+# Navigation Assist 1.1
 
-Phone navigation for xpilot: the device receives canonical v3 Android/iOS navigation observations, shows the next
-maneuver and lane guidance, lowers the cruise ceiling before a supported turn, and lets Tesla's own lane verdict
-plus an optional phone blind spot veto a lane change. It can request one bounded physical turn signal on 0x3E9;
-SP's own DesireHelper / AutoLaneChangeController remains the only lane-change start authority.
+Personal fork: [Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot), branch `xpilot`.
+Install this plugin only with the paired host containing `openpilot/tesla/lane_policy.py` and the
+`navassist` panda safety plugin. API 1 alone does not identify that capability.
 
-## What runs
+## Migrated behavior
 
-| Part | Hook / process | Effect |
-|---|---|---|
-| Receiver | `navassistd` (`process:navassistd`) | UDP 4213, strict v3 schema, per-source rate limit, session/sequence/TTL replay boundary |
-| OEM | same process, `can` input | Reads 0x39B / 0x399 / 0x238; publishes `oem.lanes` |
-| Topology | same process, `modelV2` | Visible lane count and ego index; publishes `lanes.topology` |
-| Intent | same process | Target lane + turn-lamp request; publishes `lanes.intent` |
-| Speed | `long_target` | Lowers the common cruise target before a supported maneuver; never requests a stop |
-| Lane policy | `role:lane_change.policy` | Vetoes a change on Tesla's explicit reject, availability reject without local topology, or a confirmed phone blind spot |
-| Turn signal | card `control_sends` | Clones a fresh idle 0x3E9 frame, changes request/reason/counter/checksum only; panda plugin `navassist` validates every frame |
-| HUD | `ui.py` ScreenOverlay | Maneuver, distance, recommended lane, current OEM ALC verdict |
+- Existing phone v3 UDP 4213, signed HTTP 7766, signed discovery 7765 and parked-only pairing.
+- Strict packet/replay/TTL handling, `routeAvoid`, request-sequence ACK and display-only lane feedback.
+- Navigation lane preparation retains the signal while a confirmed OEM boundary/BSM veto prevents SP starting
+  or continuing a lane change. The generic host context can only restrict SP; it cannot initiate steering.
+- Same-adjacent absolute/relative source changes preserve the request, reset readiness and require fresh
+  observations. Missing observations and recovery confirmation have separate bounded timers.
+- Turn-only lamps do not become lane-change requests; lane-position lamps do not generate a turn desire.
+- Three distinct fresh model frames plus a physical right carriageway anchor are required for absolute lane
+  numbering. Merely matching the visible and map lane counts is insufficient. Ambiguous geometry is unknown.
+- Navigation-only chime on SP's observed lane-change start, once per request. Manual changes stay silent.
+- Maneuver speed ceilings only lower the target; missing control context, poor GPS or stale guidance rejects it.
+- Optional phone blind spot **extra veto**, off by default. Missing phone data never proves clearance.
+- Front-visible closing-risk diagnostics remain observation-only (`control_eligible=false`).
 
-No new cereal messages are added: state travels on `pluginMsg` kinds `nav.state`, `lanes.topology`,
-`lanes.intent`, `oem.lanes`. Nothing here writes steering, acceleration, curvature or CarState.
+The process reuses `modelV2` geometry. It opens no camera, converts no images and runs no neural network.
+Geometry cannot identify painted solid lines: OEM rejection is used when available. The legacy explicitly
+permitted unknown-paint fallback remains limited by SP's road-edge, blind-spot, speed, lateral and panda gates.
+This is not proof that an unobserved boundary is safe.
 
-## Phone ingest
+## Plugin interfaces and settings
 
-The phone posts the canonical v3 JSON snapshot (`navigation_snapshot`, `schemaVersion: 3`) to UDP 4213. The
-parser rejects unknown/duplicate fields, non-finite numbers, unsupported enums, non-increasing sequence,
-decreasing route revision, retired sessions, a source wall clock outside the receiver window, and bodies over
-8 KiB. Each accepted packet is acknowledged with `navassist_udp_ack`; a separate 512-byte
-`lane_position_request` returns the display-only `lanePosition` block (unknown until an absolute visual
-producer exists).
+`pluginMsg`: `nav.state`, `lanes.topology`, `lanes.intent`, `oem.lanes`, `vision.closing`.
+Only messages from producer `navassist` are consumed. Expired displays clear; an expired owned lamp cannot
+fall through into automatic lane-change permission. Explicit disable clears coordinators immediately.
 
-The signed HTTP/discovery transport from the source branch is not included in 1.0.0. UDP is the Android/iOS
-default and needs no pairing token; run it only on the controlled private LAN described in the source branch.
+All configuration lives in the store's private parameter directory, not new core Params keys.
+The master, lane positioning, physical lamp and phone-veto switches default off. Pairing identities are private;
+reset is accepted only offroad. Existing keys/codes must be migrated privately during installation.
+Diagnostics rotate under the device data directory; driving logs and keys are excluded from this repository.
 
-## Settings
+The separate `phone_vision` plugin provides single wide-camera frames for the companion app.
+It is disabled by default and not started by navigation. Dual camera, overtaking and external model control
+are not enabled by this migration.
 
-All keys are store-backed (`plugin.json`): `ExtNavAssistEnabled`, `ExtNavAssistLaneChange`,
-`ExtNavAssistTurnSignal`, `ExtNavAssistTurnSlowdown`, `ExtNavAssistLookahead`,
-`ExtNavAssistExitLookahead`, `ExtNavAssistSignalLead`, `ExtNavAssistTurnSpeed`,
-`ExtNavAssistMaxChanges`.
+## Physical lamps and firmware
 
-## Safety and limits
+Card clones a fresh idle 0x3E9 bus-1 template. Only request/reason/counter/checksum change. Driver opposite
+signals/hazards take priority without a cancellation injection. The panda safety plugin checks the template,
+checksum, controls_allowed for active requests, bus, size, 100 ms rate, and 200 frames per 60 seconds.
+Cancel is permitted without controls_allowed because it only releases an owned lamp.
+SP and Tesla remain the lane-change/steering authorities. Host checks, native safety tests, actual firmware
+compilation, device build, parked validation and road validation are separate evidence.
 
-- `long_target` only lowers the target; SP's minimum selection keeps lead/FCW/model limits in force. The ceiling
-  floor is 2 m/s; it never asks for a stop or acceleration.
-- Lane positioning is one visible lane at a time. Phone absolute indices are compared with local visible indices
-  only when the phone's total count equals the visible count and the recommendation touches the maneuver-side
-  edge; otherwise the fallback is the extreme visible lane inside the configured lookahead.
-- A single OEM frame never vetoes: the blocker requires two consecutive frames and clears after six.
-- The physical lamp is bounded by panda: idle template only, request 1/2/3, reason 8/4, protected bits equal to
-  the template, counter = template + 1, 100 ms rate, 200 frames per 60 s, `controls_allowed` for an active
-  request, and the matching `safety.json` entry/param bit. Cancel (request 3) does not require
-  `controls_allowed` because it only releases the lamp; active requests still do.
-- Driver blinkers, blind spots and the configured ALC mode are still enforced by the stock DesireHelper.
+## Validation
 
-## Not in 1.0.0
+From `plugins/`, with the paired xpilot checkout on PYTHONPATH:
 
-- Signed HTTP/discovery pairing and phone identity pinning.
-- Absolute lane numbers from the camera image classifier (`road_lane_position.json` stays unknown, so phone
-  lane feedback is unknown).
-- Mid-lane-change force-abort in DesireHelper: the plugin cancels the lamp when a veto appears, but the stock
-  state machine has no plugin abort hook.
-- Closing-risk diagnostics and the Android companion app.
-
-## Tests
-
-```sh
-cd plugins && python3 -m pytest -q navassist/tests
+```
+python3 -m pytest -q navassist/tests phone_vision/tests
 ```
 
-The panda side runs with the system repository:
-
-```sh
-cd opendbc_repo && PYTHONPATH=. python3 -m pytest -q opendbc/safety/tests/test_xpilot_plugins.py
-```
+Run `tools/sp_tesla_e2e/store_e2e.py --repo ../xpilot-plugins` in the system checkout for archive installation,
+discovery and host checks. `migration-source.json` identifies the legacy coordinator source. A successful
+local check does not mean this version has been installed or road-tested.

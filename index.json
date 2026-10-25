@@ -9,7 +9,7 @@
       "category": "body_comfort",
       "author": "xpilot",
       "description": "Turns the cabin ambient lights red while a car is in the blind spot.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/ambient_light-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/ambient_light-1.0.0.tar.gz",
       "sha256": "24b9dc79d3c1f57cc0c5f71e6b3c1e760a11c88e1a8d18b26a191e8cfcee1360",
       "platform": null
     },
@@ -21,7 +21,7 @@
       "category": "longitudinal_planning",
       "author": "xpilot",
       "description": "Sets cruise speed to the car's speed limit plus an offset. Needs openpilot longitudinal and the vehicle bus.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/auto_speed-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/auto_speed-1.0.0.tar.gz",
       "sha256": "3f01ed7959683919eeab6d2cd704ad2d3ef8bdebf865505e1c949868b15c3358",
       "platform": null
     },
@@ -33,7 +33,7 @@
       "category": "overlays",
       "author": "xpilot",
       "description": "Big screen: red edge on the left or right column while a car is in that blind spot. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/blindspot_edges-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/blindspot_edges-1.0.0.tar.gz",
       "sha256": "a6c440fa92594d2518d9aab821890c7ecdf4c5f8e63aaec95fddae6b823a6224",
       "platform": null
     },
@@ -45,7 +45,7 @@
       "category": "data_source",
       "author": "xpilot",
       "description": "Big-screen tile: battery charge, pack voltage, current and power from the BMS messages on the vehicle bus. Needs the vehicle-bus harness. Read only.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/bms-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/bms-1.0.0.tar.gz",
       "sha256": "b030d6d5cea1baf056fd123f2831f963514736c28cf29eb15e6f89d7cab9d365",
       "platform": null
     },
@@ -57,7 +57,7 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: cluster speed, gear, blinkers and blind spots. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/car_tile-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/car_tile-1.0.0.tar.gz",
       "sha256": "9606fcbf15a11c49cf821b5d6174482c6f0ae088782dc3528058f7d35398a9fc",
       "platform": null
     },
@@ -69,7 +69,7 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: local time and date. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/clock_tile-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/clock_tile-1.0.0.tar.gz",
       "sha256": "9ec465cd3db73f38fb07818d1a7723ef72c6f8f46c8d7cf4cc1180cb513beec3",
       "platform": null
     },
@@ -81,7 +81,7 @@
       "category": "data_source",
       "author": "xpilot",
       "description": "Lets a laptop, LLM server or accelerator exchange data with the device over a cable or WiFi (TCP JSON lines). Peers need the token in /data/params/d/XpilotExternalToken.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/external_compute-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/external_compute-1.0.0.tar.gz",
       "sha256": "f95ac7b785c3522bc4113ceb7e7581e14b244eb3d6137b744b8a5ae918ae8a85",
       "platform": null
     },
@@ -93,7 +93,7 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: the device IP address and network type. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/ip_tile-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/ip_tile-1.0.0.tar.gz",
       "sha256": "7b74e9390a570f1de418c6e93470c99ea807cd6e0f7a4c9223960cf45967d7ff",
       "platform": null
     },
@@ -105,7 +105,7 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen card: distance and relative speed of the lead car (radarState). Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/lead_card-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/lead_card-1.0.0.tar.gz",
       "sha256": "2dcfbee9bfadc80126d0145405da57133903c1d9f9015e91355b11ebf871c40e",
       "platform": null
     },
@@ -117,20 +117,20 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: speed limit, road name and next maneuver from any map or navigation provider. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/map_tile-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/map_tile-1.0.0.tar.gz",
       "sha256": "983d072bf9c0b77120ec8fece91d6e596d5d3d05ea753ec02e680c4e980b0141",
       "platform": null
     },
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Receives canonical v3 Android/iOS navigation over UDP 4213, shows the next maneuver and lane guidance, lowers the cruise ceiling before a supported turn, and lets Tesla's own lane verdict plus an optional phone blind spot veto a lane change. Requests one bounded physical turn signal on 0x3E9; SP's ALC remains the start authority.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/navassist-1.0.0.tar.gz",
-      "sha256": "cead7841879f81011a7182700f0051eaad94941255d4dc0346ff73966436f6a7",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.1.0.tar.gz",
+      "sha256": "88800abe3ab9e8457dd6d41b8f8e7fa20ec5b64f38d67c8092937f30c4f55a7f",
       "platform": null
     },
     {
@@ -141,7 +141,7 @@
       "category": "perception_model",
       "author": "xpilot",
       "description": "Drive with the model that ships with openpilot (selfdrive/modeld, no downloads). Replaces the SP model manager while on; switch it off to go back.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/op_models-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/op_models-1.0.0.tar.gz",
       "sha256": "6f160751d990e1ba11e42b6d42f94eb5b9c4ce10175b87f5aabc3fcaf095a4a1",
       "platform": null
     },
@@ -153,8 +153,20 @@
       "category": "alerts",
       "author": "xpilot",
       "description": "Example plugin: warns when driving faster than the resolved speed limit plus a margin. Shows the manifest, store-backed params, a settings row, an alert hook and a relative import.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/overspeed_warning-1.0.1.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/overspeed_warning-1.0.1.tar.gz",
       "sha256": "8ce582c00afc071d1728c747a31571d5b4248063d42b7172cb8451a17edb4a8d",
+      "platform": null
+    },
+    {
+      "id": "phone_vision",
+      "name": "Phone side-vehicle vision",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "data_source",
+      "author": "Sniper-Eon",
+      "description": "Opt-in single wide-camera transport to the existing TesNav phone model. 640 pixels, maximum 4 Hz; no camera process while disabled. Dual experiments are not enabled.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.0.0.tar.gz",
+      "sha256": "96c928ff309af56c95310651abae7ef878f25bb248739a1259b1388978c29f55",
       "platform": null
     },
     {
@@ -165,7 +177,7 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen card: ego speed and the set speed. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/speed_card-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_card-1.0.0.tar.gz",
       "sha256": "0b9536042aade171f92ca405a3d572a13121f0be931b7a90ee072e62d66ce2d4",
       "platform": null
     },
@@ -177,7 +189,7 @@
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen card: the speed limit sunnypilot resolved (longitudinalPlanSP). Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/speed_limit_card-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_limit_card-1.0.0.tar.gz",
       "sha256": "475fa2be0271a79387aa497e0e86bfc5640f4ed2f0960c588fcb5ad8f0d3acc5",
       "platform": null
     },
@@ -189,7 +201,7 @@
       "category": "longitudinal_planning",
       "author": "xpilot",
       "description": "Stops for red lights seen by the car's own traffic-control perception. Only ever slows down.",
-      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/traffic_light-1.0.0.tar.gz",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/traffic_light-1.0.0.tar.gz",
       "sha256": "e923e02bcdb1857c8706c2abaa240d27fffcc637665dba14e85c5e00e7753140",
       "platform": null
     }

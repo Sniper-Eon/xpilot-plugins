@@ -17,6 +17,7 @@ def _always(started, params, CP) -> bool:
 
 
 class NavAssist(Plugin):
+  SERVICES = ('carState', 'modelV2')
   def __init__(self, CP, params):
     super().__init__(CP, params)
     self.params = params
@@ -44,13 +45,14 @@ class NavAssist(Plugin):
         from openpilot.tesla.plugins import PluginMsgs
         self._msgs = PluginMsgs()
       values = self._msgs.fresh("lanes.intent")
-      return next(iter(values.values())) if values else {}
+      return values.get('navassist', {})
     except Exception:
       return {}
 
   def control_sends(self, CS, CC, now_ns: int) -> list:
     # enabled=False still drives an active request through its cancel path.
-    return self.turns.update(self._fresh_intent(), CS, CC, now_ns, enabled=self.settings.turn_signal_enabled)
+    return self.turns.update(self._fresh_intent(), CS, CC, now_ns,
+                             enabled=self.settings.enabled and self.settings.turn_signal_enabled)
 
   @classmethod
   def processes(cls) -> list:
@@ -66,3 +68,8 @@ class NavAssist(Plugin):
   def long_target(cls, CP, params):
     from .target import NavSpeedTarget
     return NavSpeedTarget(params)
+
+  @classmethod
+  def alert_source(cls, CP, params):
+    from .chime import NavigationChime
+    return NavigationChime(params)

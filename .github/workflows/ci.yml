@@ -20,14 +20,14 @@ jobs:
     - uses: actions/checkout@v4
     - uses: actions/checkout@v4
       with:
-        repository: onemiless/xpilot
+        repository: Sniper-Eon/xpilot
         ref: xpilot
         path: xpilot
     - run: git -C xpilot submodule update --init --depth 1 msgq_repo
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    - run: pip install pyzmq numpy pycapnp pytest zstandard setproctitle cython scons setuptools
+    - run: pip install pyzmq numpy pycapnp pytest zstandard setproctitle cython scons setuptools cryptography
     - name: Build msgq
       working-directory: xpilot/msgq_repo
       run: scons -j4 msgq/ipc_pyx.so
@@ -44,4 +44,4 @@ jobs:
       if: failure() && github.event_name != 'pull_request'
       env:
         GH_TOKEN: ${{ github.token }}
-      run: gh issue create --title "main checks failed at ${GITHUB_SHA::10}" --body "@onemiless $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      run: gh issue create --title "main checks failed at ${GITHUB_SHA::10}" --body "@Sniper-Eon $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

@@ -9,7 +9,8 @@ import time
 
 from .feedback import REQUEST_TYPE, lane_position_feedback
 from .rate import ClientRateLimiter
-from .wire import NavAssistProtocolError, NavAssistStore
+from .wire import NavAssistProtocolError
+from .store import NavAssistStore
 
 UDP_SNAPSHOT_PORT = 4213
 MAX_UDP_SNAPSHOT_BYTES = 8 * 1024

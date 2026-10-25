@@ -39,8 +39,11 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   lane_valid = bool(snapshot.lane_guidance_present and 0 <= lane_guidance_age_ms <= MAX_PHONE_LANE_GUIDANCE_AGE_MS)
   control_source_valid = snapshot.source_platform in ("android", "ios") and snapshot.navigation_mode == "realtime"
   phone_observations_valid = _phone_observations_valid(snapshot)
+  guidance_age = snapshot.source_wall_time_ms-snapshot.guidance_observed_at_ms
+  guidance_valid = snapshot.guidance_present and 0 <= guidance_age <= 1500
+  linked = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched and guidance_valid)
   valid = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched
-               and snapshot.location_present and snapshot.guidance_present and phone_observations_valid)
+               and snapshot.location_present and guidance_valid and not snapshot.gps_weak and phone_observations_valid)
   if stale:
     reason = "stale"
   elif not control_source_valid or not snapshot.route_active:
@@ -49,6 +52,10 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
     reason = "routeUnmatched"
   elif not snapshot.location_present or not snapshot.guidance_present:
     reason = "noData"
+  elif not guidance_valid:
+    reason = "guidanceStale"
+  elif snapshot.gps_weak:
+    reason = "gpsWeak"
   elif not phone_observations_valid:
     reason = "phoneLocalization"
   else:
@@ -59,7 +66,7 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
       lanes.append({"index": lane.index, "allowedActions": lane.allowed_actions,
                     "recommendedActions": lane.recommended_actions, "recommended": lane.recommended})
   return {
-    "valid": valid, "stale": stale, "reason": reason,
+    "valid": valid, "stale": stale, "reason": reason, "linked": linked,
     "maneuver": snapshot.maneuver, "distanceM": snapshot.maneuver_distance_m,
     "nextManeuver": snapshot.next_maneuver, "nextDistanceM": snapshot.next_maneuver_distance_m,
     "lanes": lanes, "laneTotalCount": snapshot.lane_total_count,

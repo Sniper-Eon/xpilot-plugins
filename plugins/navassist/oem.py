@@ -171,25 +171,29 @@ class OemLaneSignals:
     """
     now = time.monotonic_ns() if now_ns is None else int(now_ns)
     for _mono_time, frames in can_list:
+      if type(_mono_time) is not int or not 0 < _mono_time <= now:
+        continue
       for address, raw, _bus in frames:
+        if _bus != 1:
+          continue
         data = bytes(raw)
         if len(data) != FRAME_BYTES:
           continue
         if address == ADDRESS_DAS_STATUS:
           self.alc_state = _le_bits(data, 46, 5)
           self.ldw = _le_bits(data, 37, 3)
-          self._alc_ns = now
+          self._alc_ns = _mono_time
           self.seen_alc = True
         elif address == ADDRESS_DAS_STATUS_CH:
           self.alc_state_ch = _le_bits(data, 46, 5)
-          self._alc_ch_ns = now
+          self._alc_ch_ns = _mono_time
         elif address == ADDRESS_UI_MAP_DATA:
           self.reject_left_lane = bool(_le_bits(data, 40, 1))
           self.reject_right_lane = bool(_le_bits(data, 41, 1))
           self.reject_left_free_space = bool(_le_bits(data, 44, 1))
           self.reject_right_free_space = bool(_le_bits(data, 45, 1))
           self.nav_route_active = bool(_le_bits(data, 29, 1))
-          self._map_ns = now
+          self._map_ns = _mono_time
           self.seen_map = True
 
   @staticmethod
@@ -245,22 +249,30 @@ class OemLaneSignals:
   def payload(self, now_ns: int | None = None) -> dict:
     """JSON-safe snapshot for pluginMsg kind "oem.lanes"."""
     now = time.monotonic_ns() if now_ns is None else int(now_ns)
+    alc_fresh = self._fresh(self._alc_ns, ALC_STALE_NS, now)
+    map_fresh = self._fresh(self._map_ns, MAP_STALE_NS, now)
     return {
       "alcState": int(self.alc_state),
       "alcName": ALC_NAMES.get(self.alc_state, f"UNKNOWN({self.alc_state})"),
-      "alcFresh": self._fresh(self._alc_ns, ALC_STALE_NS, now),
-      "mapFresh": self._fresh(self._map_ns, MAP_STALE_NS, now),
-      "leftExplicitBlock": self.left_explicit_block,
-      "rightExplicitBlock": self.right_explicit_block,
-      "leftAvailabilityBlock": self.left_availability_block,
-      "rightAvailabilityBlock": self.right_availability_block,
-      "solidLine": self.solid_line,
+      "alcFresh": alc_fresh,
+      "mapFresh": map_fresh,
+      "alcStampNs": self._alc_ns,
+      "mapStampNs": self._map_ns,
+      "leftExplicitBlock": bool(alc_fresh and self.alc_state in ALC_EXPLICIT_LEFT_BLOCK
+                                or map_fresh and (self.reject_left_lane or self.reject_left_free_space)),
+      "rightExplicitBlock": bool(alc_fresh and self.alc_state in ALC_EXPLICIT_RIGHT_BLOCK
+                                 or map_fresh and (self.reject_right_lane or self.reject_right_free_space)),
+      "leftAvailabilityBlock": bool(alc_fresh and self.alc_state in ALC_AVAIL_LEFT_BLOCK),
+      "rightAvailabilityBlock": bool(alc_fresh and self.alc_state in ALC_AVAIL_RIGHT_BLOCK),
+      "leftCrossingAllowed": bool(alc_fresh and self.alc_state in (ALC_AVAILABLE_ONLY_L, ALC_AVAILABLE_BOTH)),
+      "rightCrossingAllowed": bool(alc_fresh and self.alc_state in (ALC_AVAILABLE_ONLY_R, ALC_AVAILABLE_BOTH)),
+      "solidLine": bool(alc_fresh and self.alc_state == ALC_UNAVAILABLE_SOLID_LANE_LINE),
       "ldw": int(self.ldw),
       "rejectLeftLane": self.reject_left_lane,
       "rejectRightLane": self.reject_right_lane,
       "rejectLeftFreeSpace": self.reject_left_free_space,
       "rejectRightFreeSpace": self.reject_right_free_space,
-      "navRouteActive": self.nav_route_active,
+      "navRouteActive": bool(map_fresh and self.nav_route_active),
       "seenAlc": self.seen_alc,
       "seenMap": self.seen_map,
     }

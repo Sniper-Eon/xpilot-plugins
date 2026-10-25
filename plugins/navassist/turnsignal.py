@@ -96,6 +96,13 @@ class TurnSignalController:
     physical_left = bool(getattr(cs, "leftBlinker", False))
     physical_right = bool(getattr(cs, "rightBlinker", False))
     physical_on = physical_left if direction == "left" else physical_right
+    # A driver-selected opposite side (including hazards) owns the lamps. Do
+    # not send a cancel frame: that would also cancel the driver's new signal.
+    owned = self.active['direction'] if self.active is not None else direction
+    opposite_on = physical_right if owned == 'left' else physical_left if owned == 'right' else False
+    if opposite_on:
+      self.active = None
+      return []
 
     if self.active is not None:
       age = now_ns - int(self.active["started_ns"])

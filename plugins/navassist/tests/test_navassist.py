@@ -144,7 +144,7 @@ def test_lane_plan_maps_only_matching_edge():
          "lanes": [{"index": 0, "recommended": True, "allowedActions": 0, "recommendedActions": 0}]}
   topo = {"valid": True, "visibleLaneCount": 2, "egoLaneIndexFromLeft": 1}
   plan = lane_plan(nav, topo, settings, v_ego=20.0)
-  assert plan.direction == "left" and plan.target_lane == 0 and plan.edge_anchored
+  assert plan.direction == "left" and plan.target_lane == 0 and not plan.edge_anchored
   topo["visibleLaneCount"] = 3
   plan = lane_plan(nav, topo, settings, v_ego=20.0)
   assert plan.reason in ("edgeFallback", "phoneEdge")
@@ -156,9 +156,13 @@ def test_intent_blocks_on_veto():
          "distanceM": 300.0, "laneTotalCount": 3, "lanes": []}
   topo = {"valid": True, "visibleLaneCount": 3, "egoLaneIndexFromLeft": 2}
   plan = lane_plan(nav, topo, NavSettings(), v_ego=20.0)
-  out = lanes.update(nav, plan, now_ns=time.monotonic_ns(), topology_valid=True, left_blocked=True,
-                     right_blocked=False, blindspot_left=False, blindspot_right=False, lateral_active=True)
-  assert not out["signalRequested"] and out["reason"] == "boundaryVeto"
+  now = time.monotonic_ns()
+  for tick in range(30):
+    out = lanes.update(nav, plan, now_ns=now+tick*50_000_000, topology_valid=True, left_blocked=True,
+                       right_blocked=False, blindspot_left=False, blindspot_right=False, lateral_active=True,
+                       left_blinker=tick > 0)
+  assert out["signalRequested"] and not out["spLaneChangeReady"]
+  assert out["reason"].lower().endswith("waitingcrossing")
 
 
 def _template(turn=0, counter=0):
@@ -222,8 +226,8 @@ def test_policy_oem_veto_and_nav_intent():
   policy._msgs = _Msgs({"oem.lanes": {"source": "navassist", "leftExplicitBlock": True}})
   policy._last_poll = -1.0
   assert policy.allow(None, 1, True) is False
-  policy._msgs = _Msgs({"lanes.intent": {"source": "navassist", "signalRequested": True, "direction": "left",
-                                              "spLaneChangeReady": True, "laneChangeAllowed": True}})
+  policy._msgs = _Msgs({"lanes.intent": {"source": "navassist", "valid": True, "signalRequested": True, "direction": "left",
+                                              "targetLaneIndex": 0, "spLaneChangeReady": True, "laneChangeAllowed": True}})
   policy._last_poll = -1.0
   assert policy.allow(None, 1, True) is True
   assert policy.allow(None, 2, True) is False

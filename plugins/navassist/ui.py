@@ -5,6 +5,7 @@ works with the same data the lane-change policy and speed ceiling consume."""
 import pyray as rl
 
 from openpilot.tesla.ui.plugin_ui import ScreenOverlay
+from .display import read_state
 
 WHITE = (255, 255, 255)
 AMBER = (255, 176, 0)
@@ -35,13 +36,10 @@ class NavAssistOverlay(ScreenOverlay):
       if self._msgs is None:
         from openpilot.tesla.plugins import PluginMsgs
         self._msgs = PluginMsgs()
-      for kind, attr in (("nav.state", "nav"), ("lanes.intent", "intent"),
-                         ("oem.lanes", "oem"), ("lanes.topology", "topology")):
-        values = self._msgs.fresh(kind)
-        if values:
-          setattr(self, attr, next(iter(values.values())))
+      for attr, value in read_state(self._msgs).items():
+        setattr(self, attr, value)
     except Exception:
-      pass
+      self.nav, self.intent, self.oem, self.topology = {}, {}, {}, {}
 
   def update(self, sm) -> None:
     self._fresh()
