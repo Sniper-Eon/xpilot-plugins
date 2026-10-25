@@ -24,7 +24,7 @@ runtime validation remain required before activation.
 
 Local evidence:
 
-- 538 plugin tests passed, including legacy coordinator/protocol and new migration contracts.
+- 539 plugin tests passed, including legacy coordinator/protocol and new migration contracts.
 - 16 host/generated/store/fork checks passed; 17 packaged plugins installed and discovered without load errors.
 - Android: 344 JVM tests, zero failures/errors, one skip; signed candidate APK v18 built with the original
   package/certificate. See `companion/tesnav/BUILD-VALIDATION.json`. iOS source retained, not rebuilt.
@@ -37,3 +37,7 @@ Do not transfer driving logs, captured images, pairing secrets, API keys or sign
 Keep old device checkout/Params and firmware recovery material before any activation. AGNOS 19.9 and the
 correct C3-specific boot-chain manifest must be checked; this source migration does not authorize an
 unreviewed OS image update. Phone capture and dual-camera experiments stay off during the platform switch.
+
+Device dependency follow-up: the legacy systemd service supplied private OpenCV directories through its own
+PYTHONPATH. The store worker now lazily reuses those existing directories when cv2 is absent from the standard
+venv, without installing packages or modifying the host search path. phone_vision1.0.1 remains off by default.

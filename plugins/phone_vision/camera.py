@@ -58,7 +58,8 @@ def output_frame_size(width, height, max_width=640):
 
 
 def capture(store, roi_path, hz, max_width=640, jpeg_quality=75, camera_name='wide', dual_store=None):
-  import cv2
+  from .dependencies import load_opencv
+  cv2 = load_opencv()
   import numpy as np
   from msgq.visionipc import VisionIpcClient
   from openpilot.cereal.visionipc import VisionStreamType

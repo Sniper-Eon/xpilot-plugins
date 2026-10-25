@@ -160,13 +160,13 @@
     {
       "id": "phone_vision",
       "name": "Phone side-vehicle vision",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "api": 1,
       "category": "data_source",
       "author": "Sniper-Eon",
       "description": "Opt-in single wide-camera transport to the existing TesNav phone model. 640 pixels, maximum 4 Hz; no camera process while disabled. Dual experiments are not enabled.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.0.0.tar.gz",
-      "sha256": "96c928ff309af56c95310651abae7ef878f25bb248739a1259b1388978c29f55",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.0.1.tar.gz",
+      "sha256": "743778a42b3994c17a1983fb183e3eeb14fa026c61fce0a5e374a5295f663378",
       "platform": null
     },
     {

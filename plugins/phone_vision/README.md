@@ -15,3 +15,8 @@ parked load validation passes. Do not run this plugin alongside the legacy port-
 
 No dual-camera worker, automatic overtaking or new model training is enabled here. The companion app source
 and model are under `companion/tesnav`; APK files are distributed as release assets, not Git source blobs.
+
+OpenCV is loaded only after real image demand. The worker can reuse the existing private bridge packages
+under `/data/phone-vision/pydeps` and `/data/wide-capture/pydeps` when the main device venv lacks OpenCV.
+No packages are installed and the host process search path is not modified. Missing/broken dependencies
+leave the observation unavailable; enabling the plugin is not proof that camera capture works.

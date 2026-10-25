@@ -1,7 +1,7 @@
 {
   "id": "phone_vision",
   "name": "Phone side-vehicle vision",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": 1,
   "category": "data_source",
   "entry": "plugin:PhoneVision",
