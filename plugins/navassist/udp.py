@@ -11,6 +11,7 @@ from .feedback import REQUEST_TYPE, lane_position_feedback
 from .rate import ClientRateLimiter
 from .wire import NavAssistProtocolError
 from .store import NavAssistStore
+from .route_geometry import RouteGeometryCache
 
 UDP_SNAPSHOT_PORT = 4213
 MAX_UDP_SNAPSHOT_BYTES = 8 * 1024
@@ -27,6 +28,9 @@ class NavAssistUDPServer:
 
   def __init__(self, address: tuple[str, int], store: NavAssistStore, *,
                rate_limiter: ClientRateLimiter | None = None):
+    self.geometry = RouteGeometryCache()
+    self.geometry_limiter = ClientRateLimiter(max_requests=10)
+    self.ingress_limiter = ClientRateLimiter(max_requests=40)
     self._accepted_source = None
     self.store = store
     self.rate_limiter = rate_limiter or ClientRateLimiter()
@@ -70,13 +74,26 @@ class NavAssistUDPServer:
       if not body or len(body) > MAX_UDP_SNAPSHOT_BYTES:
         self._reject_record("invalidLength")
         continue
-      if not self.rate_limiter.allow(source_host):
-        self._reject_record("rateLimited")
+      if not self.ingress_limiter.allow(source_host):
+        self._reject_record('ingressRateLimited')
         continue
       try:
         query = json.loads(body)
-      except (ValueError, UnicodeDecodeError):
+      except (ValueError, UnicodeDecodeError, RecursionError):
         query = None
+      if isinstance(query, dict) and query.get("messageType") in ('route_geometry_hello', 'route_geometry_chunk'):
+        if self._accepted_source != source_host or not self.geometry_limiter.allow(source_host):
+          self._reject_record('geometrySourceOrRate')
+          continue
+        try:
+          ack = self.geometry.accept(body, self.store.current(), time.monotonic_ns())
+          self._socket.sendto(json.dumps(ack, separators=(',', ':')).encode(), address)
+        except (ValueError, OSError, UnicodeError, RecursionError):
+          self._reject_record('geometryInvalid')
+        continue
+      if not self.rate_limiter.allow(source_host):
+        self._reject_record("rateLimited")
+        continue
       if isinstance(query, dict) and query.get("messageType") == REQUEST_TYPE:
         current = self.store.current()
         if (len(body) <= 512 and set(query) == {"messageType", "sessionId", "sequence"} and

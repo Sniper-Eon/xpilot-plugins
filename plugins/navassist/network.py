@@ -16,7 +16,9 @@ class NavigationTransports:
     self.servers = []
     self.threads = []
     try:
-      self.servers.append(NavAssistUDPServer(('0.0.0.0', 4213), store))
+      udp = NavAssistUDPServer(('0.0.0.0', 4213), store)
+      self.geometry = udp.geometry
+      self.servers.append(udp)
       self.servers.append(NavAssistHTTPServer(('0.0.0.0', LISTEN_PORT), store, identity, self.pairing))
       self.servers.append(NavAssistDiscoveryServer(('0.0.0.0', DISCOVERY_PORT), identity, self.pairing,
                                                  is_offroad=is_offroad))

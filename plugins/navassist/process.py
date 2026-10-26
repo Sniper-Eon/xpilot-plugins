@@ -19,6 +19,7 @@ from .plugin import NavAssist
 from .position import publish as publish_position
 from .recording import Recorder
 from .runtime import NavigationRuntime
+from .route_geometry import RouteGeometryPublisher
 from .settings import read as read_settings
 from .store import NavAssistStore
 
@@ -52,7 +53,8 @@ def main():
   phone = PhoneBlindspotAssist(mode='assist' if settings.phone_assist_enabled else 'shadow')
   recorder = Recorder()
   rk = Ratekeeper(PUBLISH_HZ)
-  next_settings = next_record = 0
+  next_settings = next_record = next_route = 0
+  route_publisher = RouteGeometryPublisher() if not cp_source else None
   cloudlog.info('xpilot NavAssist transports online')
   try:
     while True:
@@ -83,6 +85,12 @@ def main():
         turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
         localization_valid=bool(pose_ok))
       publish_position(result['position'])
+      if route_publisher is not None and now >= next_route:
+        next_route = now+1_000_000_000
+        geometry = transports.geometry.current(store.current(now), now)
+        route_status = route_publisher.update(geometry, now,
+          enabled=settings.enabled and plugins.owner(params, 'source:route') == 'navassist')
+        plugins.send_msg(pm, NavAssist, 'nav.route', route_status, 1500)
       for key, kind, ttl in [('nav', 'nav.state', 1000), ('topology', 'lanes.topology', 150),
                             ('intent', 'lanes.intent', 200), ('oem', 'oem.lanes', 500)]:
         plugins.send_msg(pm, NavAssist, kind, result[key], ttl)
@@ -92,6 +100,8 @@ def main():
                             mono_time_ns=now, **result))
       rk.keep_time()
   finally:
+    if route_publisher is not None:
+      route_publisher.close()
     recorder.close()
     transports.close()
     publish_position(dict(version=1, valid=False, absolute_confirmed=False, capture_mono_ns=time.monotonic_ns()))

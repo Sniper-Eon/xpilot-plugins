@@ -110,6 +110,7 @@ internal class HttpNavAssistV2Exporter(
     private val ownerSettleMs: Long = 3_000L,
     private val monotonicMs: () -> Long = { System.nanoTime() / 1_000_000L },
     private val feedbackElapsedMs: () -> Long = { android.os.SystemClock.elapsedRealtime() },
+    private val routeProvider: (NavigationState) -> SdkRouteGeometry? = { null },
 ) : NavigationDataExporter {
     private val mutableConnectionState = MutableStateFlow(ExportConnectionState.STOPPED)
     override val connectionState: StateFlow<ExportConnectionState> = mutableConnectionState
@@ -143,6 +144,7 @@ internal class HttpNavAssistV2Exporter(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + publisherDispatcher)
+    private val routeTransfer = RouteGeometryTransfer(scope)
     private val session by lazy { navigationSession ?: NavAssistV2Session(validForMs = config.validForMs) }
 
     @Volatile private var running = false
@@ -202,10 +204,11 @@ internal class HttpNavAssistV2Exporter(
                                 monotonicMs().takeIf { ack != null }, ownerConfirmed, snapshot.routeActive,
                             )
                         }
-                        Pair(snapshot, ack)
+                        Triple(snapshot, ack, routeProvider(state))
                     }
                     if (attempt != null) {
                         val ack = attempt.second
+                        if (ack != null) routeTransfer.offer(attempt.first, ack.host, attempt.third) else routeTransfer.clear()
                         publishIfRunning {
                             mutableLaneAnnouncement.value = ack?.announcement
                             if (ack?.announcement?.id != completedAnnouncement?.id) completedAnnouncement = null

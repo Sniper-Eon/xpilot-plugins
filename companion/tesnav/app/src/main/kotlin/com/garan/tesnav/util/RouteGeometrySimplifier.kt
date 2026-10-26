@@ -16,6 +16,7 @@ object RouteGeometrySimplifier {
         viewportHeightPixels: Double,
         paddingPixels: Double = 0.0,
         tolerancePixels: Double = 1.5,
+        maxToleranceMeters: Double = Double.POSITIVE_INFINITY,
     ): Result {
         if (points.size <= 2) return Result(points, 0.0)
 
@@ -31,7 +32,8 @@ object RouteGeometrySimplifier {
         val availableWidth = (viewportWidthPixels - paddingPixels * 2.0).coerceAtLeast(1.0)
         val availableHeight = (viewportHeightPixels - paddingPixels * 2.0).coerceAtLeast(1.0)
         val pixelsPerMeter = minOf(availableWidth / spanX, availableHeight / spanY)
-        val toleranceMeters = tolerancePixels / pixelsPerMeter
+        require(maxToleranceMeters > 0.0)
+        val toleranceMeters = minOf(tolerancePixels / pixelsPerMeter, maxToleranceMeters)
 
         val keep = BooleanArray(points.size)
         keep[0] = true

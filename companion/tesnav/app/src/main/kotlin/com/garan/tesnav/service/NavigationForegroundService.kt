@@ -74,6 +74,7 @@ class NavigationForegroundService : Service() {
         private set
     lateinit var exporter: WebSocketNavigationDataExporter
         private set
+    @Volatile private var sdkRouteGeometry: com.garan.tesnav.export.SdkRouteGeometry? = null
     private lateinit var navAssistV2Exporter: HttpNavAssistV2Exporter
         private set
     private lateinit var navAssistSession: NavAssistV2Session
@@ -207,6 +208,11 @@ class NavigationForegroundService : Service() {
         navAssistIdentity = AndroidKeystoreNavAssistIdentity.loadOrCreate(applicationContext)
         navAssistPairingStore = NavAssistPairingStore(applicationContext)
         repository = NavigationRepository(applicationContext, stateStore) { path ->
+            val state = stateStore.state.value
+            sdkRouteGeometry = path?.takeIf { it.pathid == state.acceptedPathId }?.let {
+                com.garan.tesnav.export.SdkRouteGeometry(it.pathid, state.routeRevision, it.allLength,
+                    it.coordList.orEmpty().take(50_001).map { point -> GeoPoint(point.latitude, point.longitude) })
+            }
             if (!legacyExportEnabled || !::exporter.isInitialized) return@NavigationRepository
             if (path == null) {
                 exporter.clearRoute()
@@ -562,6 +568,10 @@ class NavigationForegroundService : Service() {
         navAssistV2Exporter = HttpNavAssistV2Exporter(
             config = navAssistV2Config,
             navigationSession = navAssistSession,
+            routeProvider = { state ->
+                sdkRouteGeometry?.takeIf { mutableNavigationDataSource.value == NavigationDataSource.AMAP_API &&
+                    it.pathId == state.acceptedPathId && it.routeRevision == state.routeRevision && !state.routeRecalculating }
+            },
             stateProvider = {
                 val selected = selectedNavigationState()
                 val prepared = sourceGate.prepare(selected, android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis())
