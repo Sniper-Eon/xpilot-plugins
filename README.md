@@ -6,6 +6,10 @@ Devices list this repository under Settings → Plugins → Plugin Store, instal
 插件仓库：xpilot 设备在 设置 → Plugins → Plugin Store 里浏览这里的插件，停车时安装，重启后生效。
 接口、类别、资源声明和底线规则见 xpilot 仓库根目录的 `XPILOT.md`。
 
+2026-10-26 用户确认：可选车辆功能通过各自插件的独立总开关启用；**导航相关功能继续
+集成在一个 navassist 插件**，内部保留变道、打灯、降速和提示音设置，不拆成多个导航插件。
+源码核查、开关清单与边界见 [插件架构核查](docs/PLUGIN_ARCHITECTURE_AUDIT_20261026.md)。
+
 ## Layout
 
 ```

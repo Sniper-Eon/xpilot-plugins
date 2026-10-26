@@ -33,6 +33,10 @@ jobs:
       run: scons -j4 msgq/ipc_pyx.so
     - name: Classifier failure modes
       run: python3 tools/pr_risk_check.py > /tmp/pr_risk_check.json
+    - name: Independent plugin master switches
+      run: |
+        python3 tools/plugin_switch_contract_check.py
+        python3 tools/plugin_switch_contract.py
     - name: Archives and index match the source
       run: python3 tools/build_index.py --check
     - name: Two X-Pilot profile contract
