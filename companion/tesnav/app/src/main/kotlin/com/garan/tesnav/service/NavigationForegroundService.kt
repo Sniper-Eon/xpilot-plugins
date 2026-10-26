@@ -446,6 +446,7 @@ class NavigationForegroundService : Service() {
         val receiver = object : BroadcastReceiver() {
             @Suppress("DEPRECATION")
             override fun onReceive(context: Context?, intent: Intent?) {
+                if (intent?.action !in AmapAutoCpCompatibility.SEND_ACTIONS) return
                 val extras = intent?.extras ?: return
                 val values = extras.keySet().associateWith { key -> runCatching { extras.get(key) }.getOrNull() }
                 val observedAtMs = System.currentTimeMillis()
@@ -453,6 +454,9 @@ class NavigationForegroundService : Service() {
                 mutableAmapAutoBroadcasts.value = AmapAutoBroadcast.retain(mutableAmapAutoBroadcasts.value, snapshot)
 
                 val keyType = snapshot.keyType
+                mutableAmapAutoNavigationState.update { current ->
+                    AmapAutoCpCompatibility.lifecycle(current, values)
+                }
                 if (keyType != null && amapAutoSeenKeyTypes.add(keyType)) {
                     NavigationTrace.append(
                         filesDir,
@@ -520,8 +524,7 @@ class NavigationForegroundService : Service() {
             }
         }
         val filter = IntentFilter().apply {
-            addAction("AUTONAVI_STANDARD_BROADCAST_SEND")
-            addAction("AUTONAVI_STANDARD_BROADCAST_RECV")
+            AmapAutoCpCompatibility.SEND_ACTIONS.forEach(::addAction)
         }
         ContextCompat.registerReceiver(this, receiver, filter, ContextCompat.RECEIVER_EXPORTED)
         trafficLightReceiver = receiver

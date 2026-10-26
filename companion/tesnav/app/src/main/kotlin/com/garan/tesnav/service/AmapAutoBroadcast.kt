@@ -160,19 +160,7 @@ internal object AmapAutoBroadcast {
             fallbackFresh -> locationFallback
             else -> previous
         }
-        val maneuver = when (icon) {
-            1 -> com.garan.tesnav.model.NavigationManeuver.STRAIGHT
-            9 -> com.garan.tesnav.model.NavigationManeuver.U_TURN_RIGHT
-            10 -> com.garan.tesnav.model.NavigationManeuver.KEEP_LEFT
-            11 -> com.garan.tesnav.model.NavigationManeuver.KEEP_RIGHT
-            12, 13 -> com.garan.tesnav.model.NavigationManeuver.ROUNDABOUT
-            // Auto's highway left/right-front guidance is a fork, not an SDK link RoadType.
-            4 -> if (roadClass in setOf(0, 6)) com.garan.tesnav.model.NavigationManeuver.MERGE_LEFT
-                else com.garan.tesnav.model.NavigationManeuver.SLIGHT_LEFT
-            5 -> if (roadClass in setOf(0, 6)) com.garan.tesnav.model.NavigationManeuver.MERGE_RIGHT
-                else com.garan.tesnav.model.NavigationManeuver.SLIGHT_RIGHT
-            else -> NavigationMappers.maneuver(icon)
-        }
+        val maneuver = autoManeuver(icon, roadClass)
         val previousActive = previous?.routePlanned == true && previous.navigationMode == NavigationMode.REALTIME
         val newRoute = routeActive && !previousActive
         val maneuverChanged = previousActive && routeActive &&
@@ -192,7 +180,7 @@ internal object AmapAutoBroadcast {
         }
         val routeRevision = if (newRoute) (previous?.routeRevision ?: 0L) + 1L else previous?.routeRevision ?: 0L
 
-        return NavigationState(
+        return AmapAutoCpCompatibility.enrich(NavigationState(
             navigationProvider = NavigationDataSource.AMAP_AUTO.name,
             navigationMode = if (routeActive) NavigationMode.REALTIME else NavigationMode.IDLE,
             latitude = location?.latitude,
@@ -255,7 +243,21 @@ internal object AmapAutoBroadcast {
             laneCallbackCount = previous?.laneCallbackCount ?: 0,
             laneLastEvent = previous?.laneLastEvent,
             speechEnabled = previous?.speechEnabled ?: true,
-        )
+        ), extras)
+    }
+
+    /** Auto IDs differ from SDK IconType, including KEEP RIGHT=11 and STRAIGHT=1. */
+    fun autoManeuver(icon: Int?, roadClass: Int?) = when (icon) {
+        1 -> com.garan.tesnav.model.NavigationManeuver.STRAIGHT
+        9 -> com.garan.tesnav.model.NavigationManeuver.U_TURN_RIGHT
+        10 -> com.garan.tesnav.model.NavigationManeuver.KEEP_LEFT
+        11 -> com.garan.tesnav.model.NavigationManeuver.KEEP_RIGHT
+        12, 13 -> com.garan.tesnav.model.NavigationManeuver.ROUNDABOUT
+        4 -> if (roadClass in setOf(0, 6)) com.garan.tesnav.model.NavigationManeuver.MERGE_LEFT
+            else com.garan.tesnav.model.NavigationManeuver.SLIGHT_LEFT
+        5 -> if (roadClass in setOf(0, 6)) com.garan.tesnav.model.NavigationManeuver.MERGE_RIGHT
+            else com.garan.tesnav.model.NavigationManeuver.SLIGHT_RIGHT
+        else -> NavigationMappers.maneuver(icon)
     }
 
     /** 13012 Auto uses icon colors/semantics distinct from SDK LaneAction. */

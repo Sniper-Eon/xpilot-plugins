@@ -1,4 +1,4 @@
-# Navigation Assist 1.2
+# Navigation Assist 1.3
 
 Personal fork: [Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot), branch `xpilot`.
 Install this plugin only with the paired host containing `openpilot/tesla/lane_policy.py` and the
@@ -39,6 +39,12 @@ Diagnostics rotate under the device data directory; driving logs and keys are ex
 The separate `phone_vision` plugin provides single wide-camera frames for the companion app.
 It is disabled by default and not started by navigation. Dual camera, overtaking and external model control
 have been removed. External model control is not supplied by this navigation plugin.
+
+The 1.3 overlay keeps fresh linked route text visible while localization is unavailable,
+marked `GUIDANCE ONLY`. This is presentation only: control validity, source expiry,
+lane readiness and vehicle assistance gates are unchanged. Stale or unlinked instructions
+still disappear. TesNav 21 adds CP-compatible AMap broadcast handling inside the existing
+companion; selecting that app on C3 still requires the TesNav v3 profile (source 0).
 
 ## Physical lamps and firmware
 

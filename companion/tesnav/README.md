@@ -4,9 +4,14 @@
 配对系统：[Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot)，`xpilot` 分支；
 设备导航和取图分别由 `navassist`、`phone_vision` 商店插件提供。
 
-本次候选版版本号 19 / `1.7-xpilot-tesnav`，名称“特会开·X-Pilot”。
+本次候选版版本号 21 / `1.8-xpilot-amap`，名称“特会开·X-Pilot”。
 包名仍为 `com.garan.tesnav.tenengkai.lane`，使用原签名覆盖更新，不创建分身。
 安装包不放进 Git；发布时作为 GitHub Release 附件。源码不包含签名密钥或 API 凭据。
+
+以特会开为主保留内置高德 SDK、车机地图、语音与原有单目识别。补齐 CP 公开源码使用的
+高德车机广播入口、后续路口、可选电子眼与明确到达状态；仍通过特会开 v3 协议发送，
+不依赖 CP 8 的 WebSocket 会话。范围与验收见 [CP_AMAP_ADAPTATION.md](docs/CP_AMAP_ADAPTATION.md)。
+这不是从 CP 提取模型，也不提供 C3 完整地图投屏。手机安装与真实导航联调尚未完成。
 
 视觉推理仍在手机；C3 的图像读取与编码仍有开销，所以候选取图插件默认关闭，单路 640、4 Hz。
 双目代码及 OpenCV 手机依赖已删除。导航 UDP 不需要视觉连接码；

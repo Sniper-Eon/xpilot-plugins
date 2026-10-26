@@ -5,7 +5,7 @@ works with the same data the lane-change policy and speed ceiling consume."""
 import pyray as rl
 
 from openpilot.tesla.ui.plugin_ui import ScreenOverlay
-from .display import read_state
+from .display import read_state, guidance_visible, guidance_only
 
 WHITE = (255, 255, 255)
 AMBER = (255, 176, 0)
@@ -47,7 +47,7 @@ class NavAssistOverlay(ScreenOverlay):
   def draw(self, zones: dict) -> None:
     nav = self.nav or {}
     intent = self.intent or {}
-    if not nav.get("valid") and not intent.get("signalRequested"):
+    if not guidance_visible(nav) and not intent.get("signalRequested"):
       return
     view = zones.get("view")
     x = int(view.x) if view is not None else 300
@@ -57,11 +57,13 @@ class NavAssistOverlay(ScreenOverlay):
     width = 560
     rl.draw_rectangle(x, y, width, 66, rl.Color(0, 0, 0, 190))
     lines = []
-    if nav.get("valid"):
+    if guidance_visible(nav):
       maneuver = _arrow(str(nav.get("maneuver", "none")))
       distance = float(nav.get("distanceM", 0.0))
       if maneuver:
         lines.append((f"{maneuver}  {distance:.0f} m", WHITE))
+      if guidance_only(nav):
+        lines.append(("GUIDANCE ONLY", AMBER))
       total = int(nav.get("laneTotalCount", -1))
       lanes = nav.get("lanes") or []
       recommended = [int(lane["index"]) + 1 for lane in lanes if lane.get("recommended")]
