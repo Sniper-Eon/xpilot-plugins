@@ -1,7 +1,7 @@
 {
   "id": "zh_cn",
   "name": "Simplified Chinese UI",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "api": 1,
   "category": "ui",
   "entry": "plugin:SimplifiedChinese",
@@ -9,9 +9,14 @@
   "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
   "priority": 100,
   "enable_param": "ExtChineseUiEnabled",
-  "claims": ["source:ui.translations"],
+  "claims": [
+    "source:ui.translations"
+  ],
   "settings": [],
   "params": {
-    "ExtChineseUiEnabled": {"type": "BOOL", "default": "0"}
+    "ExtChineseUiEnabled": {
+      "type": "BOOL",
+      "default": "0"
+    }
   }
 }

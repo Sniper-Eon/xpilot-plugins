@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 import sys
+from string import Formatter
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,6 +16,15 @@ def main():
   sys.modules[spec.name] = module
   spec.loader.exec_module(module)
   translator = module.ChineseCatalog()
+  # Regression: lower-case tile/action labels were absent despite translated settings.
+  for text in ('add tiles', 'done', 'Plugin Store', 'checking...', 'download update',
+               'updater failed to respond', 'training guide', 'driver camera', 'car model'):
+    translated = translator.translate(text)
+    assert translated and any('\u4e00' <= c <= '\u9fff' for c in translated), text
+  def fields(text):
+    return sorted((name, spec, conversion) for _, name, spec, conversion in Formatter().parse(text) if name is not None)
+  for source, translated in translator.strings.items():
+    assert fields(source) == fields(translated), source
   checked = 0
   for p in (ROOT / 'plugins').glob('*/plugin.json'):
     d = json.loads(p.read_text())
