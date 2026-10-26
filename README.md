@@ -87,6 +87,33 @@ Merge/deploy the X-20261026-59 system PR first, then this plugin PR; no automati
 external_compute 1.0.1 uses the removed host hook/services; 1.0.2 creates its own publisher.
 Upgrade to 1.0.3 with the broker host; deploy only the matching pair after both PRs merge.
 
+### Pure plugin/API migration: X-20261026-58
+
+`traffic_light` 和 `bms` **1.1.0** 使用 `plugins.send_msg` / `PluginMsgs`，不再读写历史
+`CarStateSP` / `LongitudinalPlanSP` 专用字段，也不再发布 `trafficRadarState` 服务。
+须先部署包含 `plugin_msgd` 的系统（`onemiless/xpilot@4d149dc0e52c3038204b5f5e573680c30b1499ed`
+或后续版本），再安装这两个插件；`requires.msg` 只检查消息 API，不能识别旧单发布端实现。
+系统侧专用字段仅保留 wire ordinal/type/node ID，改名 `deprecated*`。
+
+| source | kind / claim | 发布进程 / 最高频率 | TTL | 接收方 |
+|---|---|---|---|---|
+| traffic_light | traffic.observation / msg:traffic.observation | card / 20 Hz | 750 ms | trafficcontrold |
+| traffic_light | traffic.target / msg:traffic.target | trafficcontrold / modelV2 20 Hz | 350 ms | plannerd plan.filter |
+| traffic_light | traffic.plan / msg:traffic.plan | plannerd / 20 Hz | 350 ms | Traffic Light 磁贴 |
+| bms | bms.state / msg:bms.state | card / 2 Hz | 最多 2000 ms，按最旧 CAN 帧剩余寿命缩短 | Battery 磁贴 |
+
+同一个 traffic_light source 的三个进程共享 100 Hz / 256 KiB/s 预算，正常合计最多约 60 Hz。
+所有消费者用 `latest(kind, source)` 固定来源。观测保留原始帧时间、bus、DLC、地址和十六进制 payload，
+controller 仍检查原始 CAN 的 750 ms 时效；目标还检查模型发布时间的 350 ms 时效。
+过期观测不产生新证据，目标丢失走既有仲裁退化/低速保持规则；磁贴过期显示空状态。
+`traffic_light` 的控制只经 `plan.filter`，不新增 CAN、planner 或 controller ownership。
+详见 [traffic_light README](plugins/traffic_light/README.md) 和 [bms README](plugins/bms/README.md)。
+
+消息 E2E：`cd plugins && python3 -m pytest -q -s traffic_light/tests/test_plugin_messages.py`。
+实际执行 CAN 解码 → Unix datagram → broker → cereal → PluginMsgs → controller/filter/tiles，输出 JSON 结果。
+manager/Params 使用隔离夹具；跨进程认证、限流和重启由系统 `plugin_msg_e2e.py` 验证。
+这不证明设备 CAN、物理 UI 或道路控制，系统 PR 先合/部署，插件 PR 后合/安装，均需人工审核。
+
 Tests: `cd plugins && python3 -m pytest -q .` with an xpilot checkout on `PYTHONPATH` (see `.github/workflows/ci.yml`).
 Run `python3 tools/runtime_rules_check.py --output /tmp/runtime-rules` with that same `PYTHONPATH` to validate
 source and archives against the real host, compare AUTO/AMBIENT reference bytes and exercise card setup.
