@@ -19,7 +19,8 @@ internal class EmbeddedAmapBridge {
                 "Landroid/app/IActivityManager", "Landroid/hardware/input/IInputManager",
                 "Landroid/view/InputEvent;", "Landroid/app/ActivityOptions;",
                 "Landroid/app/IActivityTaskManager", "Landroid/app/ActivityManager\$StackInfo;",
-                "Landroid/app/ActivityTaskManager\$RootTaskInfo;")
+                "Landroid/app/ActivityTaskManager\$RootTaskInfo;",
+                "Landroid/app/TaskInfo;->displayId")
         }
     }
 
@@ -48,15 +49,22 @@ internal class EmbeddedAmapBridge {
             val type = stack.javaClass
             val top = type.getField("topActivity").get(stack) as? ComponentName ?: continue
             if (top.packageName != "com.autonavi.amapauto") continue
-            val names = type.getField("taskNames").get(stack) as? Array<*> ?: continue
+            val namesField = if (getter.name == "getAllRootTaskInfos") "childTaskNames" else "taskNames"
+            val names = type.getField(namesField).get(stack) as? Array<*> ?: continue
             if (names.isEmpty() || names.any { !it.toString().startsWith("com.autonavi.amapauto/") }) continue
             val id = type.getField(if (getter.name == "getAllRootTaskInfos") "taskId" else "stackId").getInt(stack)
-            val current = type.getField("displayId").getInt(stack)
-            if (current != display) {
+            val originalDisplay = type.getField("displayId").getInt(stack)
+            if (originalDisplay != display) {
                 api.getMethod(if (getter.name == "getAllRootTaskInfos") "moveRootTaskToDisplay" else "moveStackToDisplay",
                     Int::class.javaPrimitiveType, Int::class.javaPrimitiveType).invoke(tasks, id, display)
             }
-            return true
+            // A successful move request is not proof the task is already there.
+            val refreshed = getter.invoke(tasks) as List<*>
+            val moved = refreshed.filterNotNull().firstOrNull {
+                it.javaClass.getField(if (getter.name == "getAllRootTaskInfos") "taskId" else "stackId").getInt(it) == id
+            } ?: return false
+            val current = moved.javaClass.getField("displayId").getInt(moved)
+            return current == display
         }
         return false
     }

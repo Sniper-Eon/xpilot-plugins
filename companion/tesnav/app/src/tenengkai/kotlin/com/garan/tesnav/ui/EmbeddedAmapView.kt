@@ -23,12 +23,17 @@ import java.util.concurrent.Executors
 
 /** Real AMap Auto pixels and touch, confined to the existing landscape map pane. */
 class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.SurfaceTextureListener {
+    var onAvailabilityChanged: ((Boolean) -> Unit)? = null
+    private var frameReceived = false
+    private var displayVerified = false
+    private var available = false
+    private var displayChecks = 0
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor()
     private val texture = TextureView(context)
     private val message = Button(context).apply {
-        setTextColor(Color.WHITE)
-        setBackgroundColor(Color.rgb(18, 23, 29))
+        AppChrome.primaryButton(this)
+        textSize = 14f
         setOnClickListener { requestAccess() }
     }
     private var active = false
@@ -52,7 +57,7 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
             false
         }
     }
-    private val checkDisplay = Runnable {
+    private val checkDisplay: Runnable = Runnable {
         val target = display?.display?.displayId ?: return@Runnable
         val remote = bridge ?: return@Runnable
         val token = generation
@@ -60,8 +65,14 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
             if (token != generation || !active || disposed) return@execute
             val success = runCatching { remote.ensureOnDisplay(target) }.getOrDefault(false)
             main.post {
-                if (token == generation && active && !success)
+                if (token != generation || !active || disposed) return@post
+                displayVerified = success
+                updateAvailability()
+                if (!success) {
                     Log.w(TAG, "display_check_failed display=$target")
+                    if (++displayChecks < 16) main.postDelayed(checkDisplay, 400)
+                    else disconnected()
+                }
             }
         }
     }
@@ -83,9 +94,14 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
     }
 
     init {
-        setBackgroundColor(Color.rgb(18, 23, 29))
+        setBackgroundColor(Color.TRANSPARENT)
+        // Surface creation must not wait for readiness, which itself needs a frame.
+        texture.alpha = 0.01f
         addView(texture, LayoutParams(-1, -1))
-        addView(message, LayoutParams(-1, -2, Gravity.CENTER))
+        addView(message, LayoutParams(-1, -2, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
+            val d = resources.displayMetrics.density
+            marginStart = (18*d).toInt(); marginEnd = (18*d).toInt(); bottomMargin = (92*d).toInt()
+        })
         texture.surfaceTextureListener = this
         texture.setOnTouchListener { _, event -> forwardTouch(event) }
         showMessage("等待显示高德车机")
@@ -107,6 +123,7 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         attached = true
+        if (active) AmapAutoActions.embeddedOpener = embeddedOpener
         Shizuku.addBinderReceivedListenerSticky(binderReceived)
         Shizuku.addBinderDeadListener(binderDead)
         Shizuku.addRequestPermissionResultListener(permissionResult)
@@ -173,6 +190,9 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
             display = (context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager)
                 .createVirtualDisplay("TenengkaiCarMap", texture.width, texture.height, dpi, surface,
                     DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY)
+            frameReceived = false
+            displayVerified = false
+            displayChecks = 0
             val id = display?.display?.displayId ?: error("NoDisplay")
             // This version's launcher is UsbFillActivity, which forwards to display 0.
             val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse("androidauto://launch"))
@@ -184,7 +204,9 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
             val token = ++generation
             val remote = bridge ?: error("NoBridge")
             launchPending = true
-            showMessage("正在显示高德车机")
+            showMessage("正在连接高德地图…")
+            texture.visibility = View.VISIBLE
+            texture.alpha = 0.01f
             worker.execute {
                 val success = runCatching {
                     remote.launch(id, component)
@@ -193,7 +215,6 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
                     if (token != generation || disposed || !active) return@post
                     launchPending = false
                     if (success) {
-                        message.visibility = View.GONE
                         Log.i(TAG, "launch_complete display=$id")
                         scheduleDisplayChecks()
                     } else {
@@ -241,10 +262,32 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
         }
     }
 
-    private fun showMessage(text: String) { message.text = text; message.visibility = View.VISIBLE }
+    private fun setAvailability(ready: Boolean) {
+        // Keep the texture composited so Android still delivers first-frame callbacks.
+        texture.alpha = if (ready) 1f else 0.01f
+        if (available != ready) {
+            available = ready
+            texture.contentDescription = if (ready) "高德车机地图，已连接" else "高德地图连接中"
+            Log.i(TAG, "map_ready=$ready")
+            onAvailabilityChanged?.invoke(ready)
+        }
+    }
+    private fun updateAvailability() {
+        val ready = active && attached && !launchPending && displayVerified && frameReceived
+        setAvailability(ready)
+        if (ready) message.visibility = View.GONE
+    }
+    private fun showMessage(text: String) {
+        setAvailability(false)
+        message.text = text
+        message.visibility = View.VISIBLE
+    }
     private fun releaseDisplay() {
         main.removeCallbacks(checkDisplay)
         generation++
+        frameReceived = false
+        displayVerified = false
+        setAvailability(false)
         launchPending = false
         display?.release(); display = null
         surface?.release(); surface = null
@@ -261,7 +304,12 @@ class EmbeddedAmapView(context: Context) : FrameLayout(context), TextureView.Sur
         if (width > 0 && height > 0) display?.resize(width, height, resources.displayMetrics.densityDpi.coerceIn(160, 320))
     }
     override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean { releaseDisplay(); return true }
-    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
+    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {
+        if (active && display != null) {
+            frameReceived = true
+            updateAvailability()
+        }
+    }
 
     companion object { private const val TAG = "Tenengkai-CarMap" }
 }

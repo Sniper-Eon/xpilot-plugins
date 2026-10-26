@@ -101,7 +101,6 @@ class NavigationActivity : Activity() {
     private var splitArrivalView: TextView? = null
     private var splitLeftBlindspotView: TextView? = null
     private var splitRightBlindspotView: TextView? = null
-    private var splitMapPane: FrameLayout? = null
     private var embeddedAmapView: EmbeddedAmapView? = null
     private var foreground = false
     private val splitLayout: Boolean
@@ -159,7 +158,9 @@ class NavigationActivity : Activity() {
         }
         naviView = AMapNaviView(this, createViewOptions())
         createControls()
-        setContentView(createRootView())
+        val root = createRootView()
+        setContentView(root)
+        com.garan.tesnav.ui.AppChrome.fitSystemBars(this, root)
         naviView.onCreate(savedInstanceState)
         naviView.setShowTrafficLightView(true)
         naviView.setLazyOverviewButtonView(overviewButton)
@@ -201,7 +202,7 @@ class NavigationActivity : Activity() {
         routeSwitchButton = actionButton("切换路线")
         sourceButton = actionButton(
             NavigationSourcePolicy.buttonText(NavigationDataSource.AMAP_API, BuildConfig.EXTENDED_NAV_SOURCES),
-        ).apply { textSize = 14f }
+        ).apply { com.garan.tesnav.ui.AppChrome.secondaryButton(this); textSize = 13f }
         routeChoiceRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
@@ -273,12 +274,12 @@ class NavigationActivity : Activity() {
             addView(createSplitLayout(), FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
             return@apply
         }
-        addView(naviView, FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
+        addView(createMapPane(), FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         addView(navigationTopPanel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            topMargin = dp(22)
-            marginStart = dp(72)
-            marginEnd = dp(72)
+            topMargin = dp(76)
+            marginStart = dp(16)
+            marginEnd = dp(16)
         })
         addView(routeActions, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -294,6 +295,20 @@ class NavigationActivity : Activity() {
             marginEnd = dp(16)
             topMargin = dp(22)
         })
+    }
+
+    /** Both orientations keep the SDK fallback until the real car-map surface is ready. */
+    private fun createMapPane(): FrameLayout = FrameLayout(this).apply {
+        setBackgroundColor(Color.rgb(233, 240, 245))
+        addView(naviView, FrameLayout.LayoutParams(-1, -1))
+        embeddedAmapView = EmbeddedAmapView(this@NavigationActivity).apply {
+            visibility = View.GONE
+            onAvailabilityChanged = { ready ->
+                naviView.visibility = if (ready) View.INVISIBLE else View.VISIBLE
+                if (!splitLayout) navigationTopPanel.visibility = if (ready) View.GONE else View.VISIBLE
+            }
+        }
+        addView(embeddedAmapView, FrameLayout.LayoutParams(-1, -1))
     }
 
     /** Reuse the live map and guidance; only the landscape presentation changes. */
@@ -425,8 +440,7 @@ class NavigationActivity : Activity() {
             addView(debugButton, LinearLayout.LayoutParams(dp(48), dp(48)))
             addView(sourceButton, LinearLayout.LayoutParams(0, dp(48), 1f))
         }, LinearLayout.LayoutParams(-1, -2))
-        val mapPane = FrameLayout(this).apply {
-            addView(naviView, FrameLayout.LayoutParams(-1, -1))
+        val mapPane = createMapPane().apply {
             addView(overviewButton, FrameLayout.LayoutParams(dp(52), dp(52)).apply {
                 gravity = Gravity.TOP or Gravity.END
                 topMargin = dp(12); marginEnd = dp(12)
@@ -441,18 +455,11 @@ class NavigationActivity : Activity() {
                 marginStart = dp(8); marginEnd = dp(8); bottomMargin = dp(12)
             })
         }
-        splitMapPane = mapPane
-        val rightPane = FrameLayout(this).apply {
-            addView(mapPane, FrameLayout.LayoutParams(-1, -1))
-            embeddedAmapView = EmbeddedAmapView(this@NavigationActivity).apply {
-                visibility = View.GONE
-            }
-            addView(embeddedAmapView, FrameLayout.LayoutParams(-1, -1))
-        }
+        val rightPane = mapPane
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Color.rgb(18, 23, 29))
-            val sidebarWidth = dp((resources.configuration.screenWidthDp * 0.38f).toInt().coerceAtLeast(300))
+            val sidebarWidth = dp((resources.configuration.screenWidthDp * 0.32f).toInt().coerceIn(260, 360))
             addView(sidebarPane, LinearLayout.LayoutParams(sidebarWidth, -1))
             addView(rightPane, LinearLayout.LayoutParams(0, -1, 1f))
         }
@@ -542,6 +549,11 @@ class NavigationActivity : Activity() {
             isScaleControlsEnabled = false
             isIndoorSwitchEnabled = false
             isTiltGesturesEnabled = false
+        }
+        val lat = intent.getDoubleExtra(EXTRA_MAP_LATITUDE, Double.NaN)
+        val lon = intent.getDoubleExtra(EXTRA_MAP_LONGITUDE, Double.NaN)
+        if (lat.isFinite() && lat in -90.0..90.0 && lon.isFinite() && lon in -180.0..180.0) {
+            naviView.map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(lat, lon), 16f))
         }
         naviView.map.moveCamera(CameraUpdateFactory.changeTilt(0f))
     }
@@ -685,15 +697,25 @@ class NavigationActivity : Activity() {
         autoExpiryJob?.cancel()
         val autoSelected = BuildConfig.EXTENDED_NAV_SOURCES && currentSource == NavigationDataSource.AMAP_AUTO
         // The car application's real UI replaces only the SDK map pane.
-        splitMapPane?.visibility = if (autoSelected) View.INVISIBLE else View.VISIBLE
         embeddedAmapView?.setActive(autoSelected && foreground)
         autoGuidanceView.visibility = if (!splitLayout && autoSelected && state.routePlanned) View.VISIBLE else View.GONE
         if (currentSource == NavigationDataSource.AMAP_AUTO) {
             routeActions.visibility = if (BuildConfig.EXTENDED_NAV_SOURCES) View.VISIBLE else View.GONE
             routeChoiceScroll.visibility = View.GONE
             if (BuildConfig.EXTENDED_NAV_SOURCES) {
-                endNavigationButton.apply { text = "返回搜索"; visibility = View.VISIBLE }
-                realtimeButton.apply { text = "打开高德车机"; visibility = View.VISIBLE }
+                endNavigationButton.apply {
+                    text = "搜索目的地"; visibility = View.VISIBLE
+                    com.garan.tesnav.ui.AppChrome.secondaryButton(this)
+                    layoutParams = (layoutParams as LinearLayout.LayoutParams).apply {
+                        width = dp(if (splitLayout) 140 else 166); marginEnd = dp(8)
+                    }
+                }
+                realtimeButton.apply {
+                    text = "重连高德地图"; visibility = View.VISIBLE
+                    layoutParams = (layoutParams as LinearLayout.LayoutParams).apply {
+                        width = dp(if (splitLayout) 140 else 166)
+                    }
+                }
                 simulationButton.visibility = View.GONE
                 speechButton.visibility = View.GONE
                 routeSwitchButton.visibility = View.GONE
@@ -1014,9 +1036,7 @@ class NavigationActivity : Activity() {
 
     private fun actionButton(label: String): Button = Button(this).apply {
         text = label
-        textSize = 17f
-        setTextColor(Color.WHITE)
-        backgroundTintList = ColorStateList.valueOf(BRAND_BLUE)
+        com.garan.tesnav.ui.AppChrome.primaryButton(this)
     }
 
     private fun floatingIconButton(icon: Int, description: String): ImageButton = ImageButton(this).apply {
@@ -1036,9 +1056,11 @@ class NavigationActivity : Activity() {
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 
     companion object {
+        const val EXTRA_MAP_LATITUDE = "display_map_latitude"
+        const val EXTRA_MAP_LONGITUDE = "display_map_longitude"
         const val EXTRA_DESTINATION_LATITUDE = "destination_latitude"
         const val EXTRA_DESTINATION_LONGITUDE = "destination_longitude"
         private const val MAX_ROUTE_CHOICES = 3
-        private val BRAND_BLUE = Color.rgb(0, 120, 255)
+        private val BRAND_BLUE = Color.rgb(23, 99, 211)
     }
 }

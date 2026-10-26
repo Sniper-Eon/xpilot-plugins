@@ -169,7 +169,9 @@ class MainActivity : Activity(), AddressLookupView {
             elapsedRealtimeMs = SystemClock::elapsedRealtime,
         )
         createControls()
-        setContentView(createRootView())
+        val root = createRootView()
+        setContentView(root)
+        com.garan.tesnav.ui.AppChrome.fitSystemBars(this, root)
         mapView.onCreate(savedInstanceState)
         configureMap()
         configureActions()
@@ -192,7 +194,7 @@ class MainActivity : Activity(), AddressLookupView {
         }
         sourceButton = actionButton(
             NavigationSourcePolicy.buttonText(NavigationDataSource.AMAP_API, BuildConfig.EXTENDED_NAV_SOURCES),
-        ).apply { textSize = 14f }
+        ).apply { com.garan.tesnav.ui.AppChrome.secondaryButton(this); textSize = 13f }
         destinationInput = EditText(this).apply {
             hint = "输入目的地地址或地点"
             setSingleLine(true)
@@ -222,12 +224,15 @@ class MainActivity : Activity(), AddressLookupView {
         }
         currentAddressText = TextView(this).apply {
             text = "当前位置：定位中…"
-            textSize = 14f
-            setTextColor(Color.rgb(38, 50, 56))
+            textSize = 12f
+            maxLines = 2
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setTextColor(Color.rgb(90, 111, 138))
         }
         autoNavigationSummary = TextView(this).apply {
-            textSize = 18f
-            setTextColor(Color.rgb(0, 105, 92))
+            textSize = 20f
+            typeface = android.graphics.Typeface.create("sans-serif-medium", 0)
+            setTextColor(Color.rgb(26, 56, 86))
             setPadding(dp(4), dp(8), dp(4), dp(8))
             visibility = View.GONE
             contentDescription = "高德车机导航摘要，点击查看导航详情"
@@ -239,9 +244,16 @@ class MainActivity : Activity(), AddressLookupView {
 
     private fun createSearchPanel(): LinearLayout = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        elevation = dp(10).toFloat()
-        setPadding(dp(12), dp(10), dp(12), dp(10))
-        background = roundedRect(Color.argb(242, 255, 255, 255), Color.rgb(207, 216, 220))
+        elevation = dp(6).toFloat()
+        setPadding(dp(18), dp(16), dp(18), dp(14))
+        background = roundedRect(Color.rgb(252, 253, 255), Color.rgb(222, 230, 240))
+        addView(TextView(context).apply {
+            text = "特会开  /  导航"
+            textSize = 12f
+            setTextColor(Color.rgb(90, 111, 138))
+            letterSpacing = 0.08f
+            setPadding(0, 0, 0, dp(8))
+        }, LinearLayout.LayoutParams(-1, -2))
         addView(autoNavigationSummary, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         addView(autoLaneGuidance, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         addView(currentAddressText, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -664,6 +676,10 @@ class MainActivity : Activity(), AddressLookupView {
         navigationPageOpening = true
         startActivity(
             Intent(this, NavigationActivity::class.java).apply {
+                // Map preview position only; never enters navigation/export state.
+                val center = mapView.map.cameraPosition.target
+                putExtra(NavigationActivity.EXTRA_MAP_LATITUDE, center.latitude)
+                putExtra(NavigationActivity.EXTRA_MAP_LONGITUDE, center.longitude)
                 target?.let {
                     putExtra(NavigationActivity.EXTRA_DESTINATION_LATITUDE, it.latitude)
                     putExtra(NavigationActivity.EXTRA_DESTINATION_LONGITUDE, it.longitude)
@@ -898,9 +914,7 @@ class MainActivity : Activity(), AddressLookupView {
 
     private fun actionButton(label: String): Button = Button(this).apply {
         text = label
-        textSize = 17f
-        setTextColor(Color.WHITE)
-        backgroundTintList = ColorStateList.valueOf(BRAND_BLUE)
+        com.garan.tesnav.ui.AppChrome.primaryButton(this)
     }
 
     private fun floatingIconButton(icon: Int, description: String): ImageButton = ImageButton(this).apply {
@@ -917,7 +931,7 @@ class MainActivity : Activity(), AddressLookupView {
     }
 
     private fun roundedRect(fillColor: Int, strokeColor: Int) = GradientDrawable().apply {
-        cornerRadius = dp(10).toFloat()
+        cornerRadius = dp(20).toFloat()
         setColor(fillColor)
         setStroke(dp(1), strokeColor)
     }
@@ -942,7 +956,7 @@ class MainActivity : Activity(), AddressLookupView {
         const val LOCATION_WAIT_TIMEOUT_MS = 12_000L
         const val SUGGESTION_DEBOUNCE_MS = 300L
         const val MIN_SUGGESTION_QUERY_LENGTH = 2
-        const val MAX_SUGGESTION_LIST_HEIGHT_DP = 280
+        const val MAX_SUGGESTION_LIST_HEIGHT_DP = 188
     }
 
     private enum class MapState { FOLLOW, BROWSE }
