@@ -1,5 +1,5 @@
 """Bounded display-only route transfer. No control inputs or freshness updates."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import base64
 import hashlib
 import json
@@ -89,9 +89,11 @@ class RouteGeometryCache:
     self.lock = threading.RLock()
     self.geometry = None
     self.pending = None
+    self.converting = None
+    self.worker = None
 
   def _clear(self):
-    self.geometry = self.pending = None
+    self.geometry = self.pending = self.converting = None
 
   def _context(self, current, now):
     if current is None or current.is_stale(now):
@@ -103,8 +105,9 @@ class RouteGeometryCache:
     key = (s.session_id, s.route_revision)
     if self.geometry is not None and self.geometry.coordinate_system != s.coordinate_system:
       self._clear()
-    if self.geometry is not None and key != (self.geometry.session_id, self.geometry.route_revision):
-      self._clear()
+    for route in (self.geometry, self.converting):
+      if route is not None and (key != (route.session_id, route.route_revision) or route.coordinate_system != s.coordinate_system):
+        self._clear()
     if self.pending is not None and key != self.pending['key']:
       self.pending = None
     return key
@@ -145,9 +148,20 @@ class RouteGeometryCache:
     if indices[0] != 0 or indices[-1] != count-1:
       raise ValueError('geometry_endpoints')
     frozen = tuple(tuple(pair) for pair in points)
-    # Convert once on the bounded ingress thread, never per navigation/model cycle.
-    wgs = tuple(gcj02_to_wgs84(*pair) for pair in frozen) if d['coordinateSystem'] == 'gcj02' else frozen
+    # Conversion is deferred to one bounded worker, never the UDP snapshot receiver.
+    wgs = () if d['coordinateSystem'] == 'gcj02' else frozen
     return Geometry(*key, route_id, d['coordinateSystem'], frozen, wgs, tuple(indices), count, float(tolerance), path)
+
+  def _convert(self, route):
+    try:
+      converted = replace(route, wgs84_points=tuple(gcj02_to_wgs84(*pair) for pair in route.points))
+      with self.lock:
+        if self.converting is route:
+          self.geometry, self.converting = converted, None
+    except Exception:
+      with self.lock:
+        if self.converting is route:
+          self.converting = None
 
   def accept(self, body, current, now_ns):
     if not body or len(body) > 4096:
@@ -178,8 +192,8 @@ class RouteGeometryCache:
       chunk = base64.b64decode(d['payload'], validate=True)
       if not 1 <= len(chunk) <= CHUNK_BYTES:
         raise ValueError('geometry_chunk_size')
-      if self.geometry is not None:
-        if not complete:
+      if self.geometry is not None or self.converting is not None:
+        if not complete and (self.converting is None or self.converting.route_id != d['routeId']):
           raise ValueError('geometry_revision_conflict')
         return ack
       p = self.pending
@@ -198,8 +212,16 @@ class RouteGeometryCache:
         self.pending = None
         if hashlib.sha256(raw).hexdigest() != d['routeId']:
           raise ValueError('geometry_hash')
-        self.geometry = self._parse(raw, key, d['routeId'], current.snapshot.coordinate_system)
-        ack['complete'] = True
+        route = self._parse(raw, key, d['routeId'], current.snapshot.coordinate_system)
+        if route.wgs84_points:
+          self.geometry = route
+          ack['complete'] = True
+        else:
+          if self.worker is not None and self.worker.is_alive():
+            raise ValueError('geometry_conversion_busy')
+          self.converting = route
+          self.worker = threading.Thread(target=self._convert, args=(route,), daemon=True, name='nav-route-convert')
+          self.worker.start()
       return ack
 
 

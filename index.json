@@ -130,7 +130,7 @@
       "author": "Sniper-Eon",
       "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.4.0.tar.gz",
-      "sha256": "a7fe3dae9f1d3252f7688755baefd2c80dbe2130a97212580bb2076b89247628",
+      "sha256": "8505de7b3cd2a713fa0bbcee2b4178f45944ff9a0612751189beb1b07ce01c36",
       "platform": null
     },
     {

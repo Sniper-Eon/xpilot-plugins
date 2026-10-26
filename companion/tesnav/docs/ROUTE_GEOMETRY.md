@@ -49,7 +49,7 @@ The integrated plugin declares `source:route` and `msg:nav.route`. It deliberate
 does not take `source:map`, so the existing OSM process remains available. Under
 `ExtNavAssistEnabled` and route ownership, a fully checked route becomes the existing
 `navRoute` message and bounded status `nav.route`; both are display/data only.
-Conversion runs once on ingress, outside the navigation loop. Cache reads never
+Conversion runs once on a single background worker, outside both the snapshot receiver and navigation loop. Cache reads never
 wait on conversion. GCJ-02 is approximately inverted to WGS-84 before publication;
 `navRoute` itself uses Float32 coordinates and cannot label coordinate systems.
 Mode end/recalculation, new session/revision, stale snapshots or disabling the
@@ -63,6 +63,6 @@ Parallel roads, stacked roads and absolute lane identity still need independent
 evidence. This release does not claim those decisions or road validation.
 
 Reference patterns: [openpilot navd](https://github.com/commaai/openpilot/blob/master/openpilot/selfdrive/navigation/navd.py)
-separates instructions from route geometry; [AMap Android navigation SDK](https://a.amap.com/lbs/static/unzip/Android_Navi_Doc/index.html)
+separates instructions from route geometry; [AMap Android navigation SDK](https://a.amap.com/lbs/static/unzip/Android_Navi_Doc/com/amap/api/navi/model/AMapNaviPath.html)
 exposes the selected navigation path. No official mapsd renderer or camera capture
 pipeline is added to this C3.

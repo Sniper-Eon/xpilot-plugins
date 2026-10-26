@@ -10,6 +10,17 @@ from navassist.route_geometry import RouteGeometryCache, RouteGeometryPublisher,
 
 NOW=1_000_000_000
 
+def wait_route(c,ctx=None,now=NOW):
+ import time
+ ctx=ctx or context()
+ deadline=time.monotonic()+3
+ while time.monotonic()<deadline:
+  g=c.current(ctx,now)
+  if g is not None:return g
+  time.sleep(.001)
+ raise AssertionError('route conversion did not complete')
+
+
 def context(**changes):
  s=N(session_id='route-s',route_revision=7,navigation_mode='realtime',coordinate_system='gcj02')
  for k,v in changes.items():setattr(s,k,v)
@@ -37,7 +48,7 @@ def packets(data=None,size=90,**changes):
 def ready(cache=None):
  c=cache or RouteGeometryCache()
  for p in reversed(packets()):c.accept(p,context(),NOW)
- assert c.current(context(),NOW) is not None
+ assert wait_route(c) is not None
  return c
 
 
@@ -45,7 +56,7 @@ def test_out_of_order_reassembly_is_complete_only_and_duplicate_is_idempotent():
  c=RouteGeometryCache();p=packets();c.accept(p[-1],context(),NOW)
  assert c.current(context(),NOW) is None
  for b in p[:-1]:c.accept(b,context(),NOW)
- original=c.current(context(),NOW)
+ original=wait_route(c)
  assert original.points==tuple(tuple(p) for p in payload()['points'])
  assert c.accept(p[-1],context(),NOW)['complete']
  assert c.current(context(),NOW) is original
@@ -95,7 +106,7 @@ def test_pending_chunks_expire_instead_of_accumulating_across_outages():
  for b in p[1:]:c.accept(b,longctx,NOW+16_000_000_000)
  assert c.current(longctx,NOW+16_000_000_000) is None
  c.accept(p[0],longctx,NOW+16_100_000_000)
- assert c.current(longctx,NOW+16_100_000_000) is not None
+ assert wait_route(c,longctx,NOW+16_100_000_000) is not None
 
 
 def test_hello_restores_after_receiver_restart_without_large_periodic_packets():
@@ -139,7 +150,7 @@ def test_udp_transfer_is_bound_to_a_live_snapshot_and_does_not_change_it():
   current=store.current()
   for b in packets(size=1500):assert send(port,b)['accepted']
   assert store.current() is current
-  assert server.geometry.current(current,__import__('time').monotonic_ns()) is not None
+  assert wait_route(server.geometry,current,__import__('time').monotonic_ns()) is not None
   assert send(port,encode(nav_payload(session_id='route-s',route_revision=8,sequence=2)))
   assert server.geometry.current(store.current(),__import__('time').monotonic_ns()) is None
  finally:stop_server(server,thread)
@@ -182,3 +193,27 @@ def test_navigation_loop_never_waits_for_geometry_conversion_lock():
   assert c.current(context(),NOW) is None
   assert time.monotonic()-started < .1
  finally:release.set();t.join()
+
+
+def test_slow_coordinate_conversion_does_not_hold_udp_snapshot_receiver(monkeypatch):
+ import threading,time
+ from navassist import route_geometry as module
+ from navassist.tests.test_legacy_udp_receiver import run_server,stop_server,send
+ from navassist.tests.test_legacy_protocol import payload as nav_payload,encode
+ entered=threading.Event();release=threading.Event()
+ original=module.gcj02_to_wgs84
+ def slow(*point):
+  entered.set();release.wait(2)
+  return original(*point)
+ monkeypatch.setattr(module,'gcj02_to_wgs84',slow)
+ store,server,thread=run_server()
+ try:
+  port=server.server_address[1]
+  assert send(port,encode(nav_payload(session_id='route-s',route_revision=7)))
+  data=packets(size=1500)[0]
+  started=time.monotonic()
+  assert send(port,data) is not None
+  assert time.monotonic()-started < .2
+  assert entered.wait(.5)
+  assert send(port,encode(nav_payload(session_id='route-s',route_revision=7,sequence=2)))
+ finally:release.set();stop_server(server,thread)
