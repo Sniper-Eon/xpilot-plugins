@@ -1,4 +1,4 @@
-# Navigation Assist 1.3
+# Navigation Assist 1.3.1
 
 Personal fork: [Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot), branch `xpilot`.
 Install this plugin only with the paired host containing `openpilot/tesla/lane_policy.py` and the
@@ -54,6 +54,14 @@ checksum, controls_allowed for active requests, bus, size, 100 ms rate, and 200 
 Cancel is permitted without controls_allowed because it only releases an owned lamp.
 SP and Tesla remain the lane-change/steering authorities. Host checks, native safety tests, actual firmware
 compilation, device build, parked validation and road validation are separate evidence.
+
+## Turn-completion ownership repair (1.3.1)
+
+When guidance advances while the vehicle is still turning, the bounded completion hold retains the original
+physical-lamp request ID. Otherwise the wire controller treats the new instruction as a replacement and cancels
+the lamp despite the coordinator requesting a hold. Stable turn completion, route/session changes, stale inputs,
+driver override, disable and the existing timeout still release ownership. No lane-change permission is added.
+This repair uses only the paired host's existing interfaces; it does not add runtime rules or migrate firmware.
 
 ## Validation
 

@@ -72,7 +72,8 @@ class NavTurnSignalCoordinator:
         return NavLaneIntent(
           signal_requested=True,
           direction=self._active_direction,
-          request_id=plan.maneuver_event_id,
+          # The next guidance event does not own the still-active turn lamp.
+          request_id=self._active_key[2],
           target_lane_index=-1,
           reason="turnCompletion",
         )
