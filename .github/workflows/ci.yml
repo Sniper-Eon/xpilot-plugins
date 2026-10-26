@@ -22,6 +22,7 @@ jobs:
       with:
         repository: Sniper-Eon/xpilot
         ref: xpilot
+        fetch-depth: 0  # profile validation proves ancestry against its recorded host baseline
         path: xpilot
     - run: git -C xpilot submodule update --init --depth 1 msgq_repo
     - uses: actions/setup-python@v5
