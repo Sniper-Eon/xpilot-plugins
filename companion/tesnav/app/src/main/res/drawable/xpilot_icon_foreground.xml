@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Glass pane remains inside the adaptive launcher safe area. -->
+    <path android:pathData="M35,20H73C82,20 88,26 88,35V73C88,82 82,88 73,88H35C26,88 20,82 20,73V35C20,26 26,20 35,20Z"
+        android:strokeColor="#79DCFAFF" android:strokeWidth="0.7">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="25" android:startY="20" android:endX="79" android:endY="88"
+                android:startColor="#65E5FAFF" android:centerColor="#153FA4C3" android:endColor="#25226189" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M35,21H73C81,21 87,27 87,35V39C65,35 47,40 21,55V35C21,27 27,21 35,21Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="43" android:startY="21" android:endX="60" android:endY="58"
+                android:startColor="#4DFFFFFF" android:endColor="#00FFFFFF" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M35,22H73C81,22 86,27 86,35" android:fillColor="#00000000"
+        android:strokeColor="#B5F8FFFF" android:strokeWidth="0.8" android:strokeLineCap="round" />
+    <!-- Solid, readable X with a subtle cool bevel. -->
+    <path android:pathData="M34,31H45L54,45L63,31H75L60,53L77,78H65L54,62L43,78H31L48,53Z"
+        android:fillColor="#6A04192F" />
+    <path android:pathData="M34,29H45L54,43L63,29H75L60,51L77,76H65L54,60L43,76H31L48,51Z"
+        android:strokeColor="#AFFFFFFF" android:strokeWidth="0.4">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="39" android:startY="29" android:endX="67" android:endY="77"
+                android:startColor="#FFFFFF" android:centerColor="#DEF9FF" android:endColor="#8DCFE9" />
+        </aapt:attr>
+    </path>
+</vector>

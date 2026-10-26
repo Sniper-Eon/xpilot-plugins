@@ -81,6 +81,10 @@ internal class NavigationLocationFallback {
             return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "clockInvalid")
         }
         lastElapsedMs = nowElapsedMs
+        // User policy: independent, qualified phone positioning owns the navigation origin.
+        if (usable(phone, nowElapsedMs, nowWallMs)) {
+            return NavigationLocationSelection(NavigationLocationSource.PHONE, reason = "phonePrimary")
+        }
         if (usable(vehicle, nowElapsedMs, nowWallMs)) {
             val fix = vehicle!!
             val key = fix.sourceEpoch to fix.measuredAtMs
@@ -91,10 +95,7 @@ internal class NavigationLocationFallback {
             val newFix = key != previous
             if (newFix) lastVehicleFix = key
             return NavigationLocationSelection(NavigationLocationSource.VEHICLE,
-                if (newFix) fix else null, if (newFix) "vehiclePrimary" else "awaitingNewVehicleFix")
-        }
-        if (usable(phone, nowElapsedMs, nowWallMs)) {
-            return NavigationLocationSelection(NavigationLocationSource.PHONE, reason = "phoneFallback")
+                if (newFix) fix else null, if (newFix) "vehicleFallback" else "awaitingNewVehicleFix")
         }
         return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "noQualifiedLocation")
     }

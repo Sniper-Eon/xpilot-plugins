@@ -59,7 +59,7 @@ class VehicleLocationObservationTest {
         factory.reset()
         assertNotNull(factory.read(feedback(2000, 9000), 2000, 21000))
     }
-    @Test fun `vehicle bridge keeps vehicle primary and falls back when it expires`() {
+    @Test fun `vehicle bridge hands back immediately when independent phone recovers`() {
         val calls = mutableListOf<String>()
         val controller = NavigationExternalLocationController(object : NavigationExternalLocationSink {
             override fun setExternalEnabled(enabled: Boolean) { calls.add("enabled=$enabled") }
@@ -71,7 +71,7 @@ class VehicleLocationObservationTest {
         assertEquals(listOf("enabled=true", "inject"), calls)
         val phone = fix.copy(sourceEpoch="phone-gps", measuredAtMs=20000, ageAtReceiptMs=0,
             measurementTimeVerified=true, observationTimeOnly=false)
-        assertEquals(NavigationLocationSource.VEHICLE, controller.update(phone, fix, true, 1000, 20000).source)
+        assertEquals(NavigationLocationSource.PHONE, controller.update(phone, fix, true, 1000, 20000).source)
         assertEquals(NavigationLocationSource.PHONE, controller.update(phone.copy(measuredAtMs=24000, receivedElapsedMs=5000),
             null, true, 5000, 24000).source)
         assertEquals("enabled=false", calls.last())

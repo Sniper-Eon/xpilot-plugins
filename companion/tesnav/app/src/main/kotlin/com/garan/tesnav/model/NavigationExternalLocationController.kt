@@ -19,7 +19,11 @@ internal class NavigationExternalLocationController(private val sink: Navigation
 
     fun update(phone: NavigationLocationObservation?, vehicle: NavigationLocationObservation?, active: Boolean,
                nowElapsedMs: Long, nowWallMs: Long, phoneSignalWeak: Boolean = false): NavigationLocationSelection {
-        val selection = selector.select(phone.takeUnless { phoneSignalWeak }, vehicle, active, nowElapsedMs, nowWallMs)
+        // A stale SDK satellite-status callback must not suppress an independently
+        // recovered Android GNSS fix. Injected SDK output never enters this raw stream.
+        val independentGps = phone?.sourceEpoch == "phone-gps" && phone.measurementTimeVerified
+        val candidate = phone.takeUnless { phoneSignalWeak && !independentGps }
+        val selection = selector.select(candidate, vehicle, active, nowElapsedMs, nowWallMs)
         return try {
             if (selection.source == NavigationLocationSource.VEHICLE) {
                 // Do not enable external mode without a new qualified measurement.
