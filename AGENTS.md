@@ -1,5 +1,7 @@
 # User-fork plugin development
 
+- User requirement (2026-10-26): first consult the upstream onemiless/xpilot:xpilot developer rules and relevant API definitions, plus onemiless/xpilot-plugins:main contributing rules. Compare required hooks/ABI with the paired local and active device hosts. Follow the parent workspace's persistent developer-document requirement; upstream defaults do not override explicit user decisions or authorize device/firmware migration.
+
 - Follow the workspace AGENTS.md and paired `../xpilot/XPILOT.md` first.
 - Work in this checkout on `main`; do not create another branch/worktree unless requested.
 - Inspect status before edits. Keep coherent changes in scoped commits; push only when requested.
