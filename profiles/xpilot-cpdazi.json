@@ -23,7 +23,8 @@
     "speed_card",
     "speed_limit_card",
     "tn_long",
-    "traffic_light"
+    "traffic_light",
+    "zh_cn"
   ],
   "params": {
     "ExtNavAssistSource": "1",
@@ -31,7 +32,8 @@
     "ExtNavAssistLaneChange": "0",
     "ExtNavAssistTurnSignal": "0",
     "ExtPhoneVisionEnabled": "0",
-    "ExtNavAssistTurnSlowdown": "0"
+    "ExtNavAssistTurnSlowdown": "0",
+    "ExtChineseUiEnabled": "0"
   },
   "removed": [
     "stereo",

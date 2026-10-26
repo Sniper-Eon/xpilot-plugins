@@ -219,6 +219,18 @@
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/traffic_light-1.0.0.tar.gz",
       "sha256": "e923e02bcdb1857c8706c2abaa240d27fffcc637665dba14e85c5e00e7753140",
       "platform": null
+    },
+    {
+      "id": "zh_cn",
+      "name": "Simplified Chinese UI",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "ui",
+      "author": "Sniper-Eon",
+      "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.0.0.tar.gz",
+      "sha256": "57c849d5f19d384664d49a5a39479465ea7313eccc41ede2c0d22803ec384fea",
+      "platform": null
     }
   ]
 }
