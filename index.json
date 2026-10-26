@@ -194,6 +194,18 @@
       "platform": null
     },
     {
+      "id": "tesla_mixed_control",
+      "name": "Tesla Mixed Control",
+      "version": "1.1.1",
+      "api": 1,
+      "category": "controller",
+      "author": "xpilot; dzid26; Haibin Wen and sunnypilot contributors",
+      "description": "Angle-based cooperative steering: light driver torque adjusts the SP steering target with speed-dependent effort. SP must own steering; stock Autosteer must not steer at the same time (AP ownership/handoff is not implemented). Enable while parked, then restart. Overrides native TeslaCoopSteering mode for this session without changing its saved setting. Host-tested only; vehicle validation is pending.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_mixed_control-1.1.1.tar.gz",
+      "sha256": "8bcb64b5bcbf6abf9dc04bafa7023b89a6e0517d927dc0b66d748d1de6da2137",
+      "platform": null
+    },
+    {
       "id": "tn_long",
       "name": "TN Longitudinal (TN-NoDEC)",
       "version": "1.0.0",
