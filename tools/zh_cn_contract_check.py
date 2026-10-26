@@ -16,6 +16,7 @@ def main():
   sys.modules[spec.name] = module
   spec.loader.exec_module(module)
   translator = module.ChineseCatalog()
+  assert len(translator.strings) >= 3161, 'full reference catalog must be retained'
   # Regression: lower-case tile/action labels were absent despite translated settings.
   for text in ('add tiles', 'done', 'Plugin Store', 'checking...', 'download update',
                'updater failed to respond', 'training guide', 'driver camera', 'car model'):

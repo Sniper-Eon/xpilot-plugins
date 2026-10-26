@@ -223,13 +223,13 @@
     {
       "id": "zh_cn",
       "name": "Simplified Chinese UI",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "api": 1,
       "category": "ui",
       "author": "Sniper-Eon",
       "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.0.1.tar.gz",
-      "sha256": "4c4ec8312ecf116b589c01cfea9881bd428bb00711d10a09265178d23d05626b",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.0.tar.gz",
+      "sha256": "f979f5a2df688db14902b13de8a0f34695b91e9cf5c4d6039428a4771edb3bfc",
       "platform": null
     }
   ]

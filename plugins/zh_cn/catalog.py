@@ -32,8 +32,8 @@ class ChineseCatalog:
         return self.strings[prefix] + self.strings.get(tail, tail)
     matched = re.fullmatch(r'(-?\d+(?:\.\d+)?) (s|m|km/h|mph)', text)
     if matched:
-      return matched[1] + ' ' + self.strings.get(matched[2], matched[2])
+      return matched[1] + ' ' + ('米' if matched[2] == 'm' else self.strings.get(matched[2], matched[2]))
     matched = re.fullmatch(r'(TURN L|TURN R|KEEP L|KEEP R|SHARP L|SHARP R|U-TURN L|U-TURN R|STRAIGHT|ROUNDABOUT|DEST)  (\d+) m', text)
     if matched:
-      return self.strings[matched[1]] + '  ' + matched[2] + ' ' + self.strings['m']
+      return self.strings[matched[1]] + '  ' + matched[2] + ' 米'
     return None
