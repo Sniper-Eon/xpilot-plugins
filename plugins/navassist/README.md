@@ -104,3 +104,7 @@ Unnumbered navigation merges now use one bounded relative adjacent step per even
 ### HUD presentation (1.5.1)
 
 The navigation overlay uses only the strip below the driving view. It distinguishes a requested signal from actual same-side carState blinker feedback and reports unavailable primary panda authority as a wait, rather than promising a turn or lane change. Recommended lanes never establish an observed ego-lane index. Inactive/replay guidance is hidden by the existing display contract. This release does not change navigation execution, CAN, steering, camera capture or safety firmware.
+
+### Signal feedback recovery (1.5.2)
+
+Keep up to two active lamp requests and wait for physical feedback until the original 2.5-second deadline. Exhausting retries alone no longer cancels after about 0.2 seconds. A failed event cannot restart itself; a new event may start subject to the same global frame interval, including across cancellation. Brake-held entry sends no active request. Real junction lamps remain distinct from road-edge/BSM lane-crossing vetoes. Independent MADS lateral authority requires the paired host safety repair; an APK or plugin update cannot grant that authority on older firmware.

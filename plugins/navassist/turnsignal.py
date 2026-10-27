@@ -58,6 +58,8 @@ class TurnSignalController:
     self.template: bytes | None = None
     self.template_ns = 0
     self.active: dict | None = None
+    self._last_send_ns: int | None = None
+    self._failed_key = None
 
   def reset(self) -> None:
     self.active = None
@@ -69,6 +71,18 @@ class TurnSignalController:
           self.template = bytes(data)
           self.template_ns = int(now_ns)
 
+  @staticmethod
+  def _key(intent):
+    return (intent.get("sessionId"), int(intent.get("routeRevision", 0)),
+            int(intent.get("requestId", 0)), str(intent.get("direction", "none")))
+
+  def _can_send(self, now_ns):
+    return self._last_send_ns is None or now_ns-self._last_send_ns >= SEND_INTERVAL_NS
+
+  def _emit(self, direction, counter, now_ns):
+    self._last_send_ns = int(now_ns)
+    return [(ADDRESS, build(self.template, direction, counter), BUS)]
+
   def _cancel(self, now_ns: int) -> list:
     if self.active is None:
       return []
@@ -77,7 +91,7 @@ class TurnSignalController:
     if self.active.get("cancel_attempts", 0) >= MAX_CANCEL_ATTEMPTS:
       self.active = None
       return []
-    if now_ns - int(self.active.get("cancel_sent_ns", 0)) < SEND_INTERVAL_NS:
+    if not self._can_send(now_ns):
       return []
     if self.template is None or now_ns - self.template_ns > TEMPLATE_MAX_AGE_NS:
       self.active = None
@@ -86,13 +100,14 @@ class TurnSignalController:
     counter = (decode(self.template)["counter"] + 1) % 16
     self.active["cancel_attempts"] = self.active.get("cancel_attempts", 0) + 1
     self.active["cancel_sent_ns"] = int(now_ns)
-    return [(ADDRESS, build(self.template, "cancel", counter), BUS)]
+    return self._emit("cancel", counter, now_ns)
 
   def update(self, intent: dict, cs, cc, now_ns: int, *, enabled: bool) -> list:
     """Return CAN frames to append; the host checks the can.tx claim and panda validates each frame."""
     direction = str(intent.get("direction", "none"))
     requested = bool(enabled and intent.get("valid") and intent.get("signalRequested")
-                     and direction in ("left", "right") and bool(getattr(cc, "latActive", False)))
+                     and direction in ("left", "right") and bool(getattr(cc, "latActive", False))
+                     and not bool(getattr(cs, "brakePressed", False)))
     physical_left = bool(getattr(cs, "leftBlinker", False))
     physical_right = bool(getattr(cs, "rightBlinker", False))
     physical_on = physical_left if direction == "left" else physical_right
@@ -127,22 +142,22 @@ class TurnSignalController:
         self.active["held"] = physical_on
         if physical_on:
           return []
-        elapsed = now_ns - int(self.active.get("action_sent_ns", 0))
-        if elapsed > FEEDBACK_TIMEOUT_NS:
+        if age > FEEDBACK_TIMEOUT_NS:
+          self._failed_key = self._key(intent)
           return self._cancel(now_ns)
-        if now_ns - int(self.active.get("action_sent_ns", 0)) < SEND_INTERVAL_NS:
+        if not self._can_send(now_ns):
           return []
         # One retry if the first frame produced no feedback.
         if self.active.get("action_attempts", 0) >= 2:
-          return self._cancel(now_ns)
+          return []  # Await feedback until the original bounded deadline; do not cut the lamp early.
         if self.template is None or now_ns - self.template_ns > TEMPLATE_MAX_AGE_NS:
           return []
         counter = (decode(self.template)["counter"] + 1) % 16
         self.active["action_attempts"] = self.active.get("action_attempts", 0) + 1
         self.active["action_sent_ns"] = int(now_ns)
-        return [(ADDRESS, build(self.template, direction, counter), BUS)]
+        return self._emit(direction, counter, now_ns)
 
-    if not requested:
+    if not requested or self._key(intent) == self._failed_key or not self._can_send(now_ns):
       return []
     if physical_on:
       # The driver already signals this side: do not inject a duplicate frame.
@@ -155,4 +170,4 @@ class TurnSignalController:
       "started_ns": int(now_ns), "action_sent_ns": int(now_ns), "action_attempts": 1, "phase": "active",
     }
     counter = (decode(self.template)["counter"] + 1) % 16
-    return [(ADDRESS, build(self.template, direction, counter), BUS)]
+    return self._emit(direction, counter, now_ns)
