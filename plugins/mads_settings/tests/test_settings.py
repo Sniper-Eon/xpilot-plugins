@@ -38,6 +38,6 @@ def test_bad_values_fall_back():
   assert out["TeslaMadsScreenButton"] == 0
 
 
-def test_tesla_main_cruise_absent():
-  out = read(View({}), host_has_main_cruise=False)
+def test_main_cruise_moved_out():
+  out = read(View({}))
   assert "MadsMainCruiseAllowed" not in out

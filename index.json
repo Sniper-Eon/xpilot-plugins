@@ -74,6 +74,18 @@
       "platform": null
     },
     {
+      "id": "cruise_settings",
+      "name": "Cruise Settings",
+      "version": "0.1.0",
+      "api": 1,
+      "category": "tools",
+      "author": "Sniper-Eon",
+      "description": "Cruise switches in one plugin: intelligent cruise buttons, smart cruise from vision and map, main-cruise permission and the initial set speed. Writes the host params only while parked.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cruise_settings-0.1.0.tar.gz",
+      "sha256": "77e1ae86f79727cc111fada6d13664af2b8d141a61da951a4b4a311fa66e405b",
+      "platform": null
+    },
+    {
       "id": "external_compute",
       "name": "External Compute",
       "version": "1.0.0",
@@ -112,13 +124,13 @@
     {
       "id": "mads_settings",
       "name": "MADS Settings",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "api": 1,
       "category": "tools",
       "author": "Sniper-Eon",
       "description": "One place for MADS switches: MADS on/off, lateral steering on brake, unified engagement, and the Tesla screen-button mode. Writes the host MADS params only while parked.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/mads_settings-0.1.0.tar.gz",
-      "sha256": "8e8e7bdd38a73323af6ad9e1b288f91922deb928f6d16c643facc00fa7881bb4",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/mads_settings-0.1.1.tar.gz",
+      "sha256": "818a05dd180a7b14a2b9f39c68a4654af56c36e6d91585d40f1bc5db8c2f5d64",
       "platform": null
     },
     {

@@ -26,14 +26,11 @@ def _choice(view, key: str, table: dict[str, int], default: int) -> int:
   return table.get(raw, default)
 
 
-def read(view, host_has_main_cruise: bool = True) -> dict:
+def read(view) -> dict:
   """Host Params key -> value, in write order. Missing keys are left untouched by the caller."""
-  values = {
+  return {
     "Mads": _bool(view, "ExtMadsEnabled", True),
     "MadsSteeringMode": _choice(view, "ExtMadsSteeringMode", STEERING_MODE, 2),
     "MadsUnifiedEngagementMode": _bool(view, "ExtMadsUnified", True),
     "TeslaMadsScreenButton": _choice(view, "ExtMadsScreenButton", SCREEN_BUTTON, 0),
   }
-  if host_has_main_cruise:
-    values["MadsMainCruiseAllowed"] = _bool(view, "ExtMadsMainCruise", True)
-  return values
