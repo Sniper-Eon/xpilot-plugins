@@ -3239,5 +3239,14 @@
   "Manual Long Owner (wiper first detent)": "手动切换纵向控制（雨刷第一档）",
   "TesNav Navigation": "TesNav 导航",
   "TesNav phone guidance and recommended-lane display, with optional turn slowdown. No automatic lane changes or steering. Controlled private LAN only.": "TesNav 手机导航与推荐车道显示，可选转弯减速。不自动变道或控制转向，仅用于受控局域网。",
-  "Navigation turn slowdown (experimental)": "导航转弯减速（实验）"
+  "Navigation turn slowdown (experimental)": "导航转弯减速（实验）",
+  "Navigation turn signal": "导航打灯提示",
+  "TURN SIGNAL ONLY": "转弯提示，不执行变道",
+  "WAIT BLINDSPOT": "等待盲区安全",
+  "WAIT LANE BOUNDARY": "等待可跨越车道线",
+  "WAIT LANE CONFIRMATION": "等待车道确认",
+  "READY - SP CHECKS": "准备就绪，等待系统条件",
+  "WAIT SIGNAL CONFIRMATION": "等待转向灯反馈",
+  "NAV SIGNAL LEFT": "导航向左打灯",
+  "NAV SIGNAL RIGHT": "导航向右打灯"
 }

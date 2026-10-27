@@ -5,7 +5,7 @@ works with the same data the lane-change policy and speed ceiling consume."""
 import pyray as rl
 
 from openpilot.tesla.ui.plugin_ui import ScreenOverlay
-from .display import read_state, guidance_visible, guidance_only
+from .display import read_state, guidance_visible, guidance_only, signal_status
 
 WHITE = (255, 255, 255)
 AMBER = (255, 176, 0)
@@ -71,7 +71,8 @@ class NavAssistOverlay(ScreenOverlay):
         lines.append((f"LANE {'/'.join(str(i) for i in recommended)} OF {total}", WHITE))
     if intent.get("signalRequested"):
       direction = str(intent.get("direction", "none")).upper()
-      lines.append((f"NAV SIGNAL {direction}", AMBER))
+      lines.insert(0, (f"NAV SIGNAL {direction}", AMBER))
+      lines.insert(1, (signal_status(intent), AMBER))
     oem = self.oem or {}
     if oem.get("leftExplicitBlock") or oem.get("rightExplicitBlock"):
       side = "L" if oem.get("leftExplicitBlock") else "R"

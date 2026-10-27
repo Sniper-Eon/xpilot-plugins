@@ -236,23 +236,36 @@ internal object NavAssistV3AckParser {
     }
 }
 
-internal class JvmUdpNavAssistV3Client(private val trace: ((String) -> Unit)? = null) : NavAssistV3UdpClient {
+internal class JvmUdpNavAssistV3Client(private val trace: ((String) -> Unit)? = null,
+    private val clockNs: () -> Long = System::nanoTime,
+) : NavAssistV3UdpClient {
     private var discoveredHost: InetAddress? = null
     private var discoveredNetwork: String? = null
     private var consecutiveFailures = 0
+    private var retryHost: InetAddress? = null
+    private var lastAckNs = 0L
 
     internal fun deliveryTargets(network: String, discover: () -> List<InetAddress>): List<InetAddress> {
         if (network.isEmpty() || network != discoveredNetwork) {
             discoveredHost = null
+            retryHost = null
             consecutiveFailures = 0
             discoveredNetwork = network
         }
-        return discoveredHost?.let { listOf(it) } ?: discover()
+        discoveredHost?.let { return listOf(it) }
+        val broadcasts = discover()
+        // Keep probing the recently ACKed address while discovering: some phone
+        // hotspots drop broadcast. This does not renew ownership or input age.
+        val age = clockNs() - lastAckNs
+        return retryHost?.takeIf { age in 0L..10_000_000_000L }
+            ?.let { (listOf(it) + broadcasts).distinct() } ?: broadcasts
     }
 
     internal fun recordDelivery(ack: NavAssistV3UdpAck?) {
         if (ack != null) {
             discoveredHost = InetAddress.getByName(ack.host)
+            retryHost = discoveredHost
+            lastAckNs = clockNs()
             consecutiveFailures = 0
         } else if (++consecutiveFailures >= 2) {
             discoveredHost = null

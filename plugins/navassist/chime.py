@@ -1,4 +1,4 @@
-"""One audible notice when SP starts a navigation-owned lane change."""
+"""One audible preparation notice per valid navigation-owned signal request."""
 from openpilot.tesla.plugin import PluginAlert
 from .settings import read as read_settings
 
@@ -16,14 +16,11 @@ class NavigationChime:
       from openpilot.tesla.plugins import PluginMsgs
       self._msgs = PluginMsgs()
     intent = self._msgs.fresh('lanes.intent').get('navassist') or {}
-    meta = sm['modelV2'].meta
-    if not (intent.get('valid') and intent.get('signalRequested') and intent.get('spLaneChangeReady')
-            and intent.get('laneChangeAllowed') and intent.get('targetLaneIndex', -1) >= 0
-            and str(meta.laneChangeState) == 'laneChangeStarting'
-            and str(meta.laneChangeDirection) == intent.get('direction')):
+    if not (intent.get('valid') and intent.get('signalRequested')
+            and intent.get('direction') in ('left', 'right')):
       return []
     request = tuple(intent.get(k) for k in ('sessionId', 'routeRevision', 'maneuverEventId', 'requestId'))
     if request == self._last_request:
       return []
     self._last_request = request
-    return [PluginAlert('warning', 'Navigation lane change', intent['direction'].capitalize())]
+    return [PluginAlert('warning', 'Navigation turn signal', intent['direction'].capitalize())]

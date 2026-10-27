@@ -15,7 +15,7 @@ Install this plugin only with the paired host containing `openpilot/tesla/lane_p
 - Turn-only lamps do not become lane-change requests; lane-position lamps do not generate a turn desire.
 - Three distinct fresh model frames plus a physical right carriageway anchor are required for absolute lane
   numbering. Merely matching the visible and map lane counts is insufficient. Ambiguous geometry is unknown.
-- Navigation-only chime on SP's observed lane-change start, once per request. Manual changes stay silent.
+- Navigation-only chime when a valid automatic signal request begins, once per request; preparation and turn-only requests are announced, manual changes stay silent. SP's own wait/driver veto remains mandatory for lane-change initiation.
 - Maneuver speed ceilings only lower the target; missing control context, poor GPS or stale guidance rejects it.
 - Optional phone blind spot **extra veto**, off by default. Missing phone data never proves clearance.
 - Stereo, closing-speed experiments and proactive passing have been removed.

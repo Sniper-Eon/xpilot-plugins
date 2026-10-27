@@ -124,13 +124,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.4.0",
+      "version": "1.4.1",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.4.0.tar.gz",
-      "sha256": "cd60a844241ab8f1a0ceb5976b67f20676523aa6a2dc4f0092e5454ea94607ca",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.4.1.tar.gz",
+      "sha256": "be0b01ed827da030122c7d468bd5d377491e4e3b3a3717b2cdec4ce71ad4b950",
       "platform": null
     },
     {
@@ -247,13 +247,13 @@
     {
       "id": "zh_cn",
       "name": "Simplified Chinese UI",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "api": 1,
       "category": "ui",
       "author": "Sniper-Eon",
       "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.1.tar.gz",
-      "sha256": "08203d68f4c0d83e35950e6c6d74142e667b729090227f231249e41ef9d110e0",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.2.tar.gz",
+      "sha256": "ed21ac875ef7fe03d21e789bb95cfa03e0a356f4af44fc1c6f171017988dcc77",
       "platform": null
     }
   ]

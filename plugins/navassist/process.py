@@ -96,8 +96,19 @@ def main():
         plugins.send_msg(pm, NavAssist, kind, result[key], ttl)
       if now >= next_record:
         next_record = now+100_000_000
+        # Explain a preparation that does not start without relaxing any gate.
+        execution = dict(vehicleFresh=bool(vehicle_fresh), modelFresh=bool(model_good),
+          localizationValid=bool(pose_ok), lateralActive=bool(cc.latActive),
+          speedMps=float(cs.vEgo), brakePressed=bool(cs.brakePressed), gasPressed=bool(cs.gasPressed),
+          steeringPressed=bool(cs.steeringPressed), leftBlinker=bool(cs.leftBlinker),
+          rightBlinker=bool(cs.rightBlinker), leftBlindspot=bool(cs.leftBlindspot),
+          rightBlindspot=bool(cs.rightBlindspot),
+          modelState=str(model.meta.laneChangeState) if model_good else 'unavailable',
+          modelDirection=str(model.meta.laneChangeDirection) if model_good else 'unavailable',
+          autoLaneChangeMode=str(params.get('AutoLaneChangeTimer', return_default=True)))
+        ingress = transports.servers[0].diagnostics() if not cp_source else {}
         recorder.write(dict(kind='sample', wall_time_ms=time.time_ns()//1_000_000,
-                            mono_time_ns=now, **result))
+                            mono_time_ns=now, execution=execution, ingress=ingress, **result))
       rk.keep_time()
   finally:
     if route_publisher is not None:

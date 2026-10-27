@@ -20,3 +20,21 @@ def read_state(messages):
     value = messages.fresh(kind).get('navassist')
     result[field] = value if isinstance(value, dict) else {}
   return result
+
+
+def signal_status(intent):
+  """A lamp is preparation, never evidence that SP has accepted a lane change."""
+  if not intent.get('signalRequested'):
+    return ''
+  if intent.get('targetLaneIndex', -1) < 0:
+    return 'TURN SIGNAL ONLY'
+  reason = str(intent.get('reason', '')).lower()
+  if 'blindspot' in reason:
+    return 'WAIT BLINDSPOT'
+  if 'crossing' in reason:
+    return 'WAIT LANE BOUNDARY'
+  if 'observ' in reason or 'stabiliz' in reason:
+    return 'WAIT LANE CONFIRMATION'
+  if intent.get('spLaneChangeReady'):
+    return 'READY - SP CHECKS'
+  return 'WAIT SIGNAL CONFIRMATION'

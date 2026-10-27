@@ -4,6 +4,8 @@ import java.net.InetAddress
 import org.junit.Assert.*
 import org.junit.Test
 
+/** Failures: two lost replies strand delivery on blocked broadcast; cached
+ * hosts must be forgotten on interface change. */
 class NavAssistV3DeliveryTest {
     private val broadcast = listOf(InetAddress.getByName("192.168.8.255"))
     private val host = "192.168.8.101"
@@ -26,7 +28,7 @@ class NavAssistV3DeliveryTest {
         client.deliveryTargets("wifi-a") { broadcast }
         client.recordDelivery(ack())
         repeat(2) { client.recordDelivery(null) }
-        assertEquals(broadcast, client.deliveryTargets("wifi-a") { broadcast })
+        assertEquals(listOf(InetAddress.getByName(host)) + broadcast, client.deliveryTargets("wifi-a") { broadcast })
         client.recordDelivery(NavAssistV3UdpAck("192.168.8.102", null))
         assertEquals("192.168.8.102", client.deliveryTargets("wifi-a") { error("broadcast") }.single().hostAddress)
     }
@@ -45,5 +47,15 @@ class NavAssistV3DeliveryTest {
         client.deliveryTargets("wifi-a") { broadcast }
         client.recordDelivery(ack())
         assertEquals(broadcast, client.deliveryTargets("") { broadcast })
+    }
+    @Test fun `cached recovery probe expires without an ack`() {
+        var now = 1L
+        val client = JvmUdpNavAssistV3Client(clockNs = { now })
+        client.deliveryTargets("wifi-a") { broadcast }
+        client.recordDelivery(ack())
+        repeat(2) { client.recordDelivery(null) }
+        assertTrue(client.deliveryTargets("wifi-a") { broadcast }.contains(InetAddress.getByName(host)))
+        now += 10_000_000_001L
+        assertEquals(broadcast, client.deliveryTargets("wifi-a") { broadcast })
     }
 }

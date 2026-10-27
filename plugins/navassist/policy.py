@@ -66,7 +66,7 @@ class NavLanePolicy:
       return False
     intent = last.get('lanes.intent') or {}
     if intent.get('signalRequested'):
-      return bool(intent.get('valid') and str(intent.get('direction')) == side and intent.get('targetLaneIndex', -1) >= 0
+      return bool(default and intent.get('valid') and str(intent.get('direction')) == side and intent.get('targetLaneIndex', -1) >= 0
                   and intent.get('spLaneChangeReady') and intent.get('laneChangeAllowed'))
     return default
 
