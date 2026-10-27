@@ -52,6 +52,7 @@ def main():
   assert '1.3.0' in translator.translate('v1.3.0 - Sniper-Eon - Navigation lane positioning')
   assert translator.translate('8 s') == '8 \u79d2'
   # HUD arrow and route-node distances share this exact translation path.
+  assert set('米公里').issubset(set(translator.glyphs)), 'dynamic HUD units must be loaded as font glyphs'
   assert translator.translate('35 m') == '35 米'
   assert translator.translate('1.2 km') == '1.2 公里'
   assert translator.translate('999 m') == '999 米'

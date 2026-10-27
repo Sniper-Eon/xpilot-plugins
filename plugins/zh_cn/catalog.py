@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import re
 
+DISTANCE_UNITS = {'m': '米', 'km': '公里'}
+
 
 class ChineseCatalog:
   language = 'zh-CHS'
@@ -10,7 +12,7 @@ class ChineseCatalog:
   def __init__(self):
     self.font_path = Path(__file__).with_name('NotoSansCJKsc-Regular.otf')
     self.strings = json.loads(Path(__file__).with_name('strings.json').read_text(encoding='utf-8'))
-    self.glyphs = ''.join(sorted(set(''.join(self.strings.values()))))
+    self.glyphs = ''.join(sorted(set(''.join(self.strings.values()) + ''.join(DISTANCE_UNITS.values()))))
 
   def translate(self, text):
     if text in self.strings:
@@ -32,7 +34,7 @@ class ChineseCatalog:
         return self.strings[prefix] + self.strings.get(tail, tail)
     matched = re.fullmatch(r'(-?\d+(?:\.\d+)?) (s|m|km|km/h|mph)', text)
     if matched:
-      return matched[1] + ' ' + ({'m': '米', 'km': '公里'}.get(matched[2], self.strings.get(matched[2], matched[2])))
+      return matched[1] + ' ' + DISTANCE_UNITS.get(matched[2], self.strings.get(matched[2], matched[2]))
     matched = re.fullmatch(r'(TURN L|TURN R|KEEP L|KEEP R|SHARP L|SHARP R|U-TURN L|U-TURN R|STRAIGHT|ROUNDABOUT|DEST)  (\d+) m', text)
     if matched:
       return self.strings[matched[1]] + '  ' + matched[2] + ' 米'
