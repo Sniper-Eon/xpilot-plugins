@@ -13,6 +13,30 @@ def hud_rect(bottom):
   return x+16,y+16,max(0,w-32),max(0,h-32)
 
 
+MANEUVERS=frozenset(('straight','turn_left','turn_right','sharp_left','sharp_right',
+  'u_turn_left','u_turn_right','merge_left','merge_right','exit_left','exit_right',
+  'ramp_left','ramp_right','slight_left','slight_right'))
+
+
+def floating_layout(bottom):
+  x,y,w,h=hud_rect(bottom)
+  side=min(200,h-72)
+  return dict(arrow=(x+16,y+46,side,side),route=(x+w*.76,y+12,w*.23,h-24))
+
+
+def route_nodes(nav, active):
+  nodes=[]
+  if active:
+    for maneuver,distance in ((nav.get('maneuver'),nav.get('distanceM')),
+                              (nav.get('nextManeuver'),nav.get('nextDistanceM'))):
+      if (maneuver in MANEUVERS and type(distance) in (int,float)
+          and math.isfinite(distance) and distance>=0):
+        nodes.append((maneuver,float(distance)))
+      elif not nodes:
+        break  # Never relabel a next-only instruction as the current maneuver.
+  return tuple(nodes)
+
+
 def present_hud(nav,intent,topology,*,car=None,authority=None):
   active=guidance_visible(nav)
   stale=bool(nav.get('routeActive') and nav.get('stale',True))
@@ -35,4 +59,5 @@ def present_hud(nav,intent,topology,*,car=None,authority=None):
     else:status,tone='Waiting for vehicle signal','amber'
   return dict(active=active,distance=distance,maneuver=nav.get('maneuver') if active else None,
     status=status,tone=tone,count=count,recommended=recommended,ego=ego,
-    lane_status='Lane position confirmed' if ego is not None else 'Lane position pending')
+    lane_status='Lane position confirmed' if ego is not None else 'Lane position pending',
+    route_nodes=route_nodes(nav,active))

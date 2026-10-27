@@ -49,3 +49,24 @@ def test_signal_authority_matches_enabled_independent_lateral_domain():
   assert signal_authority(True,False,0)
   assert not signal_authority(False,True,0)
   assert not signal_authority(False,False,1024)
+
+
+def test_floating_route_nodes_only_use_fresh_provided_guidance():
+  nav=dict(valid=True,linked=True,stale=False,maneuver='turn_right',distanceM=180.,
+           nextManeuver='turn_left',nextDistanceM=420.)
+  state=present_hud(nav,{}, {})
+  assert state['route_nodes']==(('turn_right',180.),('turn_left',420.))
+  for changes in (dict(nextManeuver='unknown'),dict(nextDistanceM=-1),dict(nextDistanceM=float('nan'))):
+    assert len(present_hud(dict(nav,**changes),{}, {})['route_nodes'])==1
+  assert present_hud(dict(nav,valid=False,linked=False,routeActive=True,stale=True),{}, {})['route_nodes']==()
+  assert present_hud(dict(nav,maneuver='unknown'),{}, {})['route_nodes']==()
+
+
+def test_floating_guidance_is_larger_and_right_nodes_do_not_cover_road_view():
+  from navassist.hud import floating_layout
+  layout=floating_layout((300,764,1560,316))
+  ax,ay,aw,ah=layout['arrow'];rx,ry,rw,rh=layout['route']
+  assert aw>=180 and ah>=180
+  assert rx>300+1560*.7 and ax+aw<rx
+  for x,y,w,h in layout.values():
+    assert 300<=x<x+w<=1860 and 764<=y<y+h<=1080

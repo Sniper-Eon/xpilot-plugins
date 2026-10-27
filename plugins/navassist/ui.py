@@ -5,7 +5,7 @@ from openpilot.system.ui.lib.application import FontWeight
 from openpilot.tesla.ui.plugin_ui import ScreenOverlay
 from openpilot.tesla.ui.tile import text, lines_in
 from .display import read_state, signal_status
-from .hud import present_hud, hud_rect, signal_authority
+from .hud import present_hud, hud_rect, signal_authority, floating_layout
 
 CYAN=rl.Color(78,224,255,255)
 WHITE=rl.Color(238,244,252,255)
@@ -58,33 +58,53 @@ class NavAssistOverlay(ScreenOverlay):
     x,y,w,h=hud_rect((bottom.x,bottom.y,bottom.width,bottom.height))
     if w<1000 or h<180:return
     state=present_hud(self.nav,self.intent,self.topology,car=self.car,authority=self.authority)
-    rl.draw_rectangle_rounded(rl.Rectangle(x,y,w,h),.13,12,rl.Color(9,17,28,250))
-    rl.draw_line_ex(rl.Vector2(x+24,y+2),rl.Vector2(x+w-24,y+2),2,rl.Color(73,177,216,125))
+    # Erase the old tile faces to the screen canvas. Guidance has no card,
+    # capsule or colored panel background; every symbol/text floats directly.
+    rl.draw_rectangle_rec(bottom,rl.BLACK)
     tint=CYAN if state['tone']=='cyan' else AMBER if state['tone']=='amber' else DIM
-    text(FontWeight.MEDIUM,'AMap Navigation',x+30,y+18,26,DIM)
-    arrow(x+24,y+65,115,state['maneuver'],tint if state['active'] else DIM)
+    text(FontWeight.MEDIUM,'AMap Navigation',x+26,y+10,26,DIM)
+    layout=floating_layout((bottom.x,bottom.y,bottom.width,bottom.height))
+    ax,ay,aw,ah=layout['arrow']
+    if state['maneuver']:
+      arrow(ax,ay,aw,state['maneuver'],tint)
     distance=state['distance']
-    value='--' if distance is None else f'{distance/1000:.1f} km' if distance>=1000 else f'{distance:.0f} m'
-    text(FontWeight.BOLD,value,x+170,y+65,72,WHITE)
-    labels={'turn_left':'TURN L','turn_right':'TURN R','sharp_left':'SHARP L','sharp_right':'SHARP R',
-      'u_turn_left':'U-TURN L','u_turn_right':'U-TURN R','merge_left':'MERGE L','merge_right':'MERGE R',
-      'exit_left':'EXIT L','exit_right':'EXIT R','ramp_left':'RAMP L','ramp_right':'RAMP R',
-      'slight_left':'KEEP L','slight_right':'KEEP R','straight':'STRAIGHT'}
-    text(FontWeight.MEDIUM,labels.get(state['maneuver'],''),x+174,y+156,34,DIM)
+    value='--' if distance is None else distance_text(distance)
+    text(FontWeight.BOLD,value,x+242,y+67,86,WHITE)
+    text(FontWeight.MEDIUM,maneuver_label(state['maneuver']),x+246,y+166,38,DIM)
     lx=x+w*.40
-    text(FontWeight.MEDIUM,'Recommended lanes',lx,y+20,26,DIM)
+    text(FontWeight.MEDIUM,'Recommended lanes',lx,y+12,26,DIM)
     count=state['count']
     if count:
-      step=min(62,(w*.37)/count)
+      step=min(58,(w*.32)/count)
       for index in range(count):
         bx=lx+index*step;selected=index in state['recommended']
-        rl.draw_rectangle_rounded(rl.Rectangle(bx,y+65,step-7,83),.15,6,rl.Color(25,63,77,255) if selected else rl.Color(23,33,48,255))
-        arrow(bx+3,y+75,step-13,'straight',CYAN if selected else DIM)
-        if state['ego']==index:rl.draw_line_ex(rl.Vector2(bx+5,y+154),rl.Vector2(bx+step-12,y+154),4,WHITE)
-    else:text(FontWeight.MEDIUM,'Waiting for lane guidance',lx,y+88,29,DIM)
-    text(FontWeight.MEDIUM,state['lane_status'],lx,y+176,25,DIM)
-    status_box=rl.Rectangle(x+w*.79,y+30,w*.19,h-45)
-    lines=[state['status']]
-    if self.intent.get('signalRequested'):
-      lines.append(signal_status(self.intent))
-    lines_in(status_box,lines,30,color=tint)
+        arrow(bx+2,y+58,step-8,'straight',CYAN if selected else DIM)
+        if selected:rl.draw_line_ex(rl.Vector2(bx+8,y+124),rl.Vector2(bx+step-12,y+124),3,CYAN)
+        if state['ego']==index:rl.draw_circle(int(bx+step*.5),int(y+141),4,WHITE)
+    else:text(FontWeight.MEDIUM,'Waiting for lane guidance',lx,y+74,27,DIM)
+    lines=[state['lane_status'],state['status']]
+    if self.intent.get('signalRequested'):lines.append(signal_status(self.intent))
+    lines_in(rl.Rectangle(lx,y+164,w*.34,h-164),lines,25,color=tint)
+    rx,ry,rw,rh=layout['route']
+    nodes=state['route_nodes']
+    if len(nodes)>1:
+      rl.draw_line_ex(rl.Vector2(rx+11,ry+42),rl.Vector2(rx+11,ry+rh*.5+42),2,rl.Color(78,224,255,115))
+    for index,(maneuver,dist) in enumerate(nodes):
+      ny=ry+index*rh*.5
+      color=CYAN if index==0 else DIM
+      rl.draw_circle(int(rx+11),int(ny+42),7 if index==0 else 5,color)
+      text(FontWeight.MEDIUM,'Current maneuver' if index==0 else 'Next maneuver',rx+32,ny+13,24,DIM)
+      arrow(rx+30,ny+44,49,maneuver,color)
+      text(FontWeight.MEDIUM,maneuver_label(maneuver),rx+95,ny+42,28,color)
+      text(FontWeight.BOLD,distance_text(dist),rx+95,ny+79,30,WHITE if index==0 else DIM)
+
+
+def distance_text(distance):
+  return f'{distance/1000:.1f} km' if distance>=1000 else f'{distance:.0f} m'
+
+
+def maneuver_label(maneuver):
+  return {'turn_left':'TURN L','turn_right':'TURN R','sharp_left':'SHARP L','sharp_right':'SHARP R',
+    'u_turn_left':'U-TURN L','u_turn_right':'U-TURN R','merge_left':'MERGE L','merge_right':'MERGE R',
+    'exit_left':'EXIT L','exit_right':'EXIT R','ramp_left':'RAMP L','ramp_right':'RAMP R',
+    'slight_left':'KEEP L','slight_right':'KEEP R','straight':'STRAIGHT'}.get(maneuver,'')
