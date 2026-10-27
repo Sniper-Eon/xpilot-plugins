@@ -41,3 +41,11 @@ def test_link_alone_does_not_show_an_inactive_or_replay_route_as_live():
               dict(linked=True,stale=False,routeActive=True,maneuver='none',mode='realtime')):
     state=present_hud(nav,{}, {})
     assert not state['active'] and state['maneuver'] is None
+
+
+def test_signal_authority_matches_enabled_independent_lateral_domain():
+  from navassist.hud import signal_authority
+  assert signal_authority(False,True,1024)
+  assert signal_authority(True,False,0)
+  assert not signal_authority(False,True,0)
+  assert not signal_authority(False,False,1024)

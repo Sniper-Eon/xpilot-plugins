@@ -108,3 +108,5 @@ The navigation overlay uses only the strip below the driving view. It distinguis
 ### Signal feedback recovery (1.5.2)
 
 Keep up to two active lamp requests and wait for physical feedback until the original 2.5-second deadline. Exhausting retries alone no longer cancels after about 0.2 seconds. A failed event cannot restart itself; a new event may start subject to the same global frame interval, including across cancellation. Brake-held entry sends no active request. Real junction lamps remain distinct from road-edge/BSM lane-crossing vetoes. Independent MADS lateral authority requires the paired host safety repair; an APK or plugin update cannot grant that authority on older firmware.
+
+HUD authority feedback in 1.5.3 also reads native controlsAllowedLateral with the MADS enable flag, so independent lateral operation is not falsely displayed as missing all signal permission.

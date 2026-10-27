@@ -3,6 +3,11 @@ import math
 from .display import guidance_visible
 
 
+def signal_authority(primary, lateral, alternative_experience):
+  # Same native authority domain as the paired navassist safety plugin.
+  return bool(primary or ((int(alternative_experience) & (1 << 10)) and lateral))
+
+
 def hud_rect(bottom):
   x,y,w,h=bottom
   return x+16,y+16,max(0,w-32),max(0,h-32)

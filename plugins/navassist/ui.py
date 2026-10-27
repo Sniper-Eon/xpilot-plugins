@@ -5,7 +5,7 @@ from openpilot.system.ui.lib.application import FontWeight
 from openpilot.tesla.ui.plugin_ui import ScreenOverlay
 from openpilot.tesla.ui.tile import text, lines_in
 from .display import read_state, signal_status
-from .hud import present_hud, hud_rect
+from .hud import present_hud, hud_rect, signal_authority
 
 CYAN=rl.Color(78,224,255,255)
 WHITE=rl.Color(238,244,252,255)
@@ -49,7 +49,7 @@ class NavAssistOverlay(ScreenOverlay):
         cs=sm['carState'];self.car=dict(leftBlinker=bool(cs.leftBlinker),rightBlinker=bool(cs.rightBlinker))
       if sm.alive['pandaStates'] and sm.valid['pandaStates'] and 0<=now-sm.logMonoTime['pandaStates']<=500_000_000:
         states=[p for p in sm['pandaStates'] if str(p.safetyModel)=='tesla']
-        if states:self.authority=any(p.controlsAllowed for p in states)
+        if states:self.authority=any(signal_authority(p.controlsAllowed, getattr(p,'controlsAllowedLateral',False), p.alternativeExperience) for p in states)
     except (KeyError,AttributeError,TypeError):pass
 
   def draw(self,zones):
