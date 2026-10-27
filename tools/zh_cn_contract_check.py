@@ -51,6 +51,12 @@ def main():
   assert translator.translate('Sport') == '\u8fd0\u52a8'
   assert '1.3.0' in translator.translate('v1.3.0 - Sniper-Eon - Navigation lane positioning')
   assert translator.translate('8 s') == '8 \u79d2'
+  # HUD arrow and route-node distances share this exact translation path.
+  assert translator.translate('35 m') == '35 米'
+  assert translator.translate('1.2 km') == '1.2 公里'
+  assert translator.translate('999 m') == '999 米'
+  assert translator.translate('120 km/h') == '120 km/h'
+  assert translator.translate('session1.2 km') is None
   assert translator.translate('TURN R  35 m') == '\u53f3\u8f6c  35 \u7c73'
   assert set(''.join(translator.strings.values())).issubset(set(translator.glyphs))
   assert translator.font_path.is_file() and translator.font_path.stat().st_size > 1_000_000

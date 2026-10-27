@@ -30,9 +30,9 @@ class ChineseCatalog:
       if text.startswith(prefix):
         tail = text[len(prefix):]
         return self.strings[prefix] + self.strings.get(tail, tail)
-    matched = re.fullmatch(r'(-?\d+(?:\.\d+)?) (s|m|km/h|mph)', text)
+    matched = re.fullmatch(r'(-?\d+(?:\.\d+)?) (s|m|km|km/h|mph)', text)
     if matched:
-      return matched[1] + ' ' + ('米' if matched[2] == 'm' else self.strings.get(matched[2], matched[2]))
+      return matched[1] + ' ' + ({'m': '米', 'km': '公里'}.get(matched[2], self.strings.get(matched[2], matched[2])))
     matched = re.fullmatch(r'(TURN L|TURN R|KEEP L|KEEP R|SHARP L|SHARP R|U-TURN L|U-TURN R|STRAIGHT|ROUNDABOUT|DEST)  (\d+) m', text)
     if matched:
       return self.strings[matched[1]] + '  ' + matched[2] + ' 米'
