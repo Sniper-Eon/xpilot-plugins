@@ -114,3 +114,7 @@ HUD authority feedback in 1.5.3 also reads native controlsAllowedLateral with th
 ### Floating guidance (1.5.4)
 
 The bottom-strip HUD removes its card and lane-cell backgrounds. The main arrow grows from 115 to 200 screen pixels; current/next maneuver nodes move to the right. Old tile faces are erased to the screen's black canvas so they cannot show through as duplicate unknown labels. It stays outside the road viewport and critical road-view alerts. Only fresh supplied current/next instructions are shown; no route nodes or ego lane are invented. The existing host APIs and all driving/safety logic remain unchanged.
+
+### C3XL buzzer contract (1.5.5)
+
+The navigation notice uses the standard host warning/prompt alert. C3XL routes audio through its existing GPIO buzzer, whose host backend must map that prompt to a short pulse. The integration regression covers navigation preparation, host alert production, GPIO dispatch deduplication and unchanged critical-tone routing. Plugin actuation and chime timing are unchanged; installing this plugin alone cannot repair an older host buzzer backend.
