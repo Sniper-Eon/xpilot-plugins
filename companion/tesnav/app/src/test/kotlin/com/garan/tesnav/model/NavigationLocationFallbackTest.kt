@@ -83,4 +83,23 @@ class NavigationLocationFallbackTest {
         s.at(200, null, fix(200))
         assertEquals(NavigationLocationSource.PHONE, s.at(201, fix(201), fix(100)).source)
     }
+
+    @Test fun `raw phone candidate is independent and stale external SDK echo cannot recover it`() {
+        val raw = fix().copy(sourceEpoch="phone-gps", coordinateSystem=NavigationCoordinateSystem.WGS84)
+        val sdk = fix().copy(sourceEpoch="phone-sdk")
+        assertSame(raw, phoneLocationCandidate(raw, sdk, false, 100, 10100))
+        assertSame(sdk, phoneLocationCandidate(raw.copy(accuracyM=51.0), sdk, false, 100, 10100))
+        assertNull(phoneLocationCandidate(null, sdk, true, 100, 10100))
+        assertNull(phoneLocationCandidate(sdk, sdk, true, 100, 10100))
+        assertNull(phoneLocationCandidate(raw, sdk, true, 3100, 13100))
+    }
+    @Test fun `raw phone injection is deduplicated and reversed or unverified measurements are refused`() {
+        val s = NavigationLocationFallback()
+        val raw = fix(200).copy(sourceEpoch="phone-gps", coordinateSystem=NavigationCoordinateSystem.WGS84)
+        assertEquals(raw, s.at(200, raw, null).phoneFixToInject)
+        assertNull(s.at(201, raw, null).phoneFixToInject)
+        assertEquals("phoneTimeReversed", s.at(202, raw.copy(measuredAtMs=10100), null).reason)
+        assertEquals(NavigationLocationSource.NONE, NavigationLocationFallback().at(200,
+            raw.copy(measurementTimeVerified=false, observationTimeOnly=true), null).source)
+    }
 }

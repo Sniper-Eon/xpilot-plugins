@@ -24,6 +24,7 @@ internal data class NavigationLocationSelection(
     val source: NavigationLocationSource,
     val vehicleFixToInject: NavigationLocationObservation? = null,
     val reason: String,
+    val phoneFixToInject: NavigationLocationObservation? = null,
 )
 
 /** A simulation can outlive stopNavi callbacks. Only the independent GPS stream
@@ -44,31 +45,42 @@ internal fun independentPlanningOrigin(
     return GeoPoint(fix.latitude, fix.longitude)
 }
 
+internal fun qualifiedNavigationLocation(fix: NavigationLocationObservation?, elapsed: Long, wall: Long): Boolean {
+    if (fix == null || (!fix.measurementTimeVerified && !fix.observationTimeOnly) || fix.sourceEpoch.isBlank() ||
+        fix.coordinateSystem == NavigationCoordinateSystem.UNKNOWN ||
+        fix.measuredAtMs <= 0 || fix.measuredAtMs > wall || wall - fix.measuredAtMs >= 3000 ||
+        fix.receivedElapsedMs < 0 || fix.receivedElapsedMs > elapsed || fix.ageAtReceiptMs !in 0L..2999L ||
+        elapsed - fix.receivedElapsedMs >= 3000 - fix.ageAtReceiptMs) return false
+    if (fix.sourceEpoch == "phone-gps" && (!fix.measurementTimeVerified || fix.observationTimeOnly ||
+        fix.coordinateSystem != NavigationCoordinateSystem.WGS84)) return false
+    return fix.latitude.isFinite() && fix.latitude in -90.0..90.0 &&
+        fix.longitude.isFinite() && fix.longitude in -180.0..180.0 &&
+        fix.accuracyM?.let { it.isFinite() && it > 0 && it <= 50 } == true &&
+        fix.speedMps?.let { it.isFinite() && it in 0.0..83.333333 } == true &&
+        fix.bearingDeg?.let { it.isFinite() && it >= 0 && it < 360 } == true
+}
+
+/** Only independent GNSS may recover an external-input session; old SDK echoes cannot. */
+internal fun phoneLocationCandidate(raw: NavigationLocationObservation?, sdk: NavigationLocationObservation?,
+    holdForSdk: Boolean, nowElapsedMs: Long, nowWallMs: Long): NavigationLocationObservation? =
+    raw?.takeIf { it.sourceEpoch == "phone-gps" && qualifiedNavigationLocation(it, nowElapsedMs, nowWallMs) }
+        ?: sdk.takeUnless { holdForSdk }
+
 /** Candidate selection only. Does not grant route, lamp or vehicle-control authority.
  * The caller must use independent phone observations to avoid an external-GPS feedback loop.
  * CAN fallback explicitly uses observation time; it does not claim a certified GNSS fix time.
  */
 internal class NavigationLocationFallback {
+    private var lastPhoneFix: Pair<String, Long>? = null
     private var lastVehicleFix: Pair<String, Long>? = null
     private var lastElapsedMs: Long? = null
 
     fun reset() {
+        lastPhoneFix = null
         lastVehicleFix = null
         lastElapsedMs = null
     }
 
-    private fun usable(fix: NavigationLocationObservation?, elapsed: Long, wall: Long): Boolean {
-        if (fix == null || (!fix.measurementTimeVerified && !fix.observationTimeOnly) || fix.sourceEpoch.isBlank() ||
-            fix.coordinateSystem == NavigationCoordinateSystem.UNKNOWN ||
-            fix.measuredAtMs <= 0 || fix.measuredAtMs > wall || wall - fix.measuredAtMs >= 3000 ||
-            fix.receivedElapsedMs < 0 || fix.receivedElapsedMs > elapsed || fix.ageAtReceiptMs !in 0L..2999L ||
-            elapsed - fix.receivedElapsedMs >= 3000 - fix.ageAtReceiptMs) return false
-        return fix.latitude.isFinite() && fix.latitude in -90.0..90.0 &&
-            fix.longitude.isFinite() && fix.longitude in -180.0..180.0 &&
-            fix.accuracyM?.let { it.isFinite() && it > 0 && it <= 50 } == true &&
-            fix.speedMps?.let { it.isFinite() && it in 0.0..83.333333 } == true &&
-            fix.bearingDeg?.let { it.isFinite() && it >= 0 && it < 360 } == true
-    }
 
     fun select(phone: NavigationLocationObservation?, vehicle: NavigationLocationObservation?,
                active: Boolean, nowElapsedMs: Long, nowWallMs: Long): NavigationLocationSelection {
@@ -82,10 +94,19 @@ internal class NavigationLocationFallback {
         }
         lastElapsedMs = nowElapsedMs
         // User policy: independent, qualified phone positioning owns the navigation origin.
-        if (usable(phone, nowElapsedMs, nowWallMs)) {
-            return NavigationLocationSelection(NavigationLocationSource.PHONE, reason = "phonePrimary")
+        if (qualifiedNavigationLocation(phone, nowElapsedMs, nowWallMs)) {
+            val raw = phone!!.sourceEpoch == "phone-gps"
+            val key = phone.sourceEpoch to phone.measuredAtMs
+            val previous = lastPhoneFix
+            if (raw && previous?.first == key.first && key.second < previous.second) {
+                return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "phoneTimeReversed")
+            }
+            val newFix = raw && key != previous
+            if (newFix) lastPhoneFix = key
+            return NavigationLocationSelection(NavigationLocationSource.PHONE, reason = "phonePrimary",
+                phoneFixToInject = phone.takeIf { newFix })
         }
-        if (usable(vehicle, nowElapsedMs, nowWallMs)) {
+        if (qualifiedNavigationLocation(vehicle, nowElapsedMs, nowWallMs)) {
             val fix = vehicle!!
             val key = fix.sourceEpoch to fix.measuredAtMs
             val previous = lastVehicleFix

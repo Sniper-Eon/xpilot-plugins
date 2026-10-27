@@ -25,12 +25,14 @@ internal class NavigationExternalLocationController(private val sink: Navigation
         val candidate = phone.takeUnless { phoneSignalWeak && !independentGps }
         val selection = selector.select(candidate, vehicle, active, nowElapsedMs, nowWallMs)
         return try {
-            if (selection.source == NavigationLocationSource.VEHICLE) {
+            val rawPhone = selection.source == NavigationLocationSource.PHONE && candidate?.sourceEpoch == "phone-gps"
+            val fixToInject = if (rawPhone) selection.phoneFixToInject else selection.vehicleFixToInject
+            if (selection.source == NavigationLocationSource.VEHICLE || rawPhone) {
                 // Do not enable external mode without a new qualified measurement.
-                if (!external && selection.vehicleFixToInject == null) {
-                    return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "awaitingNewVehicleFix")
+                if (!external && fixToInject == null) {
+                    return NavigationLocationSelection(NavigationLocationSource.NONE, reason = if (rawPhone) "awaitingNewPhoneFix" else "awaitingNewVehicleFix")
                 }
-                selection.vehicleFixToInject?.let { fix ->
+                fixToInject?.let { fix ->
                     if (!external) {
                         // Set before the call so failure cleanup also covers partial SDK activation.
                         external = true

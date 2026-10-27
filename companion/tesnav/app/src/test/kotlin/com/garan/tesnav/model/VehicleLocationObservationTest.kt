@@ -70,11 +70,13 @@ class VehicleLocationObservationTest {
         assertEquals(NavigationLocationSource.VEHICLE, controller.update(null, fix, true, 1000, 20000).source)
         assertEquals(listOf("enabled=true", "inject"), calls)
         val phone = fix.copy(sourceEpoch="phone-gps", measuredAtMs=20000, ageAtReceiptMs=0,
-            measurementTimeVerified=true, observationTimeOnly=false)
+            measurementTimeVerified=true, observationTimeOnly=false, coordinateSystem=NavigationCoordinateSystem.WGS84)
         assertEquals(NavigationLocationSource.PHONE, controller.update(phone, fix, true, 1000, 20000).source)
         assertEquals(NavigationLocationSource.PHONE, controller.update(phone.copy(measuredAtMs=24000, receivedElapsedMs=5000),
             null, true, 5000, 24000).source)
+        assertEquals("inject", calls.last())
+        assertEquals("phone-gps", controller.injectedFix?.sourceEpoch)
+        controller.reset()
         assertEquals("enabled=false", calls.last())
-        assertNull(controller.injectedFix)
     }
 }

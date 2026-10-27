@@ -86,21 +86,24 @@ class NavigationRepository(
                     com.garan.tesnav.model.NavigationCoordinateSystem.GCJ02 -> 2
                     else -> error("Unknown external coordinate system")
                 }
-                val location = android.location.Location("tesnav-vehicle").apply {
+                val location = android.location.Location(if (fix.sourceEpoch == "phone-gps") "tesnav-phone-gps" else "tesnav-vehicle").apply {
                     latitude = fix.latitude
                     longitude = fix.longitude
                     accuracy = checkNotNull(fix.accuracyM).toFloat()
                     speed = checkNotNull(fix.speedMps).toFloat()
                     bearing = checkNotNull(fix.bearingDeg).toFloat()
+                    if (fix.sourceEpoch == "phone-gps") elapsedRealtimeNanos =
+                        (fix.receivedElapsedMs - fix.ageAtReceiptMs).coerceAtLeast(0) * 1_000_000
                     time = fix.measuredAtMs // Retain the source's explicit measurement/observation time basis.
                 }
                 checkNotNull(navi).setExtraGPSData(type, location)
             }
         })
 
-    internal val usingVehicleLocation: Boolean get() = externalLocation.isExternalEnabled
+    internal val usingExternalLocation: Boolean get() = externalLocation.isExternalEnabled
     internal var phoneGpsSignalWeak: Boolean = false
         private set
+    private var lastExternalLocation: Boolean? = null
     private var lastLocationSource: com.garan.tesnav.model.NavigationLocationSource? = null
     internal var phoneLocationObservation: com.garan.tesnav.model.NavigationLocationObservation? = null
         private set
@@ -137,8 +140,9 @@ class NavigationRepository(
         val result = externalLocation.update(phone, vehicle,
             state.navigationMode == NavigationMode.REALTIME && state.routePlanned && !state.routeRecalculating,
             android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis(), phoneGpsSignalWeak)
-        val changed = result.source != lastLocationSource
+        val changed = result.source != lastLocationSource || lastExternalLocation != externalLocation.isExternalEnabled
         lastLocationSource = result.source
+        lastExternalLocation = externalLocation.isExternalEnabled
         val weak = result.source == com.garan.tesnav.model.NavigationLocationSource.NONE ||
             com.garan.tesnav.model.selectedLocationWeak(externalLocation.isExternalEnabled,
                 externalLocation.injectedFix != null, phoneGpsSignalWeak)

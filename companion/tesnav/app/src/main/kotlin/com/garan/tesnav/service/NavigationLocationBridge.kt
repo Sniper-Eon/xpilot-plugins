@@ -96,16 +96,17 @@ internal class NavigationLocationBridge(
         }
         active = true
         val now = SystemClock.elapsedRealtime()
-        val wasExternal = repository.usingVehicleLocation
+        val wasExternal = repository.usingExternalLocation
         val sdkPhone = repository.phoneLocationObservation
         val handback = phoneHandbackAt
         if (handback != null && (sdkPhone?.receivedElapsedMs ?: -1) >= handback) phoneHandbackAt = null
         val waitingForSdk = phoneHandbackAt?.let { now - it < 3000 } == true
-        val phone = if (wasExternal || waitingForSdk) rawPhone else sdkPhone
+        val phone = phoneLocationCandidate(rawPhone, sdkPhone, wasExternal || waitingForSdk,
+            now, System.currentTimeMillis())
         val result = repository.updateExternalLocation(phone, vehicle.read(feedback, now, System.currentTimeMillis()))
-        if (wasExternal && result.source == NavigationLocationSource.PHONE) phoneHandbackAt = now
+        if (wasExternal && !repository.usingExternalLocation) phoneHandbackAt = now
         if (result.source != lastSource || now - lastTraceElapsed >= 5000) {
-            val line = "source=${result.source} reason=${result.reason} external=${repository.usingVehicleLocation} " +
+            val line = "source=${result.source} reason=${result.reason} external=${repository.usingExternalLocation} " +
                 "phoneWeak=${repository.phoneGpsSignalWeak} sdkPhoneAgeMs=${sdkPhone?.let { now-it.receivedElapsedMs+it.ageAtReceiptMs }} " +
                 "rawPhoneAgeMs=${rawPhone?.let { now-it.receivedElapsedMs+it.ageAtReceiptMs }} " +
                 "planningAgeMs=${planningPhone?.let { now-it.receivedElapsedMs }} planningFailure=$planningFailure listening=$listening enabled=$enabled " +

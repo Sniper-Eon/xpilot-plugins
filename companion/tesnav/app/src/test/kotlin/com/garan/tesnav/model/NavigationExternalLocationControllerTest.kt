@@ -91,16 +91,34 @@ class NavigationExternalLocationControllerTest {
         assertEquals(listOf("enable:true", "fix:10100", "enable:false", "enable:false"), sink.calls)
     }
 
-    @Test fun `independent recovered phone GPS overrides stale SDK weak flag without vehicle feedback loop`() {
+    @Test fun `independent recovered phone GPS replaces vehicle feed without vehicle feedback loop`() {
         val sink = Sink(); val c = NavigationExternalLocationController(sink)
         c.update(null, fix(100), true, 100, 10100, phoneSignalWeak=true)
         val raw = fix(1100).copy(sourceEpoch="phone-gps", coordinateSystem=NavigationCoordinateSystem.WGS84)
         assertEquals(NavigationLocationSource.PHONE,
             c.update(raw, fix(1100), true, 1100, 11100, phoneSignalWeak=true).source)
-        assertFalse(c.isExternalEnabled)
-        assertNull(c.injectedFix)
-        assertEquals(listOf("enable:true", "fix:10100", "enable:false"), sink.calls)
+        assertTrue(c.isExternalEnabled)
+        assertEquals(raw, c.injectedFix)
+        assertEquals(listOf("enable:true", "fix:10100", "fix:11100"), sink.calls)
         assertEquals(NavigationLocationSource.NONE,
             c.update(raw, null, true, 4100, 14100, phoneSignalWeak=true).source)
+    }
+
+    /** Cold phone-only path: real GNSS must reach SDK despite stale SDK weak flag;
+     * no CAN GPS, duplicate/expired samples, rollback and exceptions must fail closed. */
+    @Test fun `qualified raw phone GPS drives SDK without any vehicle GPS`() {
+        val sink = Sink(); val c = NavigationExternalLocationController(sink)
+        val raw = fix(100).copy(sourceEpoch="phone-gps", coordinateSystem=NavigationCoordinateSystem.WGS84)
+        assertEquals(NavigationLocationSource.PHONE,
+            c.update(raw, null, true, 100, 10100, phoneSignalWeak=true).source)
+        assertTrue(c.isExternalEnabled)
+        assertEquals(raw, c.injectedFix)
+        assertFalse(selectedLocationWeak(c.isExternalEnabled, c.injectedFix != null, true))
+        c.update(raw, null, true, 200, 10200, phoneSignalWeak=true)
+        assertEquals(listOf("enable:true", "fix:10100"), sink.calls)
+        assertEquals(NavigationLocationSource.NONE,
+            c.update(raw, null, true, 3100, 13100, phoneSignalWeak=true).source)
+        assertFalse(c.isExternalEnabled)
+        assertNull(c.injectedFix)
     }
 }
