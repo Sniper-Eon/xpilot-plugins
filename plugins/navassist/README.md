@@ -100,3 +100,7 @@ SP/Tesla gates are still required by the shared coordinator. Real CP app interop
 both bind UDP 4213, so **enable only one at a time**; this plugin does not release or probe the other's socket.
 
 Unnumbered navigation merges now use one bounded relative adjacent step per event, with observed neighbor, OEM/crossing, BSM and SP timing checks retained. Missing absolute numbering alone does not cancel merge/exit preparation. A completed relative merge cannot fall through to a fresh turn-only lamp. `signalPurpose` distinguishes junction lamps (SP turn intent still requires actual CarState blinker feedback) from merge/exit preparation (never a substitute for permission to cross). No direct turn-desire injection or new host API is used.
+
+### HUD presentation (1.5.1)
+
+The navigation overlay uses only the strip below the driving view. It distinguishes a requested signal from actual same-side carState blinker feedback and reports unavailable primary panda authority as a wait, rather than promising a turn or lane change. Recommended lanes never establish an observed ego-lane index. Inactive/replay guidance is hidden by the existing display contract. This release does not change navigation execution, CAN, steering, camera capture or safety firmware.

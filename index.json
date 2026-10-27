@@ -124,13 +124,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.5.0",
+      "version": "1.5.1",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.5.0.tar.gz",
-      "sha256": "796ba8bb4ea1514e9e23c45f174c847bcfa1a81f4da08b2038c04011f4f983de",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.5.1.tar.gz",
+      "sha256": "535a1fd5810ba188f375c81d595c97f55fd63cc2d1a06265fca20b2014f58409",
       "platform": null
     },
     {
@@ -245,15 +245,27 @@
       "platform": null
     },
     {
+      "id": "turn_lane_settings",
+      "name": "Turn & Lane Settings",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "ui",
+      "author": "Sniper-Eon",
+      "description": "Parked settings for existing turn intent and lane-change delay. The master shows the summary tile; saved driving settings are independent.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/turn_lane_settings-1.0.0.tar.gz",
+      "sha256": "2a81e1c5b811f6f8d4a396696effa772c9df80b89f2998f6492cda1c4bcc3d8c",
+      "platform": null
+    },
+    {
       "id": "zh_cn",
       "name": "Simplified Chinese UI",
-      "version": "1.1.2",
+      "version": "1.1.3",
       "api": 1,
       "category": "ui",
       "author": "Sniper-Eon",
       "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.2.tar.gz",
-      "sha256": "ed21ac875ef7fe03d21e789bb95cfa03e0a356f4af44fc1c6f171017988dcc77",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.3.tar.gz",
+      "sha256": "6c1db3d495cdef480fe244de28cd0472a15da73abec25af6f373add4a82505d1",
       "platform": null
     }
   ]
