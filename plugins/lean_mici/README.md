@@ -1,9 +1,12 @@
-# lean_mici 0.7.0
+# lean_mici 0.7.1
 
 ## Navigation
 
 The phone receives calibrated vehicle motion and returns navigation for the tile.
-Navigation is display only; turn-speed control is not included.
+The navigation tile shows a maneuver arrow, distance, instruction, and remaining time.
+Fresh, healthy route curve points can lower the SP longitudinal cruise target.
+The target accounts for distance traveled since the phone's curve sample.
+Curve braking uses A_DECEL = 1.0 m/s²; tune it with route experience.
 
 Default off; model role plus `lean_modeld` only, `rules: []`, no CAN sends.
 No model or compiled model container is packaged or committed. The aarch64 native camera bridge is shipped with reproducible build_native.py.
