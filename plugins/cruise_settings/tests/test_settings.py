@@ -14,7 +14,7 @@ class View:
 
 def test_defaults():
   out = read(View({}))
-  assert out["IntelligentCruiseButtonManagement"] is True
+  assert out["IntelligentCruiseButtonManagement"] is False
   assert out["SmartCruiseControlVision"] is False
   assert out["InitialCruiseSpeedKph"] == 40
 

@@ -26,7 +26,7 @@ def _int(view, key: str, default: int, low: int, high: int) -> int:
 
 def read(view, host_has_main_cruise: bool = True) -> dict:
   values = {
-    "IntelligentCruiseButtonManagement": _bool(view, "ExtCruiseIcbm", True),
+    "IntelligentCruiseButtonManagement": _bool(view, "ExtCruiseIcbm", False),
     "SmartCruiseControlVision": _bool(view, "ExtCruiseSccVision", False),
     "SmartCruiseControlMap": _bool(view, "ExtCruiseSccMap", False),
     "InitialCruiseSpeedKph": _int(view, "ExtCruiseInitialSpeed", 40, MIN_SPEED, MAX_SPEED),

@@ -20,7 +20,7 @@
   ],
   "params": {
     "ExtCruiseSettingsEnabled": {"type": "BOOL", "default": "0"},
-    "ExtCruiseIcbm": {"type": "BOOL", "default": "1"},
+    "ExtCruiseIcbm": {"type": "BOOL", "default": "0"},
     "ExtCruiseSccVision": {"type": "BOOL", "default": "0"},
     "ExtCruiseSccMap": {"type": "BOOL", "default": "0"},
     "ExtCruiseMainCruise": {"type": "BOOL", "default": "1"},

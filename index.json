@@ -82,7 +82,7 @@
       "author": "Sniper-Eon",
       "description": "Cruise switches in one plugin: intelligent cruise buttons, smart cruise from vision and map, main-cruise permission and the initial set speed. Writes the host params only while parked.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cruise_settings-0.1.0.tar.gz",
-      "sha256": "77e1ae86f79727cc111fada6d13664af2b8d141a61da951a4b4a311fa66e405b",
+      "sha256": "6a219d2386eee735cffd54c39e6f2e8239b3fc32fd956268ddcd7aaab9eb6db3",
       "platform": null
     },
     {
