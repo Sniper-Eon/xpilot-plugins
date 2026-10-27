@@ -5,6 +5,7 @@ from openpilot.tesla.ui.tile import Tile
 from openpilot.tesla.ui.tiles import TileSpec
 
 MODE_NAMES = {"0": "HOLD", "1": "PAUSE", "2": "OFF"}
+ICON = "icons/chffr_wheel.png"  # steering wheel from the host assets
 
 
 def _plugin():
@@ -34,5 +35,4 @@ class MadsTile(Tile):
     return (enabled, MODE_NAMES.get(mode, mode))
 
   def draw(self, rect, size, state):
-    enabled, mode = state if state else (False, '--')
-    self.draw_value(rect, 'ON' if enabled else 'OFF', mode)
+    self.face(rect, icon=ICON)
