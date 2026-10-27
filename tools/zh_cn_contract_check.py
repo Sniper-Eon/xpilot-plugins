@@ -16,6 +16,12 @@ def main():
   sys.modules[spec.name] = module
   spec.loader.exec_module(module)
   translator = module.ChineseCatalog()
+  # New settings plugins: headers and tile/status labels live outside metadata.
+  for text in ('MADS', 'CRUISE', 'HOLD', 'PAUSE', 'OFF'):
+    translated=translator.translate(text)
+    assert translated and any('\u4e00' <= c <= '\u9fff' for c in translated), text
+  for key in ('ExtMadsEnabled', 'ExtMadsSteeringMode', 'ExtCruiseIcbm', 'ExtCruiseInitialSpeed'):
+    assert translator.translate(key) is None, key
   assert len(translator.strings) >= 3161, 'full reference catalog must be retained'
   # Regression: lower-case tile/action labels were absent despite translated settings.
   for text in ('add tiles', 'done', 'Plugin Store', 'checking...', 'download update',
