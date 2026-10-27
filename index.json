@@ -52,13 +52,13 @@
     {
       "id": "car_tile",
       "name": "Car Tile",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: cluster speed, gear, blinkers and blind spots. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/car_tile-1.0.0.tar.gz",
-      "sha256": "9606fcbf15a11c49cf821b5d6174482c6f0ae088782dc3528058f7d35398a9fc",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/car_tile-1.0.1.tar.gz",
+      "sha256": "5b414327addcda74be0144c27a52731b3f5ee730be0e4df8199cbc48fd6cb7d3",
       "platform": null
     },
     {
