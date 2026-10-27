@@ -118,7 +118,7 @@
       "author": "Sniper-Eon",
       "description": "One place for MADS switches: MADS on/off, lateral steering on brake, unified engagement, and the Tesla screen-button mode. Writes the host MADS params only while parked.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/mads_settings-0.1.0.tar.gz",
-      "sha256": "ba46da496ea88a4b8fed85da9bf4ecad0beecfa86ee0abc3728ac6eed3b8af4b",
+      "sha256": "8e8e7bdd38a73323af6ad9e1b288f91922deb928f6d16c643facc00fa7881bb4",
       "platform": null
     },
     {
@@ -142,7 +142,7 @@
       "author": "Sniper-Eon",
       "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.4.0.tar.gz",
-      "sha256": "cd60a844241ab8f1a0ceb5976b67f20676523aa6a2dc4f0092e5454ea94607ca",
+      "sha256": "632b82dba5399879701cc659ffa314ccb0f523f7b3091902ff1af0d78f8dee32",
       "platform": null
     },
     {

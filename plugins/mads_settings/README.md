@@ -14,6 +14,12 @@ The worker (`mads_settingsd`) copies the switch values into the host params once
 It does not touch steering, acceleration or CAN. Turning this plugin off stops the mirroring; the host keeps the
 last values.
 
+## Tile and page
+
+The plugin adds a small **MADS** tile. Tapping it offroad opens a native page with one row per switch (the same rows
+the Plugins page shows). The tile shows ON/OFF and the brake-steering mode, and it is hidden while the plugin switch
+is off.
+
 ## Tesla notes
 
 - `MadsMainCruiseAllowed` is removed on Tesla at car init, so the plugin leaves it absent on those cars.
