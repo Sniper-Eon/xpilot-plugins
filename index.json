@@ -110,6 +110,18 @@
       "platform": null
     },
     {
+      "id": "mads_settings",
+      "name": "MADS Settings",
+      "version": "0.1.0",
+      "api": 1,
+      "category": "tools",
+      "author": "Sniper-Eon",
+      "description": "One place for MADS switches: MADS on/off, lateral steering on brake, unified engagement, and the Tesla screen-button mode. Writes the host MADS params only while parked.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/mads_settings-0.1.0.tar.gz",
+      "sha256": "ba46da496ea88a4b8fed85da9bf4ecad0beecfa86ee0abc3728ac6eed3b8af4b",
+      "platform": null
+    },
+    {
       "id": "map_tile",
       "name": "Map Tile",
       "version": "1.0.0",

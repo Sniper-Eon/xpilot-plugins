@@ -1,0 +1,26 @@
+# MADS Settings
+
+A separate plugin front end for the host MADS switches, so they can be changed without the Toggles page:
+
+| Plugin switch | Host param |
+|---|---|
+| MADS enabled | `Mads` |
+| Steering on brake | `MadsSteeringMode` (0 remain active / 1 pause / 2 disengage) |
+| Unified engagement | `MadsUnifiedEngagementMode` |
+| Tesla screen button | `TeslaMadsScreenButton` (0 off / 1 three finger / 2 four finger / 3 five finger) |
+| Main cruise allowed | `MadsMainCruiseAllowed` (not recreated when the car removes it) |
+
+The worker (`mads_settingsd`) copies the switch values into the host params once per second **only while parked**.
+It does not touch steering, acceleration or CAN. Turning this plugin off stops the mirroring; the host keeps the
+last values.
+
+## Tesla notes
+
+- `MadsMainCruiseAllowed` is removed on Tesla at car init, so the plugin leaves it absent on those cars.
+- With the screen button at Off, MADS is limited and the host forces `MadsSteeringMode = 2`; pick Three finger or
+  above if you want to keep steering through a brake press.
+- MADS still needs the host's own gates (stalk/cruise engagement, car state); this plugin only changes settings.
+
+## Checks
+
+`python -m pytest plugins/mads_settings/tests` covers the mapping and the Tesla main-cruise case.
