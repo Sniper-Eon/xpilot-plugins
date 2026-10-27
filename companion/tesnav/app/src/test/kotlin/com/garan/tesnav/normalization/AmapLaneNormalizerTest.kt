@@ -49,6 +49,21 @@ class AmapLaneNormalizerTest {
         assertEquals(2, lanes.single().rawLaneType)
     }
 
+    @Test fun declaredSixWithFourObservedLanesExportsFourContiguousLanes() {
+        val lanes = AmapLaneNormalizer.legacy(
+            List(4) { observation(6) }, byteArrayOf(1, 0, 0, 3, -1, -1),
+            byteArrayOf(15, 0, 0, 15, -1, -1),
+        )
+        val snapshot = NavAssistV2Mapper.snapshot(
+            NavigationState(lanes = lanes, laneCount = lanes.size, lanesObservedAtMs = 1000,
+                acceptedPathId = 42, guidancePathId = 42, lanesPathId = 42),
+            "fixture", 1, 1000, 1200,
+        )
+        assertEquals(4, snapshot.lanes!!.totalCount)
+        assertEquals(listOf(0, 1, 2, 3), snapshot.lanes!!.items.map { it.index })
+        assertEquals(listOf(1, 2), snapshot.lanes!!.items.filter { it.recommended }.map { it.index })
+    }
+
     @Test fun legacyTypeCharactersTakePrecedenceOverParallelByteArrays() {
         val lane = AmapLaneNormalizer.legacy(
             listOf(observation(1, "21")), byteArrayOf(3), byteArrayOf(3),

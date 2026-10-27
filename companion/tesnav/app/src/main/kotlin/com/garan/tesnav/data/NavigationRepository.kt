@@ -811,8 +811,7 @@ class NavigationRepository(
             copy(
                 lanes = lanes,
                 lanesObservedAtMs = observedAtMs,
-                laneCount = laneInfos?.firstOrNull()?.laneCount?.takeIf { it in 1..16 }
-                    ?: lanes.size.takeIf { it in 1..16 },
+                laneCount = count.takeIf { it in 1..16 },
                 lanesPathId = lanePathId,
                 laneCallbackCount = laneCallbackCount + 1,
                 laneLastEvent = if (count > 0) "legacy_data" else "legacy_empty",

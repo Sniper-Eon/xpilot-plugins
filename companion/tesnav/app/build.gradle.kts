@@ -21,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 26
-        versionName = "1.13-xpilot-navigation-recovery"
+        versionCode = 27
+        versionName = "1.14-xpilot-lane-count"
 
         manifestPlaceholders["AMAP_API_KEY"] =
             providers.gradleProperty("AMAP_API_KEY").orNull ?: ""

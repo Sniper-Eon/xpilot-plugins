@@ -10,3 +10,5 @@ ios/*.xcodeproj/
 ios/DerivedData/
 ios/.renewal/
 ios/__pycache__/
+
+.kotlin/
