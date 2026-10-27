@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import socket
 import threading
 import time
@@ -40,16 +41,19 @@ class NavAssistUDPServer:
     self._socket.bind(address)
     self._socket.settimeout(0.2)
     self._stats_lock = threading.Lock()
-    self._stats = {"received": 0, "accepted": 0, "rejected": {}, "last_sender_ip": None, "last_packet_mono_ns": 0}
+    self._stats = {"received": 0, "accepted": 0, "rejected": {}, "last_sender_ip": None, "last_packet_mono_ns": 0,
+                   "last_reject_reason": None, "last_reject_field": None}
 
   def diagnostics(self) -> dict:
     with self._stats_lock:
       return {**self._stats, "rejected": dict(self._stats["rejected"])}
 
-  def _reject_record(self, reason: str) -> None:
+  def _reject_record(self, reason: str, field: str | None = None) -> None:
     with self._stats_lock:
       rejected = self._stats["rejected"]
       rejected[reason] = rejected.get(reason, 0) + 1
+      self._stats["last_reject_reason"] = reason
+      self._stats["last_reject_field"] = field if field and re.fullmatch(r"[A-Za-z][A-Za-z0-9_.\[\]]{0,63}", field) else None
 
   @property
   def server_address(self) -> tuple[str, int]:
@@ -111,7 +115,7 @@ class NavAssistUDPServer:
       try:
         accepted = self.store.accept(body, source_key_id(source_host))
       except NavAssistProtocolError as error:
-        self._reject_record(error.reason)
+        self._reject_record(error.reason, str(error).split(" ", 1)[0])
         continue
       self._accepted_source = source_host
       with self._stats_lock:

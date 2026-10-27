@@ -30,6 +30,9 @@ MANEUVER_VALUES = frozenset((
   "u_turn_left", "u_turn_right", "keep_left", "keep_right", "merge_left", "merge_right", "exit_left",
   "exit_right", "ramp_left", "ramp_right", "roundabout", "destination", "unknown",
 ))
+ROAD_LAYER_VALUES = frozenset(("unknown", "main", "side"))
+ROUTE_NOTICE_VALUES = frozenset(("none", "unknown", "restricted_area", "forbidden_area", "road_closed",
+  "congestion", "dispatch", "route_changed", "gps_weak"))
 ROAD_TYPE_VALUES = frozenset((1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 53, 56, 58))
 
 LANE_ACTION_BITS = {
@@ -58,6 +61,8 @@ LOCATION_KEYS = frozenset((
 GUIDANCE_KEYS = frozenset((
   "maneuver", "maneuverDistanceM", "nextManeuver", "nextManeuverDistanceM", "currentRoad", "nextRoad",
   "roadClass", "roadType", "advisorySpeedMps", "observedAtMs",
+  "parallelRoadStatus", "elevatedRoadStatus", "routeNoticeType", "routeNoticeDistanceM",
+  "routeNoticeObservedAtMs", "turnSignalHold", "turnSignalCountdownS",
 ))
 LANES_KEYS = frozenset(("observedAtMs", "items", "totalCount"))
 LANE_ITEM_KEYS = frozenset(("index", "allowedActions", "recommendedActions", "recommended", "routeAvoid"))
@@ -116,6 +121,14 @@ class NavAssistSnapshot:
   lane_guidance_observed_at_ms: int
   lane_total_count: int
   lanes: tuple[LaneGuidance, ...]
+  # Optional phone context is validated data, not lane position or actuation permission.
+  parallel_road_status: str = "unknown"
+  elevated_road_status: str = "unknown"
+  route_notice_type: str = "none"
+  route_notice_distance_m: int = -1
+  route_notice_observed_at_ms: int = 0
+  turn_signal_hold: bool = False
+  turn_signal_countdown_s: int = -1
 
 
 @dataclass(frozen=True)
@@ -337,6 +350,13 @@ def parse_snapshot(body: bytes) -> NavAssistSnapshot:
     next_maneuver=_enum(guidance, "nextManeuver", MANEUVER_VALUES, default="none"),
     next_maneuver_distance_m=float(_optional_integer(guidance, "nextManeuverDistanceM", 0, 100_000, default=0)),
     advisory_speed_mps=advisory_speed,
+    parallel_road_status=_enum(guidance, "parallelRoadStatus", ROAD_LAYER_VALUES, default="unknown"),
+    elevated_road_status=_enum(guidance, "elevatedRoadStatus", ROAD_LAYER_VALUES, default="unknown"),
+    route_notice_type=_enum(guidance, "routeNoticeType", ROUTE_NOTICE_VALUES, default="none"),
+    route_notice_distance_m=_optional_integer(guidance, "routeNoticeDistanceM", 0, 100_000),
+    route_notice_observed_at_ms=_optional_integer(guidance, "routeNoticeObservedAtMs", 0, 2**63-1, default=0),
+    turn_signal_hold=_optional_boolean(guidance, "turnSignalHold"),
+    turn_signal_countdown_s=_optional_integer(guidance, "turnSignalCountdownS", 0, 3600),
     road_class=_optional_integer(guidance, "roadClass", 0, 10),
     road_type=_documented_road_type(guidance),
     current_road=_optional_road_name(guidance, "currentRoad"),

@@ -118,3 +118,7 @@ The bottom-strip HUD removes its card and lane-cell backgrounds. The main arrow 
 ### C3XL buzzer contract (1.5.5)
 
 The navigation notice uses the standard host warning/prompt alert. C3XL routes audio through its existing GPIO buzzer, whose host backend must map that prompt to a short pulse. The integration regression covers navigation preparation, host alert production, GPIO dispatch deduplication and unchanged critical-tone routing. Plugin actuation and chime timing are unchanged; installing this plugin alone cannot repair an older host buzzer backend.
+
+### Phone metadata compatibility (1.5.6)
+
+Recognize the seven optional context fields already emitted by TesNav: parallel/elevated road status, route notice type/distance/time, and turn-signal hold/countdown. Validate enums, booleans and numeric bounds instead of discarding the entire snapshot when these documented fields appear. They remain data only: no new lane index, turn, crossing permission or countdown-based actuation is inferred. All route/position freshness and SP/BSM/paint gates remain unchanged. Reject diagnostics retain a bounded field name and category without echoing packet values.
