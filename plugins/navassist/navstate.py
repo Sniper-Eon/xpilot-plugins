@@ -44,7 +44,11 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   phone_observations_valid = _phone_observations_valid(snapshot)
   guidance_age = snapshot.source_wall_time_ms-snapshot.guidance_observed_at_ms
   guidance_valid = snapshot.guidance_present and 0 <= guidance_age <= 1500
-  linked = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched and guidance_valid)
+  # AMap need not repeat unchanged maneuver callbacks. As on the 23-Oct
+  # baseline, a fresh matched snapshot keeps turn-only guidance available.
+  # Lane/slowdown validity below still requires recent guidance and positioning.
+  guidance_known = snapshot.guidance_present and guidance_age >= 0
+  linked = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched and guidance_known)
   valid = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched
                and snapshot.location_present and guidance_valid and not snapshot.gps_weak and phone_observations_valid)
   if stale:
