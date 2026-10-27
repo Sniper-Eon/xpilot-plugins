@@ -130,7 +130,7 @@
       "author": "Sniper-Eon",
       "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.4.0.tar.gz",
-      "sha256": "8505de7b3cd2a713fa0bbcee2b4178f45944ff9a0612751189beb1b07ce01c36",
+      "sha256": "632b82dba5399879701cc659ffa314ccb0f523f7b3091902ff1af0d78f8dee32",
       "platform": null
     },
     {
@@ -203,6 +203,18 @@
       "description": "Angle-based cooperative steering: light driver torque adjusts the SP steering target with speed-dependent effort. SP must own steering; stock Autosteer must not steer at the same time (AP ownership/handoff is not implemented). Enable while parked, then restart. Overrides native TeslaCoopSteering mode for this session without changing its saved setting. Host-tested only; vehicle validation is pending.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_mixed_control-1.1.1.tar.gz",
       "sha256": "8bcb64b5bcbf6abf9dc04bafa7023b89a6e0517d927dc0b66d748d1de6da2137",
+      "platform": null
+    },
+    {
+      "id": "tesnav",
+      "name": "TesNav Navigation",
+      "version": "0.1.1",
+      "api": 1,
+      "category": "navigation",
+      "author": "juyun86",
+      "description": "TesNav phone guidance and recommended-lane display, with optional turn slowdown. No automatic lane changes or steering. Controlled private LAN only.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesnav-0.1.1.tar.gz",
+      "sha256": "03ab88660fa0bd0490f064e739680f16d76dc9f876ca3a9873d15d33db0ba584",
       "platform": null
     },
     {

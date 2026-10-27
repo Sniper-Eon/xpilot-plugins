@@ -92,3 +92,9 @@ unsupported. The original CP app may still show its own unsupported controls. No
 CP navigation observations expire independently of reception/heartbeat. Stale/absent GPS, route, guidance
 or status cannot start a request. A new control lease resets the source. Fresh native localization and normal
 SP/Tesla gates are still required by the shared coordinator. Real CP app interoperability is pending.
+
+## Local fork note: TesNav coexistence
+
+`tesnav` (vendored from `juyun86/xpilot-plugins`) is a separate navigation plugin with its own switch
+`ExtTesNavEnabled`. This plugin keeps `ExtNavAssistEnabled`. Both receive the same phone snapshot family and
+both bind UDP 4213, so **enable only one at a time**; this plugin does not release or probe the other's socket.
