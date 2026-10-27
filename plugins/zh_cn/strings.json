@@ -3236,5 +3236,8 @@
   "Not set": "未设置",
   "Printable ASCII only": "仅支持可打印的 ASCII 字符",
   "Maximum {count} characters": "最多输入 {count} 个字符",
-  "Manual Long Owner (wiper first detent)": "手动切换纵向控制（雨刷第一档）"
+  "Manual Long Owner (wiper first detent)": "手动切换纵向控制（雨刷第一档）",
+  "TesNav Navigation": "TesNav 导航",
+  "TesNav phone guidance and recommended-lane display, with optional turn slowdown. No automatic lane changes or steering. Controlled private LAN only.": "TesNav 手机导航与推荐车道显示，可选转弯减速。不自动变道或控制转向，仅用于受控局域网。",
+  "Navigation turn slowdown (experimental)": "导航转弯减速（实验）"
 }
