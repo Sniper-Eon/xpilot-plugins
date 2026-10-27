@@ -47,15 +47,24 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
   )
 
   if maneuver in MERGE_MANEUVERS:
-    # A merge direction describes route geometry, not proof that the vehicle
-    # still occupies the auxiliary lane. Never repeat an edge search merely
-    # because another merge instruction arrives after entering the main road.
-    if not (nav_valid and lanes and recommended and amap_ego_index is not None
-            and 0 <= amap_ego_index < len(lanes)
+    if amap_ego_index is None:
+      # A missing full-road lane number is not a reason to discard a fresh
+      # merge instruction. Prepare one adjacent relative step, not an edge
+      # search across the whole road; observation/paint/BSM gates stay below.
+      visual_ego = int(topology.egoLaneIndexFromLeft)
+      ready = bool(nav_valid and int(nav.maneuverEventId) != 0
+                   and 0 <= visual_ego < lane_count and fallback_side is not None
+                   and math.isfinite(distance_m) and 0 < distance_m <= lookahead_m)
+      target = 0 if fallback_side == 'left' else max(0, lane_count-1)
+      return NavLanePlan(ready, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
+                         lane_count, (target,), heuristic=True,
+                         edge_direction=LaneIntentDirection.left if fallback_side == 'left' else LaneIntentDirection.right,
+                         relative_change_limit=1)
+    if not (nav_valid and lanes and recommended and 0 <= amap_ego_index < len(lanes)
             and 0 <= int(topology.egoLaneIndexFromLeft) < lane_count):
       return NavLanePlan(False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
                          len(lanes), (), observation_interrupted=bool(nav_valid and recommended))
-    fallback_side = None  # Only the confirmed absolute mapping below may choose a lane.
+    fallback_side = None  # A confirmed absolute position still resolves the actual recommendation.
 
   if lanes:
     amap_lane_count = len(lanes)

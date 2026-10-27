@@ -69,7 +69,10 @@ def payload(intent, nav):
               signalRequested=intent.signal_requested, direction=intent.direction.name,
               targetLaneIndex=intent.target_lane_index, spLaneChangeReady=intent.lane_change_ready,
               laneChangeAllowed=intent.lane_change_ready, reason=intent.reason, requestId=intent.request_id,
-              forkNow=False, allowUnknownCrossing=False, ignoreSolidBoundary=False)
+              forkNow=False, allowUnknownCrossing=False, ignoreSolidBoundary=False,
+              signalPurpose='lanePreparation' if nav.get('maneuver') in
+                ('merge_left', 'merge_right', 'exit_left', 'exit_right', 'ramp_left', 'ramp_right')
+                or intent.target_lane_index >= 0 else 'junction')
 
 
 class TurnSignalCoordinator:
@@ -92,9 +95,13 @@ class LaneIntentCoordinator:
   def __init__(self, *, max_changes=5):
     self.max_changes = max_changes
     self.core = NavLaneIntentCoordinator(max_changes=max_changes)
+    self._completed_relative_event = None
+    self._owned_lane_event = None
 
   def reset(self):
     self.core = NavLaneIntentCoordinator(max_changes=self.max_changes)
+    self._completed_relative_event = None
+    self._owned_lane_event = None
 
   def update(self, nav, plan, *, now_ns, topology_valid, left_blocked, right_blocked,
              blindspot_left, blindspot_right, lateral_active, left_blinker=False, right_blinker=False,
@@ -121,7 +128,13 @@ class LaneIntentCoordinator:
       left_blinker, right_blinker, brake_pressed, gas_pressed, steering_pressed, state, direction)
     result = self.core.update(plan.core, topology, vehicle, now_ns=now_ns,
                               allow_new_lane_change=allow_new_lane_change)
-    return payload(result, nav)
+    event = (nav.get('sessionId'), nav.get('routeRevision'), nav.get('maneuverEventId'))
+    if plan.core.relative_change_limit == 1 and result.reason == 'laneChangeObserved':
+      self._completed_relative_event = event
+    if result.signal_requested:
+      self._owned_lane_event = event
+    return dict(payload(result, nav), relativeStepComplete=self._completed_relative_event == event,
+                laneRequestOwned=self._owned_lane_event == event)
 
 
 def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
@@ -140,11 +153,22 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
     left_blinker=left_blinker, right_blinker=right_blinker, brake_pressed=brake_pressed,
     gas_pressed=gas_pressed, steering_pressed=steering_pressed, model_state=model_state,
     model_direction=model_direction, allow_new_lane_change=n.maneuverDistanceM > 0 and not approaching)
+  if (n.maneuver in ('mergeLeft', 'mergeRight') and topology.get('absoluteEgoIndex') is None
+      and out.get('relativeStepComplete')):
+    out.update(signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False, reason='heuristicChangeLimit')
+    return out
   if out['signalRequested']:
     return out
   if settings.turn_signal_enabled and turn['signalRequested']:
-    if not intersection and (topology.get('absoluteEgoIndex') is None or
-        out['reason'] in ('alreadyInRecommendedLane', 'noNeighbor')):
+    relative_route_action = n.maneuver in ('mergeLeft', 'mergeRight', 'exitLeft', 'exitRight', 'rampLeft', 'rampRight')
+    if relative_route_action and out.get('laneRequestOwned'):
+      return out  # Never bypass a lane coordinator's pause/abort via a turn-only fallback.
+    if not intersection and (out['reason'] in ('alreadyInRecommendedLane', 'noNeighbor') or
+        (topology.get('absoluteEgoIndex') is None and not relative_route_action)):
+      return out
+    # A completed relative merge cannot turn its lamp back on via the turn-only
+    # fallback after the one-step lane coordinator has ended the request.
+    if relative_route_action and out['reason'] in ('heuristicChangeLimit', 'changeLimit'):
       return out
     return turn
   if out['reason'] in ('routeChanged', 'neighborObservationPaused', 'crossingWaitTimeout') or out['reason'].startswith('lanePosition'):

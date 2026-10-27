@@ -167,7 +167,10 @@ class NavLaneIntentCoordinator(LanePreparation):
         reason=self._plan_reason(plan, self._phase),
       )
 
-    if relative_status is not None and relative_status.completed_changes >= self._relative_consistency.max_changes:
+    relative_limit = self._relative_consistency.max_changes
+    if plan.relative_change_limit is not None:
+      relative_limit = min(relative_limit, plan.relative_change_limit)
+    if relative_status is not None and relative_status.completed_changes >= relative_limit:
       self._reset()
       return self._idle(self._plan_reason(plan, "changeLimit"))
 

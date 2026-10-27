@@ -27,7 +27,7 @@ def signal_status(intent):
   if not intent.get('signalRequested'):
     return ''
   if intent.get('targetLaneIndex', -1) < 0:
-    return 'TURN SIGNAL ONLY'
+    return 'WAIT LANE CONFIRMATION' if intent.get('signalPurpose') == 'lanePreparation' else 'TURN SIGNAL ONLY'
   reason = str(intent.get('reason', '')).lower()
   if 'blindspot' in reason:
     return 'WAIT BLINDSPOT'

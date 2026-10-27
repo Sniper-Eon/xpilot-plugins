@@ -31,6 +31,7 @@ class NavLanePlan:
   allow_unknown_crossing: bool = False
   ignore_solid_boundary: bool = False
   observation_interrupted: bool = False
+  relative_change_limit: int | None = None
 
 
 @dataclass(frozen=True)

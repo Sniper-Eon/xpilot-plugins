@@ -33,6 +33,7 @@ class NavLanePolicy:
     self._phone_states = None
     self._owned_side = None
     self._turn_only = False
+    self._suppress_turn = False
 
   def _poll(self):
     now = time.monotonic()
@@ -78,18 +79,20 @@ class NavLanePolicy:
     if intent.get('valid') and intent.get('signalRequested') and side in ('left', 'right'):
       self._owned_side = side
       self._turn_only = intent.get('targetLaneIndex', -1) < 0
+      self._suppress_turn = not self._turn_only or intent.get('signalPurpose') == 'lanePreparation'
       conflicting = right if side == 'left' else left
       if conflicting:
         return LaneChangeLimits(allow_start=False, allow_continue=False, suppress_turn=True)
       if self._turn_only:
-        return LaneChangeLimits(allow_start=False, allow_continue=False, turn_only=True)
+        return LaneChangeLimits(allow_start=False, allow_continue=False, turn_only=True,
+                                suppress_turn=self._suppress_turn)
       ready = bool(intent.get('spLaneChangeReady') and intent.get('laneChangeAllowed'))
       clear = ready and not self._blocked(side, last)
       return LaneChangeLimits(allow_start=clear, allow_continue=clear, suppress_turn=True)
     if self._owned_side is not None:
       if left or right:
         return LaneChangeLimits(allow_start=False, allow_continue=False,
-                                turn_only=self._turn_only, suppress_turn=not self._turn_only)
+                                turn_only=self._turn_only, suppress_turn=self._suppress_turn)
       self._owned_side = None
     blocked = self._blocked(_side(direction), last)
     return LaneChangeLimits(allow_start=not blocked, allow_continue=not blocked)

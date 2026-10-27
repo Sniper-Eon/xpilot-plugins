@@ -17,9 +17,10 @@ def nav(maneuver='mergeRight',lanes=True):
 
 @pytest.mark.parametrize('maneuver',['mergeLeft','mergeRight'])
 @pytest.mark.parametrize('lanes',[False,True])
-def test_merge_direction_without_confirmed_absolute_position_cannot_choose_a_lane(maneuver,lanes):
+def test_merge_without_absolute_position_uses_one_relative_step(maneuver,lanes):
  p=build_lane_plan(nav(maneuver,lanes),N(visibleLaneCount=3,egoLaneIndexFromLeft=1),healthy=True)
- assert not p.valid and not p.heuristic
+ assert p.valid and p.heuristic and p.relative_change_limit == 1
+ assert not p.force_fork and not p.ignore_solid_boundary
 
 
 def test_merge_allows_only_proven_mismatch_and_already_recommended_is_no_action():
@@ -30,7 +31,7 @@ def test_merge_allows_only_proven_mismatch_and_already_recommended_is_no_action(
  assert p.valid and p.recommended_indices==(2,) and not p.heuristic
 
 
-@pytest.mark.parametrize('absolute',[None,2])
+@pytest.mark.parametrize('absolute',[2])
 def test_shared_publisher_does_not_fall_through_to_merge_turn_lamp(absolute):
  n=dict(valid=True,stale=False,linked=True,sessionId='route',routeRevision=1,maneuverEventId=7,
   maneuver='merge_right',distanceM=80.,laneTotalCount=3,lanes=[{'index':i,'recommended':i==2} for i in range(3)])

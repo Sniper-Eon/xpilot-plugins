@@ -98,3 +98,5 @@ SP/Tesla gates are still required by the shared coordinator. Real CP app interop
 `tesnav` (vendored from `juyun86/xpilot-plugins`) is a separate navigation plugin with its own switch
 `ExtTesNavEnabled`. This plugin keeps `ExtNavAssistEnabled`. Both receive the same phone snapshot family and
 both bind UDP 4213, so **enable only one at a time**; this plugin does not release or probe the other's socket.
+
+Unnumbered navigation merges now use one bounded relative adjacent step per event, with observed neighbor, OEM/crossing, BSM and SP timing checks retained. Missing absolute numbering alone does not cancel merge/exit preparation. A completed relative merge cannot fall through to a fresh turn-only lamp. `signalPurpose` distinguishes junction lamps (SP turn intent still requires actual CarState blinker feedback) from merge/exit preparation (never a substitute for permission to cross). No direct turn-desire injection or new host API is used.
