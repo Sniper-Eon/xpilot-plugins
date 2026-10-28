@@ -52,7 +52,7 @@ jobs:
         python3 tools/prepare_profile.py --host "$X" --profile tesnav --destination /tmp/xpilot-tesnav-profile
     - name: Plugin tests
       working-directory: plugins
-      run: PYTHONPATH=$X:$X/msgq_repo:$X/opendbc_repo python3 -m pytest -q -p no:cacheprovider .
+      run: PYTHONPATH=..:$X:$X/msgq_repo:$X/opendbc_repo python3 -m pytest -q -p no:cacheprovider .
     - name: Store end to end (install, discover, enable)
       run: PYTHONPATH=$X/msgq_repo python3 $X/tools/sp_tesla_e2e/store_e2e.py --repo .
     - name: Tell the owner main is broken
