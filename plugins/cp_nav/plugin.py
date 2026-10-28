@@ -1,5 +1,7 @@
 """Independent CP navigation entry. No TesNav package dependency."""
 from openpilot.tesla.plugin import Plugin
+# Import-time capability gate: the old single-publisher host cannot run CP.
+from openpilot.tesla.plugin_msgd import socket_path as _required_message_broker  # noqa: F401
 from .settings import read
 from .turnsignal import TurnSignalController
 from .oem import OemLaneSignals
@@ -13,7 +15,7 @@ class CPNav(Plugin):
 
   def __init__(self,CP,params):
     super().__init__(CP,params)
-    self.params=params;self.settings=read(params);self.turns=TurnSignalController();self._msgs=None;self.oem=OemLaneSignals();self._pm=None;self._next_oem=0
+    self.params=params;self.settings=read(params);self.turns=TurnSignalController();self._msgs=None;self.oem=OemLaneSignals();self._next_oem=0
 
   def setup(self,CP_SP):
     from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
@@ -28,10 +30,8 @@ class CPNav(Plugin):
     self.turns.observe(can_list,now_ns);self.oem.update(can_list,now_ns)
     if now_ns>=self._next_oem:
       self._next_oem=now_ns+100_000_000
-      from openpilot.cereal import messaging
       from openpilot.tesla import plugins
-      if self._pm is None:self._pm=messaging.PubMaster(['pluginMsg'])
-      plugins.send_msg(self._pm,type(self),'oem.lanes',self.oem.payload(now_ns),350)
+      plugins.send_msg(type(self),'oem.lanes',self.oem.payload(now_ns),350)
     return []
 
   def control_sends(self,CS,CC,now_ns):

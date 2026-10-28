@@ -1,4 +1,4 @@
-# Independent CP navigation — local candidate 0.1.0
+# Independent CP navigation — local candidate 0.1.1
 
 This is a standalone store plugin with BOOL master `ExtCpNavEnabled`, its own
 settings, process, data receiver and vehicle hooks. TesNav remains integrated
@@ -78,3 +78,17 @@ Factory-lane vetoes retain the DS two-frame confirmation and bounded release.
 `tools/cp_upstream_probe/run.py --independent` runs the author's unchanged
 Kotlin wire client/mapper through this receiver and native Carrot kernel using
 loopback synthetic observations. It is not a full Android build or road replay.
+
+## 0.1.1 — onroad message publication repair
+
+Requires a paired host with `openpilot.tesla.plugin_msgd` and the broker send API.
+Install the host transport backport before upgrading cp_nav or navassist. The
+entry refuses to import on old single-publisher hosts. Both navigation producers
+now use the host broker without constructing a cereal pluginMsg publisher.
+This fixes the real onroad crash where card's OEM-lane publisher displaced
+cp_navd, causing a process-not-running cruise entry block. No safety checks or
+required-process checks are bypassed. Existing navigation settings and firmware
+permissions remain unchanged. Phone connection and road behavior still require
+a post-update device check; loopback protocol tests are not phone validation.
+
+Required broker host commit: `fc9afa643497a334f7d69df637042bcaca03777b` or a compatible descendant.

@@ -1,7 +1,8 @@
-"""Failures: ready intent bypasses SP wait; preparation is silent; a cleared
+"""Failures: ready intent bypasses SP wait; execution is silent; a cleared
 blindspot stays stuck; turn-only is misrepresented as permission to change.
 """
 from types import SimpleNamespace as N
+from openpilot.cereal import log
 from .test_migration_contract import Params, Messages
 
 
@@ -14,7 +15,7 @@ def test_navigation_ready_never_overrides_sp_wait_or_driver_veto():
   assert p.allow(None, 1, True)
 
 
-def test_preparation_chime_once_even_when_waiting_for_clearance():
+def test_chime_waits_for_execution_after_clearance():
   from navassist.chime import NavigationChime
   chime = NavigationChime(Params())
   chime.settings = N(enabled=True, beep_enabled=True)
@@ -22,10 +23,13 @@ def test_preparation_chime_once_even_when_waiting_for_clearance():
                 spLaneChangeReady=False, laneChangeAllowed=False,
                 sessionId='s', routeRevision=1, maneuverEventId=9, requestId=1)
   chime._msgs = Messages({'lanes.intent': {'navassist': intent}})
-  assert len(chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))})) == 1
+  assert chime.update({'modelV2': N(meta=N(laneChangeState=log.LaneChangeState.preLaneChange, laneChangeDirection=log.LaneChangeDirection.left))}) == []
   assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []
   intent.update(spLaneChangeReady=True, laneChangeAllowed=True)
   assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []
+  executing = {'modelV2': N(meta=N(laneChangeState=log.LaneChangeState.laneChangeStarting, laneChangeDirection=log.LaneChangeDirection.left))}
+  assert len(chime.update(executing)) == 1
+  assert chime.update(executing) == []
   intent['requestId'] = 2
   chime.settings.beep_enabled = False
   assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []

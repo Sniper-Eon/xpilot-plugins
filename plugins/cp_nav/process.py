@@ -22,7 +22,7 @@ def parked_now(state):
 def main():
   params=plugins.view(Params());store=CPStore();runtime=CPRuntime(read(params))
   sm=messaging.SubMaster(['carState','carControl','controlsState','modelV2','deviceState'])
-  pm=messaging.PubMaster(['pluginMsg']);msgs=plugins.PluginMsgs();parked={'verified':False}
+  msgs=plugins.PluginMsgs();parked={'verified':False}
   transports=CPTransports(store,params,lambda:parked_now(parked))
   rk=Ratekeeper(20);next_settings=0
   try:
@@ -42,13 +42,13 @@ def main():
         vehicle_fresh=vehicle,owner=plugins.owner(params,'source:route')=='cp_nav',
         oem=msgs.fresh('oem.lanes').get('cp_nav') or {},
         curvature=float(sm['controlsState'].desiredCurvature) if vehicle else None)
-      plugins.send_msg(pm,CPNav,'cp.state',out['state'],500)
-      plugins.send_msg(pm,CPNav,'lanes.intent',out['intent'],200)
+      plugins.send_msg(CPNav,'cp.state',out['state'],500)
+      plugins.send_msg(CPNav,'lanes.intent',out['intent'],200)
       rk.keep_time()
   finally:
     transports.close()
-    plugins.send_msg(pm,CPNav,'cp.state',{'valid':False},100)
-    plugins.send_msg(pm,CPNav,'lanes.intent',{'valid':False,'signalRequested':False},100)
+    plugins.send_msg(CPNav,'cp.state',{'valid':False},100)
+    plugins.send_msg(CPNav,'lanes.intent',{'valid':False,'signalRequested':False},100)
 
 
 if __name__=='__main__':main()

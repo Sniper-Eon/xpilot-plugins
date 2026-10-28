@@ -38,7 +38,6 @@ def main():
   store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
   sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState', 'deviceMotion'])
   can_socket = messaging.sub_sock('can', conflate=False)
-  pm = messaging.PubMaster(['pluginMsg'])
   state = {'offroad': False}
   transports = NavigationTransports(store, params, lambda: state['offroad'])
   phone = PhoneBlindspotAssist(mode='assist' if settings.phone_assist_enabled else 'shadow')
@@ -79,10 +78,10 @@ def main():
         geometry = transports.geometry.current(store.current(now), now)
         route_status = route_publisher.update(geometry, now,
           enabled=settings.enabled and plugins.owner(params, 'source:route') == 'navassist')
-        plugins.send_msg(pm, NavAssist, 'nav.route', route_status, 1500)
+        plugins.send_msg(NavAssist, 'nav.route', route_status, 1500)
       for key, kind, ttl in [('nav', 'nav.state', 1000), ('topology', 'lanes.topology', 150),
                             ('intent', 'lanes.intent', 200), ('oem', 'oem.lanes', 500)]:
-        plugins.send_msg(pm, NavAssist, kind, result[key], ttl)
+        plugins.send_msg(NavAssist, kind, result[key], ttl)
       if now >= next_record:
         next_record = now+100_000_000
         # Explain a preparation that does not start without relaxing any gate.

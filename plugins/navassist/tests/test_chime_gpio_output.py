@@ -4,6 +4,7 @@ chain with GPIO dispatch mocked, plus existing dedup and critical-tone routing.
 Never construct Beepd or open a real GPIO device in this check.
 """
 from types import SimpleNamespace as N
+from openpilot.cereal import log
 from unittest.mock import Mock
 import pytest
 from navassist.chime import NavigationChime
@@ -20,7 +21,7 @@ def backend():
   return b
 
 
-def test_navigation_preparation_reaches_c3xl_buzzer_once(monkeypatch):
+def test_navigation_execution_reaches_c3xl_buzzer_once(monkeypatch):
   monkeypatch.setattr(alerts,'current',{})
   c=NavigationChime(Params());c.plugin_name='navassist'
   c.settings=N(enabled=True,beep_enabled=True)
@@ -28,14 +29,15 @@ def test_navigation_preparation_reaches_c3xl_buzzer_once(monkeypatch):
               maneuverEventId=3,requestId=3,spLaneChangeReady=False)
   c._msgs=Messages({'lanes.intent':{'navassist':intent}})
   events=[]
-  plugins.update_alerts([c],{},N(add=events.append))
+  sm={'modelV2':N(meta=N(laneChangeState=log.LaneChangeState.laneChangeStarting,laneChangeDirection=log.LaneChangeDirection.right))}
+  plugins.update_alerts([c],sm,N(add=events.append))
   assert events==[alerts.EVENT_NAMES['warning']]
   alert=alerts._callback('warning')(None,None,{},False,0,None)
   assert alert.audible_alert==AudibleAlert.prompt and alert.duration>=5
   b=backend()
   for _ in range(5):b.update_alert(alert.audible_alert)
   b.dispatch_beep.assert_called_once_with(b.engage)
-  plugins.update_alerts([c],{},N(add=events.append))
+  plugins.update_alerts([c],sm,N(add=events.append))
   assert not alerts.current  # the same navigation request does not create another notice
 
 

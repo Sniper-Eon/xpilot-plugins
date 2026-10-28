@@ -131,3 +131,11 @@ The navigation notice uses the standard host warning/prompt alert. C3XL routes a
 ### Phone metadata compatibility (1.5.6)
 
 Recognize the seven optional context fields already emitted by TesNav: parallel/elevated road status, route notice type/distance/time, and turn-signal hold/countdown. Validate enums, booleans and numeric bounds instead of discarding the entire snapshot when these documented fields appear. They remain data only: no new lane index, turn, crossing permission or countdown-based actuation is inferred. All route/position freshness and SP/BSM/paint gates remain unchanged. Reject diagnostics retain a bounded field name and category without echoing packet values.
+
+## Message transport compatibility (1.5.9)
+
+Requires the paired host plugin_msgd broker. The receiver sends the same kinds,
+payloads and TTL through the single broker instead of owning pluginMsg directly.
+Deploy the compatible host first. No navigation decisions or settings changed.
+
+Required broker host commit: `fc9afa643497a334f7d69df637042bcaca03777b` or a compatible descendant.

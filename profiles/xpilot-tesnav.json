@@ -2,7 +2,7 @@
   "id": "xpilot-tesnav",
   "host": "Sniper-Eon/xpilot",
   "host_branch": "xpilot",
-  "host_min_commit": "964aebf31a2714c0c68790c7f6dbce6977ac0e9c",
+  "host_min_commit": "fc9afa643497a334f7d69df637042bcaca03777b",
   "source": "tesnav",
   "companion": "com.garan.tesnav.tenengkai.lane",
   "plugins": [

@@ -73,3 +73,29 @@ or activated releases. The host dependency must be published before plugins.
   compilation/flash, device deployment/activation or road test was performed.
 - Real parked C3/phone interoperation and driving validation remain separate
   steps; user requested no deployment for this task.
+
+## 0.1.1 onroad receiver repair (2026-10-28)
+
+Historical device evidence at 17:08:35 records cp_navd dying with
+MultiplePublishersError on pluginMsg after card begins OEM publication. At
+17:08:39 selfdrived reports process_not_running for cp_navd. The user switched
+back to TesNav after the failure; its later master switch state is a consequence,
+not the root cause. The phone's reported inability to connect is consistent with
+this C3 receiver failure; actual phone handshake remains unverified.
+
+Paired host minimum fc9afa643497a334f7d69df637042bcaca03777b selectively backports
+the upstream broker, source authentication, bounded transport and manager restart.
+CP 0.1.1 and navassist 1.5.9 no longer construct their own pluginMsg publishers.
+An import gate rejects hosts without the broker. No safety or mandatory process
+check is removed, and no firmware/schema migration is included.
+
+The new CP card regression failed on the old publisher construction before the
+repair, and passes after it. Local full plugin suite: 751 passed before merging
+the concurrent upstream-in-user-fork chime commit. Retained that commit and the
+host's concurrent soundd changes; updated three existing chime fixtures to test
+actual laneChangeStarting with cereal enum values and a modelV2 input, retaining
+the producer/host/GPIO dispatch coverage. The scoped eight sound checks pass.
+Host and plugin metadata/archive/profile gates passed; both profiles require the
+broker host and remain unactivated. Device files/settings are untouched by this
+repair so far. Real parked phone connection and vehicle-start validation remain
+pending. Private raw logs are outside the repositories.
