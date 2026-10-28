@@ -15,6 +15,8 @@ class _TnPlanner:
     from .registry import TN_NO_DEC_BACKEND
     from .tn_no_dec.planner import LongitudinalPlanner
     self.planner = LongitudinalPlanner(CP, CP_SP)
+    from openpilot.tesla import plugins
+    self.planner.plugin_long_targets = plugins.long_targets(CP, params)
     self.planner.mpc.configure_runtime_tuning(params, TN_NO_DEC_BACKEND)
 
   def update(self, sm, sp):

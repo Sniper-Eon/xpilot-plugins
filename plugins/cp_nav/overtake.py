@@ -17,7 +17,7 @@ class CPOvertake:
     self.phase='idle';self.counter=0;self.pending=None;self.since=0;self.last_frame=-1
     self.net_changes=0;self.memory_since=0;self.passed_since=0;self.last_action=0
     self.saw_start=self.saw_finish=False
-    self.candidate=None
+    self.candidate=None;self.request_id=0
 
   def cancel(self,reason):
     self.phase='blocked';self.counter=0;self.pending=None;self.passed_since=0;self.candidate=None
@@ -25,7 +25,7 @@ class CPOvertake:
     return dict(state=self.phase,reason=reason,request_direction=None,net_changes=self.net_changes)
 
   def _result(self,reason='',request=None):
-    return dict(state=self.phase,reason=reason,request_direction=request,net_changes=self.net_changes)
+    return dict(state=self.phase,reason=reason,request_direction=request,request_id=self.request_id,net_changes=self.net_changes)
 
   def update(self,o,settings,now_ns):
     if not settings.enabled or settings.overtake_mode==0:
@@ -78,7 +78,7 @@ class CPOvertake:
       if not self.passed_since:self.passed_since=now_ns
       if now_ns-self.passed_since<2_000_000_000:return self._result('confirmingPass')
       if settings.overtake_mode!=2:return self._result('suggestReturn')
-      self.pending=return_side;self.phase='requested';self.since=now_ns;self.last_action=now_ns
+      self.request_id+=1;self.pending=return_side;self.phase='requested';self.since=now_ns;self.last_action=now_ns
       return self._result(request=return_side)
     if state!='off':return self.cancel('modelBusy')
     if self.last_action and now_ns-self.last_action<cooldown:
@@ -103,5 +103,5 @@ class CPOvertake:
       self.phase='preparing';self.pending=target;self.since=now_ns
     if now_ns-self.since<2_500_000_000:return self._result('preparationDelay')
     if settings.overtake_mode!=2:return self._result('suggestPass')
-    self.phase='requested';self.last_action=now_ns
+    self.request_id+=1;self.phase='requested';self.last_action=now_ns
     return self._result(request=target)

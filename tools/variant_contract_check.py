@@ -39,13 +39,18 @@ for name in ("cpdazi", "tesnav"):
   d = json.loads(p.read_text())
   if d.get("host") != "Sniper-Eon/xpilot" or d.get("source") != name:
     errors.append("Wrong base/source: " + name)
-  if d.get("removed") != ["stereo", "automatic_overtaking"]:
+  if d.get("removed") != (["stereo"] if name=="cpdazi" else ["stereo", "automatic_overtaking"]):
     errors.append("Wrong removals: " + name)
 profiles = [json.loads((ROOT / "profiles" / f"xpilot-{name}.json").read_text()) for name in ("cpdazi", "tesnav")]
 if profiles[0]["plugins"] != profiles[1]["plugins"]:
   errors.append("Ordinary feature lists differ")
 for d in profiles:
-  expected = "1" if d["source"] == "cpdazi" else "0"
+  expected = "0"
+  cp=d['source']=='cpdazi'
+  if 'cp_nav' not in d['plugins'] or d['params'].get('ExtCpNavEnabled')!=('1' if cp else '0') or d['params'].get('ExtNavAssistEnabled')!=('0' if cp else '1'):
+    errors.append('Independent navigation owners are not selected: '+d['id'])
+  for key in ('ExtCpNavSignals','ExtCpNavLaneChanges','ExtCpNavSpeedControl','ExtCpNavSpeedRaise','ExtCpNavOvertakeMode'):
+    if d['params'].get(key)!='0':errors.append('Unvalidated CP feature enabled: '+key)
   if d["params"].get("ExtNavAssistSource") != expected:
     errors.append("Wrong exclusive navigation source: " + d["id"])
   for key in ("ExtNavAssistLaneChange", "ExtNavAssistTurnSignal", "ExtNavAssistTurnSlowdown", "ExtPhoneVisionEnabled"):

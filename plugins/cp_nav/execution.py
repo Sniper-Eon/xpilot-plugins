@@ -24,7 +24,7 @@ class CPExecution:
       kind='none'
     side=kind.rsplit(' ',1)[-1] if kind!='none' else passing.get('request_direction')
     turn=kind.startswith(('turn ','atc '));fork=kind.startswith('fork ')
-    key=(route,event,side,'turn' if turn else 'fork' if fork else 'pass')
+    key=(route,event,side,'turn' if turn else 'fork' if fork else ('pass',passing.get('request_id')))
     if side not in ('left','right') or key in self.consumed:
       self.key=None;return out
     if key!=self.key:

@@ -135,3 +135,19 @@ def test_cp_tbt_bias_blocks_opposing_pass_with_insufficient_advantage():
   x=observation(i+1);x.update(nav_distance_m=2100,nav_direction='right');x['lead']['speed_mps']=20.
   out=p.update(x,s,1_000_000_000+i*1_000_000_000)
   assert not out.get('request_direction')
+
+
+def test_source_dropout_cannot_rearm_a_cancelled_same_route_speed_increase():
+ import time
+ from cp_nav.engine import CPEngine
+ from .test_native_contract import snapshot,car,control
+ now=time.monotonic_ns();settings=CPSettings(enabled=True,speed_raise=True)
+ source=snapshot(now,turn=51,distance=5000,limit=100);engine=CPEngine(settings);speed=CPSpeedPolicy()
+ def update(connected,stamp):
+  source['connected']=connected
+  state=engine.update(source,car(),control(),now_ns=stamp,vehicle_fresh=True)
+  return speed.update(state,v_cruise=60/3.6,v_ego=60/3.6,long_active=True,
+    override=False,settings=settings,now_ns=stamp)
+ assert update(True,now)>60/3.6
+ assert update(False,now+100_000_000) is None
+ assert update(True,now+200_000_000) is None

@@ -2,11 +2,12 @@
   "id": "xpilot-cpdazi",
   "host": "Sniper-Eon/xpilot",
   "host_branch": "xpilot",
-  "host_min_commit": "0b49f127a0f90ecd13fc2c015a7afde3a6e6428e",
+  "host_min_commit": "964aebf31a2714c0c68790c7f6dbce6977ac0e9c",
   "source": "cpdazi",
   "companion": "com.jixiexiaoge.drivingassist",
   "plugins": [
     "navassist",
+    "cp_nav",
     "ambient_light",
     "auto_speed",
     "blindspot_edges",
@@ -27,26 +28,33 @@
     "zh_cn"
   ],
   "params": {
-    "ExtNavAssistSource": "1",
-    "ExtNavAssistEnabled": "1",
+    "ExtNavAssistSource": "0",
+    "ExtNavAssistEnabled": "0",
     "ExtNavAssistLaneChange": "0",
     "ExtNavAssistTurnSignal": "0",
     "ExtPhoneVisionEnabled": "0",
     "ExtNavAssistTurnSlowdown": "0",
-    "ExtChineseUiEnabled": "0"
+    "ExtChineseUiEnabled": "1",
+    "ExtCpNavEnabled": "1",
+    "ExtCpNavSignals": "0",
+    "ExtCpNavLaneChanges": "0",
+    "ExtCpNavSpeedControl": "0",
+    "ExtCpNavSpeedRaise": "0",
+    "ExtCpNavOvertakeMode": "0"
   },
   "removed": [
-    "stereo",
-    "automatic_overtaking"
+    "stereo"
   ],
   "activation": "candidate_not_road_validated",
   "cp_limitations": [
-    "native_car_state_only",
-    "no_CP_remote_parameters_or_model_download",
-    "no_side_radar_or_image_stream",
-    "no_CP_cloud_license_bypass"
+    "no_side_lead_or_return_evidence_on_standard_host",
+    "no_camera_streaming",
+    "no_unscoped_remote_parameters",
+    "no_full_Carrot_longitudinal_or_traffic_light_planner",
+    "no_CP_cloud_license_bypass",
+    "native_phone_automatic_passing_remains_unavailable"
   ],
-  "initial_mode": "navigation_observation_no_physical_lamp_lane_change_or_speed_target",
+  "initial_mode": "independent_CP_observation_no_physical_lamp_crossing_or_speed_target",
   "host_validated_commits": [
     "0b49f127a0f90ecd13fc2c015a7afde3a6e6428e",
     "991d6d31f6bc1b495ecbdcbcd1cd181914232283"

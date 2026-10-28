@@ -73,3 +73,24 @@ def test_native_result_never_grants_park_reverse_or_steering_fault_permission():
   else:setattr(cs,fault,True)
   out=CPEngine(CPSettings(enabled=True)).update(snapshot(now),cs,control(),now_ns=now,vehicle_fresh=True)
   assert out['valid'] and not out['control_allowed'],fault
+
+
+def test_malformed_guidance_distance_is_not_native_control_permission():
+ now=time.monotonic_ns()
+ for distance in (-1,float('inf'),'80',True):
+  s=snapshot(now,distance=distance)
+  out=CPEngine(CPSettings(enabled=True)).update(s,car(),control(),now_ns=now,vehicle_fresh=True)
+  assert not out['control_allowed'],distance
+
+
+def test_cp_mode_labels_match_native_signal_and_slowdown_semantics():
+ import json
+ from pathlib import Path
+ manifest=json.loads((Path(__file__).resolve().parents[1]/'plugin.json').read_text())
+ modes=next(r['choices'] for r in manifest['settings'] if r['key']=='ExtCpNavAutoTurn')
+ assert dict((value,label) for label,value in modes)=={0:'Off',1:'Signals only',2:'Signals and slowdown',3:'Slowdown only'}
+ now=time.monotonic_ns()
+ for mode in (1,2,3):
+  out=CPEngine(CPSettings(enabled=True,auto_turn=mode)).update(snapshot(now),car(),control(),now_ns=now,vehicle_fresh=True)
+  assert (out['carrot']['atcType']!='none')==(mode in (1,2))
+  assert (out['carrot']['desiredSpeed']<80)==(mode in (2,3))

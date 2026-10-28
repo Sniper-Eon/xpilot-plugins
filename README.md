@@ -79,3 +79,12 @@ Sniper-Eon/xpilot 的 xpilot 分支，插件基础相同，仅导航来源独占
 两版初始为导航观察模式，物理打灯、导航变道和取图关闭；不是已完成路测的安装版。
 CP版目前支持导航v2接收和原车盲区状态回传，尚未完成真实CP App联调，其他CP专有接口见兼容清单。
 原有单目手机识别代码保留为可选功能，开启前仍须完成取图负载验证。
+
+## Independent CP navigation candidate (2026-10-28)
+
+CP now has its own `cp_nav` plugin and BOOL master, mutually exclusive with the
+TesNav `navassist` plugin. See [CP candidate scope and limitations](plugins/cp_nav/README.md).
+The profiles stage both choices and select one in observation mode; no device
+activation is implied. Original CP Kotlin-client loopback interoperation is
+verified; full APK/model execution and automatic passing are not validated.
+This newer decision supersedes the older shared-source profile description.

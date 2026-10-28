@@ -24,7 +24,7 @@ class CPSettings:
   curve_mode: int = 0
   curve_min_kph: int = 20
   curve_factor_pct: int = 100
-  countdown_mode: int = 1
+  countdown_mode: int = 0
   max_kph: int = 120
   raise_step_kph: int = 10
   raise_interval_s: int = 3
@@ -58,12 +58,29 @@ class NativeParams:
     return str(self.get_int(key))
 
 
+BOUNDS = {
+ 'overtake_mode':(0,2),'driving_style':(0,2),'auto_turn':(0,3),
+ 'turn_kph':(10,40),'turn_end_s':(1,15),'decel_cms2':(50,250),
+ 'speed_factor_pct':(80,110),'road_offset_kph':(-20,20),'speed_end_s':(1,15),
+ 'bump_kph':(10,50),'bump_time_s':(1,10),'rear_hold_m':(0,500),
+ 'curve_mode':(0,0),'curve_min_kph':(10,60),'curve_factor_pct':(50,150),
+ 'countdown_mode':(0,0),'max_kph':(30,140),'raise_step_kph':(1,10),
+ 'raise_interval_s':(3,30),'lane_delay_ms':(500,5000),'overtake_min_kph':(70,120),
+}
+
+
+def param_key(name):
+  return 'ExtCpNav'+''.join(part.capitalize() for part in name.split('_'))
+
+
 def read(params):
   values={}
   for name, field in CPSettings.__dataclass_fields__.items():
-    key='ExtCpNav'+''.join(part.capitalize() for part in name.split('_'))
+    key=param_key(name)
     try:
       raw=params.get_bool(key) if isinstance(field.default,bool) else int(params.get(key,return_default=True))
     except (ValueError,TypeError,KeyError):raw=field.default
+    if name in BOUNDS:
+      low,high=BOUNDS[name];raw=max(low,min(high,raw))
     values[name]=raw
   return CPSettings(**values)

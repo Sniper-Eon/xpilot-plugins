@@ -41,12 +41,14 @@ class CPEngine:
     qualified=(snapshot.get('connected') and all(fresh(n) for n in ('vehicle','guidance_current','navigation_status','route'))
       and v.get('virtual_gps') is False and status.get('mode')=='guiding' and status.get('guidance_active') is True
       and status.get('route_present') is True and status.get('off_route',False) is False)
-    turn=(items.get('guidance_current',{}).get('value') or {}).get('turn_type')
+    guide=items.get('guidance_current',{}).get('value') or {}
+    turn=guide.get('turn_type');distance=guide.get('distance_m')
+    qualified=qualified and type(distance) in (int,float) and math.isfinite(distance) and 0<=distance<=100000
     qualified=qualified and type(turn) is int and turn in nav_type_mapping
     coords=(v.get('lat'),v.get('lon'))
     qualified=bool(qualified and all(type(n) in (int,float) and math.isfinite(n) for n in coords)
       and -85.05112878<=coords[0]<=85.05112878 and -180<=coords[1]<=180 and coords!=(0,0))
-    out=dict(valid=False,control_allowed=False,carrot={},native_source='jixiexiaoge/carrot@3615bf4',reason='sourceUnavailable')
+    out=dict(valid=False,control_allowed=False,route_key=(snapshot.get('session_id'),snapshot.get('generation')),carrot={},native_source='jixiexiaoge/carrot@3615bf4',reason='sourceUnavailable')
     if not self.settings.enabled or not qualified or not vehicle_fresh:
       self.key=None;return out
     key=(snapshot.get('session_id'),snapshot.get('generation'))

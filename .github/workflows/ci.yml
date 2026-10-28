@@ -38,6 +38,7 @@ jobs:
       run: |
         python3 tools/plugin_switch_contract_check.py
         python3 tools/plugin_switch_contract.py
+        python3 tools/cp_candidate_check.py
         python3 tools/zh_cn_contract_check.py
         python3 companion/tesnav/tests/test_map_view_contract.py
     - name: Archives and index match the source

@@ -1,63 +1,80 @@
-# Independent CP navigation candidate — source foundation
+# Independent CP navigation — local candidate 0.1.0
 
-User decision 2026-10-28: CP is independent from TesNav and may retain CP's
-slow-lead passing/return behavior. This supersedes the previous CP passing
-exclusion. Stereo speed measurement remains excluded.
+This is a standalone store plugin with BOOL master `ExtCpNavEnabled`, its own
+settings, process, data receiver and vehicle hooks. TesNav remains integrated
+under `navassist` / `ExtNavAssistEnabled`; exclusive route, lane-policy and CAN
+claims make the host switch off the other implementation when one is selected.
+Use the parked Plugins page; applying a process/source change requires restart.
+Installing a phone app cannot enable either plugin.
 
-## Status
+## Implemented
 
-This directory is deliberately **not an installable store plugin yet**: it has
-no plugin.json, no running process and no vehicle hooks. It is a tested source
-foundation for the independent plugin, not a deployed or road-validated release.
-Existing TesNav/navassist and the running devices are unchanged.
+- Original CP navigation-v2 WebSocket ingress on 7714, bounded session/peer lease,
+  source timestamps, replay rejection and route withdrawal. No TesNav package
+  dependency. Source age is never renewed by an unchanged heartbeat.
+- Original Carrot navigation decision kernel, pinned to jixiexiaoge/carrot
+  `3615bf4bf40016f102e7d4af3745455a3791faa2`. The 37 retained method ASTs match
+  provenance.json. Original MIT notice is in CARROT-LICENSE. Explicit CP-only
+  Params and private output adapters replace live native services/OS mutation.
+- Native turn/fork and road/camera/bump/section speed arbitration; bounded
+  physical Tesla lamp transport under the existing hardware-checked 0x3E9
+  policy. Route-turn lamps carry turn intent. Fork lamps can remain in
+  preparation while OEM/BSM blocks crossing; SP automatic-mode and lane gates
+  still decide whether a change starts. Observed completion consumes a maneuver.
+- Optional bounded cruise increases, driver-setpoint/override cancellation,
+  ceilings and scoped targets. TN 1.0.1 now receives all host plugin targets;
+  other SP/model/lead caps remain effective. Effective planner target is not
+  misrepresented as the OEM cruise setpoint.
+- Dedicated parked settings in X-Pilot, Chinese labels via zh_cn 1.1.8, floating
+  CP status HUD and one preparation chime per request. No camera client/JPEG
+  encoder/image stream is started by this plugin.
+- CP7000 native BSM compact telemetry. Original App-compatible `values` API and
+  effectful navigation parameter aliases only. Writes require the bound CP
+  peer, enabled master, fresh zero-speed/P state, type/range checks and a second
+  state check after receipt. Global/experimental/master settings are rejected.
 
-Implemented locally:
+## Automatic passing: retained source, not available on this host yet
 
-- Original Carrot navigation kernel pinned to jixiexiaoge/carrot commit
-  3615bf4bf40016f102e7d4af3745455a3791faa2. Native methods retain their ASTs;
-  provenance.json records hashes. MIT notice is in CARROT-LICENSE.
-- Explicit CP-only parameter and private message adapters. Legacy UDP/system-time
-  mutation and live native publishers are excluded. No fake GPS CAN or invented
-  phone heading. Fresh source, route, actual vehicle authority and driver vetoes
-  are checked separately from native decisions.
-- Bounded speed-target candidate, with opt-in increases, driver-setpoint cancel,
-  route binding and absolute ceilings. This is a candidate, not a wired planner.
-- CP passing state/threshold adaptation referencing navipilot latest-snapshot
-  91d77de4fd7650ebc76c38cf4b47ede503f6d0dc AutoOvertakeManager.kt. It preserves
-  normal slow-lead selection, driving-style multipliers, TBT direction bias,
-  three new frames, 2.5s preparation, action cooldown, original-lane memory and
-  a continuously qualified return interval. It is **not the complete original
-  Kotlin manager** and does not execute on a vehicle.
-- Completion requires actual start/finish/off observations. Queuing an intent
-  never records completion. Unknown side/gap/crossing evidence blocks requests;
-  factory BSM not-triggered alone is not proof of rear clearance.
-- Carrot turn/fork intent adapter keeps a fork lamp in preparation through a
-  crossing veto and prevents repeat requests after an observed completion.
+User explicitly reauthorized CP passing on 2026-10-28; stereo remains removed.
+The candidate retains a source-derived CP state/threshold adapter: slow-lead
+confirmation, styles/TBT priority, 2.5s preparation, cooldown, original-lane memory
+and continuous return confirmation. Only observed start/finish/off records a
+completed change. A new command is not completion.
 
-## Required work before a release
+The paired standard SP host has no CP `leadLeft`/`leadRight` and no qualified
+pass-complete/return-efficiency feed. Production observations therefore declare
+passing unavailable; it **does not initiate automatic passing or return** merely
+because factory BSM is not triggered. The original phone manager likewise lacks
+its full active/model telemetry on this adapter. The mode remains a development
+setting; selecting it displays unavailable until real evidence is implemented.
 
-1. Standalone manifest, BOOL master, CP-only settings/Chinese labels, entry hooks,
-   process lifecycle, network binding and truthful telemetry capabilities.
-2. Connect the native Carrot pipeline to the original CP v2 ingress; whitelist
-   only effective CP-scoped remote settings and source-bound explicit commands.
-3. Supply real qualified passing observations and retain original CP behavior
-   that is not represented here (including early-trigger and side-lead/return
-   assessment). Missing standard-host fields must remain unavailable.
-4. Wire targets to every supported planner, including TN, and verify disable,
-   fault and ownership paths. Preserve Panda and SP limits.
-5. Mutual-exclusion UI/profile updates, full host/store gates, original-client
-   interoperation, packaged candidate. Source gates do not establish firmware
-   compilation, device activation, camera/model inference or road correctness.
+This is not the complete original Kotlin AutoOvertakeManager, complete Carrot
+longitudinal/traffic-light planner, CP vehicle firmware, full CP settings API,
+CP camera/MNN execution, or a rebuilt/licence-bypassed phone App. Native UDP
+SPEED/LANECHANGE commands, curve input and spoken countdown are not advertised
+as available. Unsupported CP App settings are explicitly rejected.
 
-No APK rebuild, device access, install, restart, parameter change, firmware
-migration or road test has been performed for this candidate.
+## Host compatibility and activation
 
-## Scoped local checks
+Requires the paired Sniper-Eon/xpilot host commit `964aebf` or a compatible
+descendant supporting exact `safety_provider` references. It reuses the already
+declared navassist firmware rule, with identical header, bit and TX addresses;
+no new Panda slot, frame permission or firmware migration is introduced.
+Older hosts refuse installation. Current onemiless upstream uses a different
+runtime-rule ABI; this artifact must not be installed there as-is.
 
-```sh
-PYTHONPATH=../xpilot:../xpilot/msgq_repo:../xpilot/opendbc_repo:plugins python3 -m pytest -q plugins/cp_nav/tests
-```
+Default master is off. Prepared CP/TesNav profiles select one data source in
+observation mode, with physical lamps, crossing, speed control, increases and
+passing initially off. They preserve other plugins and Chinese localization.
 
-23 cases passed on 2026-10-28. Failure checks were added and observed failing
-before their corresponding changes. Full store release gates are pending until
-the independent entry and production inputs exist.
+Local package and source checks are separate from device/road evidence. No
+C3/phone access, installation, restart, parameter mutation, firmware build,
+actual MNN execution or road test was performed for this candidate.
+
+## Validation
+
+See REPORT.md for commands, outcomes and the remaining integration limits.
+Factory-lane vetoes retain the DS two-frame confirmation and bounded release.
+`tools/cp_upstream_probe/run.py --independent` runs the author's unchanged
+Kotlin wire client/mapper through this receiver and native Carrot kernel using
+loopback synthetic observations. It is not a full Android build or road replay.

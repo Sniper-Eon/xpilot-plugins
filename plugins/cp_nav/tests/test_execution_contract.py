@@ -52,3 +52,14 @@ def test_stale_model_keeps_fork_preparation_but_never_crosses():
  e=CPExecution();e.update(native(),x,{},CPSettings(enabled=True),now)
  out=e.update(native(),x,{},CPSettings(enabled=True),now+600_000_000)
  assert out['signalRequested'] and not out['laneChangeAllowed']
+
+
+def test_a_new_cp_passing_request_is_not_consumed_by_the_previous_pass():
+ e=CPExecution();s=CPSettings(enabled=True);now=1_000_000_000
+ state=native('none');passing={'request_direction':'left','request_id':1}
+ assert e.update(state,obs(),passing,s,now)['signalRequested']
+ for i,m in enumerate(('laneChangeStarting','laneChangeFinishing','off')):
+  e.update(state,obs(state=m,direction='left' if m!='off' else 'none'),passing,s,now+(i+1)*600_000_000)
+ assert not e.update(state,obs(),passing,s,now+3_000_000_000)['signalRequested']
+ passing['request_id']=2
+ assert e.update(state,obs(),passing,s,now+30_000_000_000)['signalRequested']

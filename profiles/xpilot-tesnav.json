@@ -2,11 +2,12 @@
   "id": "xpilot-tesnav",
   "host": "Sniper-Eon/xpilot",
   "host_branch": "xpilot",
-  "host_min_commit": "0b49f127a0f90ecd13fc2c015a7afde3a6e6428e",
+  "host_min_commit": "964aebf31a2714c0c68790c7f6dbce6977ac0e9c",
   "source": "tesnav",
   "companion": "com.garan.tesnav.tenengkai.lane",
   "plugins": [
     "navassist",
+    "cp_nav",
     "ambient_light",
     "auto_speed",
     "blindspot_edges",
@@ -33,7 +34,13 @@
     "ExtNavAssistTurnSignal": "0",
     "ExtPhoneVisionEnabled": "0",
     "ExtNavAssistTurnSlowdown": "0",
-    "ExtChineseUiEnabled": "0"
+    "ExtChineseUiEnabled": "1",
+    "ExtCpNavEnabled": "0",
+    "ExtCpNavSignals": "0",
+    "ExtCpNavLaneChanges": "0",
+    "ExtCpNavSpeedControl": "0",
+    "ExtCpNavSpeedRaise": "0",
+    "ExtCpNavOvertakeMode": "0"
   },
   "removed": [
     "stereo",

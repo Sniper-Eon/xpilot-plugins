@@ -1,12 +1,12 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",
   "author": "Sniper-Eon",
-  "description": "Exclusive TesNav v3 or CPdazi v2 navigation source; shared bounded route-lane preparation, native Tesla/BSM veto and maneuver speed ceiling. No passing or stereo features.",
+  "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
   "priority": 100,
   "enable_param": "ExtNavAssistEnabled",
   "claims": [
@@ -176,7 +176,7 @@
     "ExtNavAssistSource": {
       "type": "INT",
       "default": "0",
-      "note": "0 TesNav, 1 CPdazi; read once at process start; exclusive profile"
+      "note": "Retired shared-source selector; retained for rollback only. This version always uses TesNav; select the separate CP plugin for CP navigation."
     }
   }
 }

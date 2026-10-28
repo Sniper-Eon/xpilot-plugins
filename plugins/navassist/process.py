@@ -35,26 +35,17 @@ def main():
   params = plugins.view(Params())
   settings = read_settings(params)
   runtime = NavigationRuntime(settings)
-  source = params.get('ExtNavAssistSource', return_default=True)
-  if source not in (b'0', b'1', '0', '1', 0, 1):
-    raise ValueError('Unsupported navigation source; restart after selecting a profile')
-  cp_source = source in (b'1', '1', 1)
-  if cp_source:
-    from .cpnav import CPStore
-    from .cpnetwork import CPTransports
-    store = CPStore()
-  else:
-    store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
+  store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
   sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState', 'deviceMotion'])
   can_socket = messaging.sub_sock('can', conflate=False)
   pm = messaging.PubMaster(['pluginMsg'])
   state = {'offroad': False}
-  transports = (CPTransports if cp_source else NavigationTransports)(store, params, lambda: state['offroad'])
+  transports = NavigationTransports(store, params, lambda: state['offroad'])
   phone = PhoneBlindspotAssist(mode='assist' if settings.phone_assist_enabled else 'shadow')
   recorder = Recorder()
   rk = Ratekeeper(PUBLISH_HZ)
   next_settings = next_record = next_route = 0
-  route_publisher = RouteGeometryPublisher() if not cp_source else None
+  route_publisher = RouteGeometryPublisher()
   cloudlog.info('xpilot NavAssist transports online')
   try:
     while True:
@@ -67,7 +58,7 @@ def main():
         settings = read_settings(params)
         runtime.settings = settings
         phone.mode = 'assist' if settings.phone_assist_enabled else 'shadow'
-        if not cp_source and state['offroad'] and params.get_bool('ExtNavAssistPairingReset'):
+        if state['offroad'] and params.get_bool('ExtNavAssistPairingReset'):
           transports.pairing.reset()
           params.put_bool('ExtNavAssistPairingReset', False)
       model_good = healthy(sm, ['modelV2'], now, 150_000_000)
@@ -77,8 +68,6 @@ def main():
       pose_ok = healthy(sm, ['deviceMotion'], now, 500_000_000) and sm['deviceMotion'].inputsOK
       cs, cc = sm['carState'], sm['carControl']
       curvature = float(sm['controlsState'].desiredCurvature) if vehicle_fresh else 0.
-      if cp_source and healthy(sm, ['carState'], now):
-        transports.metadata.update(cs, int(sm.logMonoTime['carState']))
       result = runtime.tick(store.current(now), model, int(sm.logMonoTime['modelV2']), cs, cc, now,
         can_list=can_batches(messaging.drain_sock(can_socket)), vehicle_fresh=vehicle_fresh,
         left_phone=bool(phone_sides and phone_sides[0].blocked), right_phone=bool(phone_sides and phone_sides[1].blocked),
@@ -106,7 +95,7 @@ def main():
           modelState=str(model.meta.laneChangeState) if model_good else 'unavailable',
           modelDirection=str(model.meta.laneChangeDirection) if model_good else 'unavailable',
           autoLaneChangeMode=str(params.get('AutoLaneChangeTimer', return_default=True)))
-        ingress = transports.servers[0].diagnostics() if not cp_source else {}
+        ingress = transports.servers[0].diagnostics()
         recorder.write(dict(kind='sample', wall_time_ms=time.time_ns()//1_000_000,
                             mono_time_ns=now, execution=execution, ingress=ingress, **result))
       rk.keep_time()
