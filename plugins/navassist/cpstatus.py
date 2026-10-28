@@ -12,6 +12,7 @@ from .cpmeta import SERVICES
 CAPABILITIES = {
   "navigation_v2": True,
   "native_bsm": True,
+  "phone_lane_model_observations": True,
   "images": False,
   "automatic_overtaking": False,
   "stereo": False,

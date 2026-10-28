@@ -11,6 +11,18 @@ import time
 import uuid
 from .cp_catalog import JSON_STREAMS, TURN_TYPES
 
+ROUTE_SCOPED = frozenset(("guidance_current", "guidance_next", "lane_current", "lane_ahead",
+                         "speed", "traffic_signal", "crossroad", "navigation_status"))
+
+
+def model_observation(lane):
+  if lane.get('lane_source') not in ('model', 'map+model'):
+    return None
+  count, current = lane.get('model_count'), lane.get('model_current_lane')
+  if type(count) is not int or type(current) is not int or not 1 <= current <= count <= 16:
+    return None
+  return dict(count=count, laneNumber=current, source='cpPhoneVision', confirmed=False, mapAssociated=False)
+
 
 class CPStore:
   def __init__(self, clock_ms=None, clock_ns=None):
@@ -32,6 +44,7 @@ class CPStore:
       self._event_key = None
       self._route_key = None
       self._distance = None
+      self.route_cutoff = -1
 
   def current(self, now_ns=None):
     return self
@@ -76,6 +89,8 @@ class CPStore:
       # An absent envelope is timed at withdrawal, not at sensor acquisition.
       # Compare observations with observations; a new GPS sample may legitimately
       # predate the administrative withdrawal while advancing the real sensor.
+      if present and (name in ROUTE_SCOPED or name == "route") and stamp < self.route_cutoff:
+        raise ValueError("previous_route_observation")
       previous = self.observation_stamps.get(name)
       if present and previous is not None and (
         stamp < previous or (name in self.withdrawn and stamp == previous)
@@ -86,6 +101,13 @@ class CPStore:
         self.withdrawn.discard(name)
       else:
         self.withdrawn.add(name)
+      if name == "route" and not present and self.rows.get("route", (None,))[0] is not None:
+        self.revision += 1
+        self.event += 1
+        self.route_cutoff = stamp
+        self._route_key = self._event_key = self._distance = None
+        for key in ROUTE_SCOPED:
+          self.rows.pop(key, None)
       self.sequences[name] = seq
       self.rows[name] = (copy.deepcopy(value) if present else None, stamp, self.mono(), max(0, now - stamp))
       return {"type": "item_ack", "sequence": seq, "name": name, "accepted": True}
@@ -137,7 +159,8 @@ class CPStore:
       count = lane.get("count", lane.get("lane_count", 0))
       items = lane.get("lanes", lane.get("items", []))
       lanes = []
-      if type(count) is int and 1 <= count <= 16 and isinstance(items, list) and len(items) == count:
+      if (lane.get("lane_source", "map") in ("map", "map+model")
+          and type(count) is int and 1 <= count <= 16 and isinstance(items, list) and len(items) == count):
         for i, item in enumerate(items):
           if not isinstance(item, dict) or type(item.get("index")) is not int or item.get("index") != i:
             lanes = []
@@ -166,6 +189,8 @@ class CPStore:
         distanceM=distance if guide else 0.0,
         lanes=lanes,
         laneTotalCount=count if lanes else -1,
+        laneGuidanceSource="map" if lanes else "none",
+        modelLaneEstimate=model_observation(lane),
       )
       nxt = self._value("guidance_next", now_ns)
       nt = nxt.get("turn_type")

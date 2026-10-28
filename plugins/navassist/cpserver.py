@@ -57,10 +57,12 @@ def send(sock, data, opcode=1):
 class CPServer(ThreadingHTTPServer):
   daemon_threads = True
   allow_reuse_address = True
+  request_queue_size = 24
 
   def __init__(self, address, store, handler=None):
     self.store = store
     self.lock = threading.RLock()
+    self.ready = threading.Condition(self.lock)
     self.owner = None
     self.applied = False
     self.slots = threading.BoundedSemaphore(24)
@@ -121,11 +123,17 @@ class Handler(BaseHTTPRequestHandler):
         s.owner = (peer, id(self))
         s.applied = False
         s.store.restart()
-      elif not (
-        stream in JSON_STREAMS and pieces[-2] == s.store.session and s.applied and s.owner and s.owner[0] == peer
-      ):
-        self.send_error(404)
-        return
+      else:
+        if not (stream in JSON_STREAMS and pieces[-2] == s.store.session and s.owner and s.owner[0] == peer):
+          self.send_error(404)
+          return
+        requested_session = pieces[-2]
+        # Android enqueues manifest_applied and opens independent sockets in one
+        # callback. A bound socket may arrive before its control frame is read.
+        s.ready.wait_for(lambda: s.applied or not s.owner or s.store.session != requested_session, timeout=.75)
+        if not (s.applied and s.owner and s.owner[0] == peer and s.store.session == requested_session):
+          self.send_error(409, "manifest_not_applied")
+          return
       session = s.store.session
     try:
       key = self.headers.get("Sec-WebSocket-Key", "")
@@ -177,6 +185,7 @@ class Handler(BaseHTTPRequestHandler):
               send(self.connection, manifest(session))
             elif d.get("type") == "manifest_applied" and d.get("session_id") == session and d.get("revision") == 1:
               s.applied = True
+              s.ready.notify_all()
             else:
               raise ValueError("control_message")
           else:
@@ -198,3 +207,4 @@ class Handler(BaseHTTPRequestHandler):
             s.owner = None
             s.applied = False
             s.store.restart()
+            s.ready.notify_all()

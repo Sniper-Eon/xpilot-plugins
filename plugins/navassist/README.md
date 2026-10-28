@@ -91,7 +91,16 @@ Remote Params, CP model downloads, CP cloud authorization, destination injection
 unsupported. The original CP app may still show its own unsupported controls. No entitlement is bypassed.
 CP navigation observations expire independently of reception/heartbeat. Stale/absent GPS, route, guidance
 or status cannot start a request. A new control lease resets the source. Fresh native localization and normal
-SP/Tesla gates are still required by the shared coordinator. Real CP app interoperability is pending.
+SP/Tesla gates are still required by the shared coordinator.
+
+1.5.7 checks the original `jixiexiaoge/navipilot:latest-snapshot` source at
+`91d77de4fd7650ebc76c38cf4b47ede503f6d0dc`. Its unmodified Kotlin WebSocket client,
+mapper, data models and compact decoder pass loopback interoperability; this is
+not a full Android UI, MNN inference or vehicle validation. The receiver tolerates
+bounded control/data handshake reordering, fixes the distinct sharp-left/exit/
+lane-change/slight-turn codes, and clears route-scoped data on explicit route
+withdrawal. Phone model estimates are bounded observations only, never map lane
+identity, recommendations or crossing permission. See [CP snapshot compatibility](CP_SNAPSHOT.md).
 
 ## Local fork note: TesNav coexistence
 
