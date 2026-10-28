@@ -17,6 +17,7 @@ from contextlib import ExitStack
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import platform
 import runpy
@@ -43,8 +44,9 @@ from openpilot.tesla import manifest as mf, panda_rules, plugins
 from openpilot.tesla.plugin_params import ParamsView
 
 if __package__:
-  from . import reference
+  from . import provenance, reference
 else:
+  import provenance
   import reference
 
 PLUGIN = Path(__file__).resolve().parents[1]
@@ -87,6 +89,7 @@ def scripted_inputs():
 
 
 def run(output):
+  plugin_source = provenance.source(PLUGIN, os.environ.get("TESLA_MIXED_SOURCE_MANIFEST"))
   output.mkdir(parents=True, exist_ok=True)
   (output / "inputs").mkdir(exist_ok=True)
   rows = scripted_inputs()
@@ -333,7 +336,8 @@ def run(output):
     return subprocess.check_output(["git", "-C", str(path), "rev-parse", "HEAD"], text=True).strip()
   system = Path(plugins.__file__).resolve().parents[3]
   source = dict(reference=O_SHA, reference_sha256=hashlib.sha256((PLUGIN / "tests/reference.py").read_bytes()).hexdigest(),
-                system=head(system), plugin=head(PLUGIN), python=sys.version, platform=platform.platform(),
+                system=head(system), plugin=plugin_source["commit"], plugin_provenance=plugin_source,
+                python=sys.version, platform=platform.platform(),
                 source_sha256={str(p.relative_to(PLUGIN)): hashlib.sha256(p.read_bytes()).hexdigest()
                                for p in sorted(PLUGIN.rglob("*")) if p.is_file() and "__pycache__" not in p.parts})
   (output / "source.json").write_text(json.dumps(source, indent=2) + "\n")
