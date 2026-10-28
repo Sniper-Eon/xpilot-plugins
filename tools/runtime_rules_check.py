@@ -41,12 +41,14 @@ def main():
     fixture = Path(mf.__file__).resolve().parents[2] / 'opendbc_repo/opendbc/safety/tests/xpilot_rules_helpers.py'
     # Evaluate the reference definitions without importing the unrelated C loader/cffi harness.
     definitions = [n for n in ast.parse(fixture.read_text()).body if isinstance(n, ast.Assign)
-                   and isinstance(n.targets[0], ast.Name) and n.targets[0].id in ('AUTO', 'AMBIENT', 'NAV')]
+                   and isinstance(n.targets[0], ast.Name) and n.targets[0].id in ('AUTO', 'AMBIENT', 'NAV', 'NAV_LATERAL')]
     examples = {'rule': pr.rule, 'field': pr.field}
     exec(compile(ast.Module(body=definitions, type_ignores=[]), str(fixture), 'exec'), examples)
     references = {'auto_speed': examples['AUTO'], 'ambient_light': examples['AMBIENT']}
     if (ROOT / 'plugins/navassist').exists():
-      references['navassist'] = examples['NAV']
+      references['navassist'] = examples['NAV_LATERAL']
+    if (ROOT / 'plugins/cp_nav').exists():
+      references['cp_nav'] = examples['NAV_LATERAL']
     from build_index import archive
     index = json.loads((ROOT / 'index.json').read_text())['plugins']
     for path in sorted((ROOT / 'plugins').rglob('plugin.json')):
@@ -60,7 +62,7 @@ def main():
     for pid, reference in references.items():
       source = ROOT / 'plugins' / pid
       entries = [e for e in index if e['id'] == pid]
-      if len(entries) != 1 or (pid != 'navassist' and entries[0]['version'] != '1.1.0'):
+      if len(entries) != 1 or (pid not in ('navassist','cp_nav') and entries[0]['version'] != '1.1.0'):
         errors.append(f'R19 {pid}: expected one 1.1.0 release')
       for entry in entries:
         path = ROOT / 'dist' / entry['url'].split('/dist/', 1)[1]
@@ -73,7 +75,7 @@ def main():
       for path in (source / 'plugin.json', installed / pid / 'plugin.json'):
         hashes[str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else f'installed/{pid}/plugin.json'] = hashlib.sha256(path.read_bytes()).hexdigest()
         raw = json.loads(path.read_text())
-        if raw.get('requires', {}).get('rule_abi') != 1:
+        if raw.get('requires', {}).get('rule_abi') != reference[2]:
           errors.append(f'R17 {pid}: requires.rule_abi=1 missing')
         if pr.encode_rules(raw.get('rules', [])) != pr.table([reference]):
           errors.append(f'R16 {pid}: reference rules missing or different')
@@ -83,7 +85,7 @@ def main():
           errors.append(f'R15 {pid} {path.parent.parent.name}: {e}')
           continue
         ok, reason = mf.compatible(m, mf.HOST_CAPS)
-        if m.requires.get('rule_abi') != mf.RULE_ABI or mf.RULE_ABI != 1 or not ok:
+        if m.requires.get('rule_abi') != reference[2] or mf.RULE_ABI != 2 or not ok:
           errors.append(f'R17 {pid}: {m.requires} {reason}')
         actual, expected = pr.encode_rules(m.rules), pr.table([reference])
         if actual != expected:
@@ -114,7 +116,8 @@ def main():
           with patch.object(plugins, 'PLUGINS', classes), patch.object(plugins, 'record_fault', lambda *a: faults.append(str(a))):
             card = plugins.CarPlugins(cp, params)
             card.setup(cp_sp)
-          assert not faults and len(card.plugins) == len(classes), ('R18', faults)
+          selected = {p.NAME for p in plugins.active(params) if p.NAME in references}
+          assert not faults and {p.NAME for p in card.plugins} == selected, ('R18', faults)
           assert cp_sp.safetyParam == 1, 'R18 safetyParam changed'
           auto = next(p for p in card.plugins if p.NAME == 'auto_speed')
           assert auto.controller.configured == (longitudinal and vehicle_bus), 'R18 auto-speed gate'

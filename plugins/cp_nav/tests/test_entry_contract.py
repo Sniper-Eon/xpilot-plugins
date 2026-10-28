@@ -27,7 +27,7 @@ class Messages:
 def test_independent_entry_owned_keys_and_exclusive_navigation_claims():
  m=mf.parse(ROOT/'plugin.json');nav=mf.parse(ROOT.parent/'navassist/plugin.json')
  assert m.enable_param=='ExtCpNavEnabled' and m.params[m.enable_param]['default']=='0'
- assert m.requires['rule_abi']==nav.requires['rule_abi']==1
+ assert m.requires['rule_abi']==nav.requires['rule_abi']==2
  assert m.rules==nav.rules
  assert set(m.params).isdisjoint(nav.params)
  assert mf.conflicting(m.id,[(m.id,m.priority,m.claims),(nav.id,nav.priority,nav.claims)])==['navassist']

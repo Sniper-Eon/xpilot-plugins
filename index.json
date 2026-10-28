@@ -82,13 +82,13 @@
     {
       "id": "cp_nav",
       "name": "CP Native Navigation",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Independent CP v2 native Carrot navigation candidate. Separate settings, bounded lamp preparation and cruise targets; passing requires qualified side observations. No camera streaming.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cp_nav-0.2.0.tar.gz",
-      "sha256": "3ccee06cfe6d62c2b1bd261e177197d73f19d91a5ae531a938ac3bfc105aff32",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cp_nav-0.2.1.tar.gz",
+      "sha256": "a2df058009265abb6fa3af9f5a825a661f764055ba30f688c00364ea8ccbbf25",
       "platform": null,
       "default": false
     },
@@ -215,13 +215,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "2.0.1",
+      "version": "2.0.2",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.0.1.tar.gz",
-      "sha256": "c373f27b6bc2068fc88fe2967008ad644056bf65b4af76e70d6ff53f4763ace6",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.0.2.tar.gz",
+      "sha256": "a7a680bef99bcdee8ff6992cecbcd0bb23af251163dad3f2c2bfed9d95de7c99",
       "platform": null,
       "default": false
     },

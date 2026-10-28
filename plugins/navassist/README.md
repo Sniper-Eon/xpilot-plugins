@@ -1,5 +1,8 @@
 # Navigation Assist 2.0.1
 
+Current release 2.0.2 requires host c1f33cf2f4a2eaa287025369a930e4a468888999 (or compatible descendant) and qualified Panda ABI-2 firmware. Explicit per-rule primary_or_lateral guard preserves native MADS-only lamp permission without changing any ABI-1 rule. Brake, relay, template, counter, checksum, time and session gates still apply. Never install this archive onto the old deployed host/firmware alone.
+
+
 Personal fork: [Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot), branch `xpilot`.
 Install this release only with the synchronized paired host and runtime-rule
 ABI 1 firmware. Its canonical NAV template rule replaces the old per-feature

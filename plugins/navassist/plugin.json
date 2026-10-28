@@ -1,7 +1,7 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",
@@ -176,7 +176,7 @@
   },
   "rules": [
     {
-      "type": "template_clone.v1",
+      "type": "template_clone.v2",
       "tx_address": 1001,
       "rx_address": 1001,
       "tx_bus": 1,
@@ -294,11 +294,12 @@
             4
           ]
         }
-      ]
+      ],
+      "engagement": "primary_or_lateral"
     }
   ],
   "requires": {
-    "rule_abi": 1,
+    "rule_abi": 2,
     "hooks": [
       "observe_can",
       "control_sends",

@@ -1,7 +1,7 @@
 {
   "id": "cp_nav",
   "name": "CP Native Navigation",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:CPNav",
@@ -367,7 +367,7 @@
   },
   "rules": [
     {
-      "type": "template_clone.v1",
+      "type": "template_clone.v2",
       "tx_address": 1001,
       "rx_address": 1001,
       "tx_bus": 1,
@@ -485,11 +485,12 @@
             4
           ]
         }
-      ]
+      ],
+      "engagement": "primary_or_lateral"
     }
   ],
   "requires": {
-    "rule_abi": 1,
+    "rule_abi": 2,
     "hooks": [
       "observe_can",
       "control_sends"
