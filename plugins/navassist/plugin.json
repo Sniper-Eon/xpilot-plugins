@@ -1,7 +1,7 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "2.0.3",
+  "version": "2.1.0",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",
@@ -22,7 +22,8 @@
     "source:route",
     "msg:nav.route",
     "source:turnsignals",
-    "sound"
+    "sound",
+    "msg:nav.map"
   ],
   "settings": [
     {

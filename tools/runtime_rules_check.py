@@ -62,8 +62,8 @@ def main():
     for pid, reference in references.items():
       source = ROOT / 'plugins' / pid
       entries = [e for e in index if e['id'] == pid]
-      if len(entries) != 1 or (pid not in ('navassist','cp_nav') and entries[0]['version'] != '1.1.0'):
-        errors.append(f'R19 {pid}: expected one 1.1.0 release')
+      if len(entries) != 1 or (pid not in ('navassist','cp_nav') and entries[0]['version'] != ('1.2.0' if pid == 'auto_speed' else '1.1.0')):
+        errors.append(f'R19 {pid}: expected one current validated release')
       for entry in entries:
         path = ROOT / 'dist' / entry['url'].split('/dist/', 1)[1]
         data = path.read_bytes()

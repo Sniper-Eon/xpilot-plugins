@@ -83,6 +83,7 @@ class NavAssistOverlay(ScreenOverlay):
         if state['ego']==index:rl.draw_circle(int(bx+step*.5),int(y+141),4,WHITE)
     else:text(FontWeight.MEDIUM,'Waiting for lane guidance',lx,y+74,27,DIM)
     lines=[state['lane_status'],state['status']]
+    if state['branch_message']:lines.insert(0,state['branch_message'])
     if self.intent.get('signalRequested'):lines.append(signal_status(self.intent))
     lines_in(rl.Rectangle(lx,y+164,w*.34,h-164),lines,25,color=tint)
     rx,ry,rw,rh=layout['route']

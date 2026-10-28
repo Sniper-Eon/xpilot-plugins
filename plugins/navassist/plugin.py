@@ -11,6 +11,7 @@ from openpilot.tesla.plugin import Plugin
 from openpilot.tesla.plugin_msgd import socket_path as _required_message_broker  # noqa: F401
 from openpilot.tesla.lane_policy import LaneChangeLimits  # noqa: F401; refuse hosts without the required lane context
 
+from .map_data import MapData
 from .settings import read as read_settings
 from .turnsignal import TurnSignalController
 
@@ -26,6 +27,8 @@ class NavAssist(Plugin):
     self.params = params
     self.settings = read_settings(params)
     self.turns = TurnSignalController()
+    self.map = MapData()
+    self._next_map = 0
     self._msgs = None
 
 
@@ -35,6 +38,11 @@ class NavAssist(Plugin):
 
   def observe_can(self, can_list, now_ns: int) -> list:
     self.turns.observe(can_list, now_ns)
+    self.map.update(can_list, now_ns)
+    if now_ns >= self._next_map:
+      from openpilot.tesla import plugins
+      self._next_map = now_ns+500_000_000
+      plugins.send_msg(type(self), 'nav.map', self.map.snapshot(now_ns), 750)
     return []
 
   def _fresh_intent(self) -> dict:

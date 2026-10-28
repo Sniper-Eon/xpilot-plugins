@@ -125,7 +125,8 @@ class AutoSpeedController:
       self._reset()
       return []
 
-    if CS.out.brakePressed or not getattr(CS, "tesla_speed_limit_target_valid", False):
+    if (CS.out.brakePressed or not getattr(CS, "tesla_speed_limit_target_valid", False)
+        or not getattr(CS, "tesla_fused_limit_fresh", True)):
       self._reset()
       return []
 
@@ -203,6 +204,11 @@ class AutoSpeedController:
     template = getattr(CS, "tesla_speed_button_template", None)
     template_nanos = int(getattr(CS, "tesla_speed_button_template_nanos", 0))
     if template is None or now_nanos - template_nanos > TEMPLATE_MAX_AGE_NS:
+      return []
+
+    # Map disagreement only stops new upward ticks; it never creates a lower target.
+    if self.remaining_steps > 0 and getattr(CS, "tesla_map_conflict", False):
+      self._reset_pending()
       return []
 
     direction = 1 if self.remaining_steps > 0 else -1

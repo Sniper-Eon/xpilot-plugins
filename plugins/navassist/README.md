@@ -173,3 +173,14 @@ The BOOL master releases this restriction when disabled.
 
 This is a planning/admission repair, not a retrained vision model. Local tests and
 replays are distinct from device activation and road validation.
+
+## Original-car fork corroboration (2.1.0)
+
+A read-only card-side VEH 0x238 decoder publishes `nav.map`. The navigation process
+attaches `branchEvidence` to each current route event and shows a quiet fork notice in
+the existing HUD. It distinguishes an observed fork, checking/consistent route evidence
+and a potentially different fork. Three distinct frames and decreasing distance are
+required; stale data, rerouting and disable clear the evidence. CONSISTENT is advisory,
+not unique junction identification or target-lane clearance. No maneuver, lamp timing,
+slowdown, unknown-lane behavior, native checks or buzzer behavior is overridden.
+The standalone Tesla Map diagnostic plugin is optional and need not be enabled.

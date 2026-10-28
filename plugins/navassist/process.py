@@ -35,6 +35,7 @@ def main():
   params = plugins.view(Params())
   settings = read_settings(params)
   runtime = NavigationRuntime(settings)
+  map_messages = plugins.PluginMsgs()
   store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
   sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState', 'deviceMotion'])
   can_socket = messaging.sub_sock('can', conflate=False)
@@ -71,7 +72,7 @@ def main():
         can_list=can_batches(messaging.drain_sock(can_socket)), vehicle_fresh=vehicle_fresh,
         left_phone=bool(phone_sides and phone_sides[0].blocked), right_phone=bool(phone_sides and phone_sides[1].blocked),
         turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
-        localization_valid=bool(pose_ok))
+        localization_valid=bool(pose_ok), map_snapshot=map_messages.fresh('nav.map').get('navassist'))
       publish_position(result['position'])
       if route_publisher is not None and now >= next_route:
         next_route = now+1_000_000_000

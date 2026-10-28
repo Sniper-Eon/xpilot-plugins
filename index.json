@@ -17,13 +17,13 @@
     {
       "id": "auto_speed",
       "name": "Auto Speed Limit",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "api": 1,
       "category": "longitudinal_planning",
       "author": "xpilot",
       "description": "Sets cruise speed to the car's speed limit plus an offset. Needs openpilot longitudinal and the vehicle bus.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/auto_speed-1.1.0.tar.gz",
-      "sha256": "19fb68b2c79d39017f1bea71daa8b75d8b073f13df8e236b7e02e00fbc3bb229",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/auto_speed-1.2.0.tar.gz",
+      "sha256": "34ffd63b715ae57514a7a0d49ff3c8d70f2a4a399f33f3ef3e73ce39d4e83067",
       "platform": null,
       "default": false
     },
@@ -215,13 +215,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "2.0.3",
+      "version": "2.1.0",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.0.3.tar.gz",
-      "sha256": "45d40e660c977edb4348b58ae7ab6a2ee019784efbdcb69e345c0956d52ee59d",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.1.0.tar.gz",
+      "sha256": "2fe3772b87b2abf95604ae56221256973b38825ce0d6be35f99ace2d11355773",
       "platform": null,
       "default": false
     },
@@ -317,6 +317,19 @@
       "default": false
     },
     {
+      "id": "tesla_map",
+      "name": "Tesla Map Diagnostics",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "data_source",
+      "author": "Sniper-Eon",
+      "description": "Read-only VEH map bounds, fork evidence and fused-limit comparison. No control output.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_map-1.0.0.tar.gz",
+      "sha256": "4c053db37297342e25c259ddf061890fcb56e24d6697248e0b6261d39da54b26",
+      "platform": null,
+      "default": false
+    },
+    {
       "id": "tesla_mixed_control",
       "name": "Tesla Mixed Control",
       "version": "1.1.2",
@@ -400,13 +413,13 @@
     {
       "id": "zh_cn",
       "name": "Simplified Chinese UI",
-      "version": "1.1.9",
+      "version": "1.1.10",
       "api": 1,
       "category": "ui",
       "author": "Sniper-Eon",
       "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.9.tar.gz",
-      "sha256": "1015cfa72efe6b3df5cba0d200bae0820e0c14ff04df64397ad60c5dc07eb8da",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.10.tar.gz",
+      "sha256": "9fff61e962cbb8502c809b5664423b8ffe933882c370195d55fd37084a341b03",
       "platform": null,
       "default": false
     }

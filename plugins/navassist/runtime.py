@@ -1,6 +1,8 @@
 """One complete pure navigation cycle; no camera, socket or vehicle actuation."""
 from __future__ import annotations
 
+from .branch import BranchMatcher
+from .map_data import MapData
 from .blocker import LaneChangeBlocker
 from .intent import LaneIntentCoordinator, TurnSignalCoordinator, build_intent
 from .navstate import build as build_nav_state
@@ -12,6 +14,7 @@ from .topology import from_model
 class NavigationRuntime:
   def __init__(self, settings):
     self.settings = settings
+    self.branch = BranchMatcher()
     self.oem = OemLaneSignals()
     self.blocker = LaneChangeBlocker()
     self.position = AbsolutePosition()
@@ -20,7 +23,7 @@ class NavigationRuntime:
 
   def tick(self, current, model, model_ns, car, cc, now_ns, *, can_list=(), vehicle_fresh=False,
            left_phone=False, right_phone=False, turn_geometry_active=False,
-           localization_valid=True):
+           localization_valid=True, map_snapshot=None):
     self.oem.update(can_list, now_ns)
     oem = self.oem.payload(now_ns)
     topology = from_model(model, now_ns, model_ns)
@@ -28,6 +31,14 @@ class NavigationRuntime:
     nav['valid'] = bool(nav['valid'] and localization_valid)
     if not localization_valid and nav['reason'] == 'none':
       nav['reason'] = 'localLocalization'
+    evidence = map_snapshot or MapData().snapshot(now_ns)
+    # Broker TTL cannot extend the original CAN timestamp.
+    if not 0 < evidence.get('stampNs', 0) <= now_ns or now_ns-evidence.get('stampNs', 0) > 1_000_000_000:
+      evidence = MapData().snapshot(now_ns)
+    if not self.settings.enabled:
+      self.branch = BranchMatcher()
+      evidence = MapData().snapshot(now_ns)
+    nav['branchEvidence'] = self.branch.update(nav, evidence, now_ns)
     position = self.position.update(topology, nav, now_ns)
     topology['absoluteEgoIndex'] = position['lane_index']-1 if position['valid'] else None
     left_blocked, right_blocked, reasons = self.blocker.update(oem, topology,

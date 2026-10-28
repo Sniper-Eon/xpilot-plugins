@@ -1,6 +1,8 @@
 """Auto speed plugin: follows the car's own speed limit (DAS_fusedSpeedLimit, upstream carStateSP.speedLimit)
 plus an offset by sending single right scroll-wheel ticks (0x3C2) cloned from the car's idle frame.
 Panda permissions: plugin.json runtime rules. Params: TeslaAutoSpeedLimit(Offset)."""
+import time
+from .map_data import MapData, LimitComparison
 from types import SimpleNamespace
 
 from opendbc.can import CANParser
@@ -20,6 +22,9 @@ class AutoSpeed(Plugin):
   def __init__(self, CP, params):
     super().__init__(CP, params)
     self.controller = AutoSpeedController()
+    self.map = MapData()
+    self.comparison = LimitComparison()
+    self.fused_limit, self.fused_stamp = 0., 0
     # State the controller reads; filled from CAN and carStateSP below.
     self.state = SimpleNamespace(out=None, tesla_speed_limit_assist_enabled=False, tesla_speed_limit_target=0.0,
                                  tesla_speed_limit_target_valid=False, tesla_speed_units="KPH", tesla_autopilot_active=False,
@@ -61,6 +66,7 @@ class AutoSpeed(Plugin):
       self._down_ns, self._up_ns = now_ns, 0
 
   def observe_can(self, can_list, now_ns: int) -> list:
+    self.map.update(can_list, now_ns)
     self.party.update(can_list)
     self.ap_party.update(can_list)
     for mono_time, frames in can_list:
@@ -75,11 +81,16 @@ class AutoSpeed(Plugin):
 
   def publish_state(self, CS_SP) -> None:
     unit = MPH_TO_MS if self.state.tesla_speed_units == "MPH" else KPH_TO_MS
+    self.fused_limit, self.fused_stamp = float(CS_SP.speedLimit), time.monotonic_ns()
     target = CS_SP.speedLimit + self.offset * unit
     self.state.tesla_speed_limit_target_valid = CS_SP.speedLimit > 0 and target > 0
     self.state.tesla_speed_limit_target = target if self.state.tesla_speed_limit_target_valid else 0.0
 
   def control_sends(self, CS, CC, now_ns: int) -> list:
+    self.state.tesla_fused_limit_fresh = bool(self.fused_stamp and 0 <= now_ns-self.fused_stamp <= 500_000_000)
+    fused = self.fused_limit if self.state.tesla_fused_limit_fresh else 0.
+    comparison = self.comparison.update(self.map.snapshot(now_ns), fused, now_ns)
+    self.state.tesla_map_conflict = comparison["blockIncrease"]
     self.state.out = CS
     return self.controller.update(CC, self.state, now_ns)
 

@@ -38,4 +38,7 @@ class ChineseCatalog:
     matched = re.fullmatch(r'(TURN L|TURN R|KEEP L|KEEP R|SHARP L|SHARP R|U-TURN L|U-TURN R|STRAIGHT|ROUNDABOUT|DEST)  (\d+) m', text)
     if matched:
       return self.strings[matched[1]] + '  ' + matched[2] + ' 米'
+    matched = re.fullmatch(r'Fork (LEFT|RIGHT|BOTH) (\d+) m - (route unconfirmed|follow route|route consistent|checking route|may be another fork)', text)
+    if matched:
+      return self.strings['Fork']+' '+self.strings['Fork '+matched[1]]+' '+matched[2]+' 米 - '+self.strings[matched[3]]
     return None

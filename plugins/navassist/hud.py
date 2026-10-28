@@ -60,4 +60,5 @@ def present_hud(nav,intent,topology,*,car=None,authority=None):
   return dict(active=active,distance=distance,maneuver=nav.get('maneuver') if active else None,
     status=status,tone=tone,count=count,recommended=recommended,ego=ego,
     lane_status='Lane position confirmed' if ego is not None else 'Lane position pending',
-    route_nodes=route_nodes(nav,active))
+    route_nodes=route_nodes(nav,active),
+    branch_message=nav.get('branchEvidence', {}).get('message', '') if active else '')

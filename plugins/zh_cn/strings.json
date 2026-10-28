@@ -3426,5 +3426,19 @@
   "Four-finger owner toggle": "四指切换控速方",
   "Model blinker threshold": "模型打灯意图阈值",
   "Turn signal distance": "导航打灯距离",
-  "Blinker delay": "打灯延迟"
+  "Blinker delay": "打灯延迟",
+  "Tesla Map Diagnostics": "特斯拉地图诊断",
+  "Tesla Map": "特斯拉地图",
+  "Read-only VEH map bounds, fork evidence and fused-limit comparison. No control output.": "只读车辆地图限速上界、分岔证据与融合限速对比，不输出控制。",
+  "MAP unavailable": "地图数据不可用",
+  "VEH 0x238 - no fresh data": "车辆总线 0x238 无新鲜数据",
+  "Fork": "分岔",
+  "route unconfirmed": "路线未确认",
+  "follow route": "遵循导航路线",
+  "route consistent": "与路线一致",
+  "checking route": "正在核对路线",
+  "may be another fork": "可能是另一分岔",
+  "Fork LEFT": "左侧",
+  "Fork RIGHT": "右侧",
+  "Fork BOTH": "两侧"
 }
