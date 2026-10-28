@@ -26,10 +26,11 @@ def test_navigation_execution_reaches_c3xl_buzzer_once(monkeypatch):
   c=NavigationChime(Params());c.plugin_name='navassist'
   c.settings=N(enabled=True,beep_enabled=True)
   intent=dict(valid=True,signalRequested=True,direction='right',sessionId='s',routeRevision=1,
-              maneuverEventId=3,requestId=3,spLaneChangeReady=False)
+              maneuverEventId=3,requestId=3,spLaneChangeReady=True,laneChangeAllowed=True,targetLaneIndex=2)
   c._msgs=Messages({'lanes.intent':{'navassist':intent}})
   events=[]
-  sm={'modelV2':N(meta=N(laneChangeState=log.LaneChangeState.laneChangeStarting,laneChangeDirection=log.LaneChangeDirection.right))}
+  from .test_signal_and_buzzer_admission import State
+  sm=State()
   plugins.update_alerts([c],sm,N(add=events.append))
   assert events==[alerts.EVENT_NAMES['warning']]
   alert=alerts._callback('warning')(None,None,{},False,0,None)

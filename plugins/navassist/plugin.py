@@ -71,3 +71,8 @@ class NavAssist(Plugin):
   def alert_source(cls, CP, params):
     from .chime import NavigationChime
     return NavigationChime(params)
+
+  @classmethod
+  def buzzer_policy(cls, params):
+    from .chime import NavigationBuzzerPolicy
+    return NavigationBuzzerPolicy(params)

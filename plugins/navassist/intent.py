@@ -10,7 +10,7 @@ from types import SimpleNamespace as N
 
 from .coordinator import NavLaneIntentCoordinator, NavTurnSignalCoordinator
 from .intent_types import LaneIntentDirection, LaneTopologyInput, LaneVehicleInput, NavTurnPlan, ObservedLaneChangeState
-from .planning import build_lane_plan, lane_alignment_may_start
+from .planning import build_lane_plan, lane_alignment_may_start, RELATIVE_ROUTE_MANEUVERS
 
 
 def camel(name):
@@ -70,7 +70,8 @@ def payload(intent, nav):
               targetLaneIndex=intent.target_lane_index, spLaneChangeReady=intent.lane_change_ready,
               laneChangeAllowed=intent.lane_change_ready, reason=intent.reason, requestId=intent.request_id,
               forkNow=False, allowUnknownCrossing=False, ignoreSolidBoundary=False,
-              signalPurpose='lanePreparation' if nav.get('maneuver') in
+              signalPurpose='nativeLaneChange' if nav.get('maneuver') in ('slight_left', 'slight_right')
+                and intent.target_lane_index < 0 else 'lanePreparation' if nav.get('maneuver') in
                 ('merge_left', 'merge_right', 'exit_left', 'exit_right', 'ramp_left', 'ramp_right')
                 or intent.target_lane_index >= 0 else 'junction')
 
@@ -153,7 +154,7 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
     left_blinker=left_blinker, right_blinker=right_blinker, brake_pressed=brake_pressed,
     gas_pressed=gas_pressed, steering_pressed=steering_pressed, model_state=model_state,
     model_direction=model_direction, allow_new_lane_change=n.maneuverDistanceM > 0 and not approaching)
-  if (n.maneuver in ('mergeLeft', 'mergeRight') and topology.get('absoluteEgoIndex') is None
+  if (n.maneuver in RELATIVE_ROUTE_MANEUVERS and topology.get('absoluteEgoIndex') is None
       and out.get('relativeStepComplete')):
     out.update(signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False, reason='heuristicChangeLimit')
     return out
@@ -163,8 +164,7 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
     relative_route_action = n.maneuver in ('mergeLeft', 'mergeRight', 'exitLeft', 'exitRight', 'rampLeft', 'rampRight')
     if relative_route_action and out.get('laneRequestOwned'):
       return out  # Never bypass a lane coordinator's pause/abort via a turn-only fallback.
-    if not intersection and (out['reason'] in ('alreadyInRecommendedLane', 'noNeighbor') or
-        (topology.get('absoluteEgoIndex') is None and not relative_route_action)):
+    if not intersection and out['reason'] in ('alreadyInRecommendedLane', 'noNeighbor'):
       return out
     # A completed relative merge cannot turn its lamp back on via the turn-only
     # fallback after the one-step lane coordinator has ended the request.

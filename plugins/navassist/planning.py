@@ -18,6 +18,7 @@ RIGHT_EXIT_LANE_MANEUVERS = frozenset(("exitRight", "rampRight", "mergeRight"))
 
 
 MERGE_MANEUVERS = frozenset(("mergeLeft", "mergeRight"))
+RELATIVE_ROUTE_MANEUVERS = LEFT_EXIT_LANE_MANEUVERS | RIGHT_EXIT_LANE_MANEUVERS
 
 FORK_NOW_DISTANCE_M = 50.0
 
@@ -46,10 +47,10 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     and math.isfinite(distance_m) and 0.0 < distance_m <= FORK_NOW_DISTANCE_M
   )
 
-  if maneuver in MERGE_MANEUVERS:
+  if maneuver in RELATIVE_ROUTE_MANEUVERS:
     if amap_ego_index is None:
       # A missing full-road lane number is not a reason to discard a fresh
-      # merge instruction. Prepare one adjacent relative step, not an edge
+      # merge/exit/ramp instruction. Prepare one adjacent relative step, not an edge
       # search across the whole road; observation/paint/BSM gates stay below.
       visual_ego = int(topology.egoLaneIndexFromLeft)
       ready = bool(nav_valid and int(nav.maneuverEventId) != 0

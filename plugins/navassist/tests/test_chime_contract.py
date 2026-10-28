@@ -11,7 +11,10 @@ def test_navigation_start_chime_is_single_and_never_manual():
   source = NavigationChime(Params())
   source.settings = N(enabled=True, beep_enabled=True)
   source._msgs = Messages({})
-  sm = {'modelV2': N(meta=N(laneChangeState=log.LaneChangeState.laneChangeStarting, laneChangeDirection=log.LaneChangeDirection.left))}
+  from .test_signal_and_buzzer_admission import State
+  sm = State()
+  sm['modelV2'].meta.laneChangeDirection = log.LaneChangeDirection.left
+  sm['carState'].leftBlinker, sm['carState'].rightBlinker = True, False
   assert source.update(sm) == []
   intent = dict(valid=True, signalRequested=True, direction='left', targetLaneIndex=0,
                 spLaneChangeReady=True, laneChangeAllowed=True, requestId=4,
@@ -27,5 +30,6 @@ def test_navigation_start_chime_is_single_and_never_manual():
   assert source.update(sm) == []
   source.settings.beep_enabled = True
   intent['targetLaneIndex'] = -1
-  assert len(source.update(sm)) == 1
+  intent['laneChangeAllowed'] = False
+  assert source.update(sm) == []
   assert source.update(sm) == []

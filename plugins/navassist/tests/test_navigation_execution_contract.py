@@ -17,25 +17,31 @@ def test_navigation_ready_never_overrides_sp_wait_or_driver_veto():
 
 def test_chime_waits_for_execution_after_clearance():
   from navassist.chime import NavigationChime
+  from .test_signal_and_buzzer_admission import State
+  def state(meta):
+    sm = State()
+    sm['modelV2'].meta = meta
+    sm['carState'].leftBlinker, sm['carState'].rightBlinker = True, False
+    return sm
   chime = NavigationChime(Params())
   chime.settings = N(enabled=True, beep_enabled=True)
   intent = dict(valid=True, signalRequested=True, direction='left', targetLaneIndex=0,
                 spLaneChangeReady=False, laneChangeAllowed=False,
                 sessionId='s', routeRevision=1, maneuverEventId=9, requestId=1)
   chime._msgs = Messages({'lanes.intent': {'navassist': intent}})
-  assert chime.update({'modelV2': N(meta=N(laneChangeState=log.LaneChangeState.preLaneChange, laneChangeDirection=log.LaneChangeDirection.left))}) == []
-  assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []
+  assert chime.update(state(N(laneChangeState=log.LaneChangeState.preLaneChange, laneChangeDirection=log.LaneChangeDirection.left))) == []
+  assert chime.update(state(N(laneChangeState='preLaneChange', laneChangeDirection='left'))) == []
   intent.update(spLaneChangeReady=True, laneChangeAllowed=True)
-  assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []
-  executing = {'modelV2': N(meta=N(laneChangeState=log.LaneChangeState.laneChangeStarting, laneChangeDirection=log.LaneChangeDirection.left))}
+  assert chime.update(state(N(laneChangeState='preLaneChange', laneChangeDirection='left'))) == []
+  executing = state(N(laneChangeState=log.LaneChangeState.laneChangeStarting, laneChangeDirection=log.LaneChangeDirection.left))
   assert len(chime.update(executing)) == 1
   assert chime.update(executing) == []
   intent['requestId'] = 2
   chime.settings.beep_enabled = False
-  assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []
+  assert chime.update(state(N(laneChangeState='preLaneChange', laneChangeDirection='left'))) == []
   chime.settings.beep_enabled = True
   intent['valid'] = False
-  assert chime.update({'modelV2': N(meta=N(laneChangeState='preLaneChange', laneChangeDirection='left'))}) == []
+  assert chime.update(state(N(laneChangeState='preLaneChange', laneChangeDirection='left'))) == []
 
 
 def test_turn_only_status_and_waiting_are_distinct():

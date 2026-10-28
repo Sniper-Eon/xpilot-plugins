@@ -67,6 +67,10 @@ class NavLanePolicy:
       return False
     intent = last.get('lanes.intent') or {}
     if intent.get('signalRequested'):
+      if intent.get('signalPurpose') == 'nativeLaneChange':
+        return bool(default and self.settings.lane_change_enabled and intent.get('valid')
+                    and str(intent.get('direction')) == side
+                    and not getattr(carstate, side+'Blindspot', False))
       return bool(default and intent.get('valid') and str(intent.get('direction')) == side and intent.get('targetLaneIndex', -1) >= 0
                   and intent.get('spLaneChangeReady') and intent.get('laneChangeAllowed'))
     return default
@@ -78,11 +82,16 @@ class NavLanePolicy:
     left, right = bool(getattr(carstate, 'leftBlinker', False)), bool(getattr(carstate, 'rightBlinker', False))
     if intent.get('valid') and intent.get('signalRequested') and side in ('left', 'right'):
       self._owned_side = side
-      self._turn_only = intent.get('targetLaneIndex', -1) < 0
+      delegated = intent.get('signalPurpose') == 'nativeLaneChange'
+      self._turn_only = intent.get('targetLaneIndex', -1) < 0 and not delegated
       self._suppress_turn = not self._turn_only or intent.get('signalPurpose') == 'lanePreparation'
       conflicting = right if side == 'left' else left
       if conflicting:
         return LaneChangeLimits(allow_start=False, allow_continue=False, suppress_turn=True)
+      if delegated:
+        clear = bool(self.settings.lane_change_enabled and not self._blocked(side, last)
+                     and not getattr(carstate, side+'Blindspot', False))
+        return LaneChangeLimits(allow_start=clear, allow_continue=clear, suppress_turn=True)
       if self._turn_only:
         return LaneChangeLimits(allow_start=False, allow_continue=False, turn_only=True,
                                 suppress_turn=self._suppress_turn)

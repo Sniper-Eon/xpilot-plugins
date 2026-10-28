@@ -1,7 +1,7 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",
@@ -21,7 +21,8 @@
     "alert",
     "source:route",
     "msg:nav.route",
-    "source:turnsignals"
+    "source:turnsignals",
+    "sound"
   ],
   "settings": [
     {
@@ -300,7 +301,8 @@
     "rule_abi": 1,
     "hooks": [
       "observe_can",
-      "control_sends"
+      "control_sends",
+      "buzzer_policy"
     ]
   },
   "use": "both"

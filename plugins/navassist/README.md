@@ -1,4 +1,4 @@
-# Navigation Assist 2.0.0
+# Navigation Assist 2.0.1
 
 Personal fork: [Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot), branch `xpilot`.
 Install this release only with the synchronized paired host and runtime-rule
@@ -145,3 +145,28 @@ Required broker host commit: `fc9afa643497a334f7d69df637042bcaca03777b` or a com
 ## Upstream runtime-rule migration 2.0.0
 
 Requires the synchronized host f451a13b219930e26d316b8997dafda93fc6784f (or a compatible descendant) and qualified runtime-rule ABI 1 firmware. The old per-feature safetyParam bit/policy reference is retired. Ship a coherent host/store/firmware set; do not copy this package onto the old device host. Existing navigation settings and integration remain, but active physical signal requests now require primary cruise engagement; the earlier MADS-only permission is not equivalent and remains a pre-deployment compatibility item. No device or phone was updated by source synchronization.
+
+## 2.0.1 — directional lamps and execution-only GPIO notice
+
+Requires paired host 71e16223e8fbac00dab8d5d6975e50d9df0e483e (or a compatible descendant), including
+`buzzer_policy`, plus the existing ABI-1 firmware requirement. Do not copy this
+release onto the older deployed host alone.
+
+Unknown absolute numbering no longer suppresses slight-left/right lamps. These
+lamps delegate automatic admission to native SP/BSM rather than manufacturing a
+map lane index; SP vetoes, road edges and driver controls remain authoritative.
+Explicit merge/exit/ramp guidance can prepare one observed adjacent corridor per
+event without absolute numbering. Missing corridor, paint, BSM and source gates
+still block the crossing. A slight-direction lamp does not create low-speed turn
+desire.
+
+A chime needs fresh matching navigation ownership, physical lamp feedback,
+lateral engagement and actual laneChangeStarting; delegated SP changes are
+recognized from the real model transition, never from a clear BSM bit alone.
+Manual/opposite/stale or denied preparations remain silent. While this plugin
+is enabled, ordinary GPIO prompts are restricted to this navigation execution
+notice; MADS on/off and emergency warnings retain the host's native tones.
+The BOOL master releases this restriction when disabled.
+
+This is a planning/admission repair, not a retrained vision model. Local tests and
+replays are distinct from device activation and road validation.
