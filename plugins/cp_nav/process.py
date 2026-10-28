@@ -19,6 +19,13 @@ def parked_now(state):
   return bool(state.get('verified') is True and 0<=time.monotonic_ns()-state.get('stamp',0)<=250_000_000)
 
 
+def publish(kind, payload, valid_for_ms):
+  try:
+    plugins.send_msg(CPNav, kind, payload, valid_for_ms)
+  except Exception:
+    pass  # keep the CP servers alive if the broker is missing or another publisher owns it
+
+
 def main():
   params=plugins.view(Params());store=CPStore();runtime=CPRuntime(read(params))
   sm=messaging.SubMaster(['carState','carControl','controlsState','modelV2','deviceState'])
@@ -37,18 +44,22 @@ def main():
       with ingress.lock:
         snapshot=store.snapshot(connected=bool(ingress.owner and ingress.applied),now_ns=now)
       model=sm['modelV2'] if healthy(sm,['modelV2'],now,150_000_000) else None
-      if healthy(sm,['carState'],now):transports.metadata.update(cs,int(sm.logMonoTime['carState']))
+      if healthy(sm,['carState'],now):transports.metadata.update(cs,model,int(sm.logMonoTime['carState']))
+      try:
+        oem=msgs.fresh('oem.lanes').get('cp_nav') or {}
+      except Exception:
+        oem={}
       out=runtime.tick(snapshot,cs,cc,model,int(sm.logMonoTime['modelV2']),now_ns=now,
         vehicle_fresh=vehicle,owner=plugins.owner(params,'source:route')=='cp_nav',
-        oem=msgs.fresh('oem.lanes').get('cp_nav') or {},
+        oem=oem,
         curvature=float(sm['controlsState'].desiredCurvature) if vehicle else None)
-      plugins.send_msg(CPNav,'cp.state',out['state'],500)
-      plugins.send_msg(CPNav,'lanes.intent',out['intent'],200)
+      publish('cp.state',out['state'],500)
+      publish('lanes.intent',out['intent'],200)
       rk.keep_time()
   finally:
     transports.close()
-    plugins.send_msg(CPNav,'cp.state',{'valid':False},100)
-    plugins.send_msg(CPNav,'lanes.intent',{'valid':False,'signalRequested':False},100)
+    publish('cp.state',{'valid':False},100)
+    publish('lanes.intent',{'valid':False,'signalRequested':False},100)
 
 
 if __name__=='__main__':main()

@@ -82,13 +82,13 @@
     {
       "id": "cp_nav",
       "name": "CP Native Navigation",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Independent CP v2 native Carrot navigation candidate. Separate settings, bounded lamp preparation and cruise targets; passing requires qualified side observations. No camera streaming.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cp_nav-0.2.0.tar.gz",
-      "sha256": "3ccee06cfe6d62c2b1bd261e177197d73f19d91a5ae531a938ac3bfc105aff32",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cp_nav-0.2.1.tar.gz",
+      "sha256": "496344bd4d4da95e5f788695eff2a25aa08ca9e7ff8d4ae4549eaec7756a785b",
       "platform": null,
       "default": false
     },

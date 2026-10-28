@@ -21,7 +21,7 @@ CAPABILITIES = {
   "remote_params": True,
   "remote_params_scope": "qualified_parked_cp_navigation_only",
   "model_download": False,
-  "compact_services_available": ["carState"],
+  "compact_services_available": ["carState", "modelV2"],
   "compact_reserved_fields": [
     "softHoldActive",
     "carrotCruise",

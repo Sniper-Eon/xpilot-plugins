@@ -73,8 +73,9 @@ class TurnSignalController:
 
   @staticmethod
   def _key(intent):
+    identity = intent.get("maneuverEventId", intent.get("requestId", 0))
     return (intent.get("sessionId"), int(intent.get("routeRevision", 0)),
-            int(intent.get("requestId", 0)), str(intent.get("direction", "none")))
+            int(identity), str(intent.get("direction", "none")))
 
   def _can_send(self, now_ns):
     return self._last_send_ns is None or now_ns-self._last_send_ns >= SEND_INTERVAL_NS
@@ -121,9 +122,10 @@ class TurnSignalController:
 
     if self.active is not None:
       age = now_ns - int(self.active["started_ns"])
+      identity = intent.get("maneuverEventId", intent.get("requestId", 0))
       same = (direction == self.active["direction"] and intent.get("sessionId") == self.active["sessionId"]
               and int(intent.get("routeRevision", 0)) == self.active["routeRevision"]
-              and int(intent.get("requestId", 0)) == self.active["requestId"])
+              and int(identity) == self.active.get("maneuverEventId"))
       if self.active["phase"] == "cancelling":
         # Cancellation owns the lamp until CarState confirms it is off, or the bound expires.
         if not physical_left and not physical_right:
@@ -134,9 +136,15 @@ class TurnSignalController:
           return self._cancel(now_ns)
       if self.active is None:
         pass
-      elif not requested or not same or age > SESSION_TIMEOUT_NS:
+      elif not same or age > SESSION_TIMEOUT_NS:
         return self._cancel(now_ns)
       elif int(getattr(cs, "brakePressed", False)):
+        return self._cancel(now_ns)
+      elif not requested:
+        # Hold the lamp for this maneuver while the intent flaps or a gate blocks the change.
+        if physical_on:
+          self.active["held"] = True
+          return []
         return self._cancel(now_ns)
       else:
         self.active["held"] = physical_on
@@ -167,6 +175,7 @@ class TurnSignalController:
     self.active = {
       "direction": direction, "sessionId": intent.get("sessionId"),
       "routeRevision": int(intent.get("routeRevision", 0)), "requestId": int(intent.get("requestId", 0)),
+      "maneuverEventId": int(intent.get("maneuverEventId", intent.get("requestId", 0))),
       "started_ns": int(now_ns), "action_sent_ns": int(now_ns), "action_attempts": 1, "phase": "active",
     }
     counter = (decode(self.template)["counter"] + 1) % 16
