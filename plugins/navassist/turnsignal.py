@@ -134,9 +134,17 @@ class TurnSignalController:
           return self._cancel(now_ns)
       if self.active is None:
         pass
-      elif not requested or not same or age > SESSION_TIMEOUT_NS:
+      elif not same or age > SESSION_TIMEOUT_NS:
         return self._cancel(now_ns)
       elif int(getattr(cs, "brakePressed", False)):
+        return self._cancel(now_ns)
+      elif not requested:
+        # Keep the lamp for the current maneuver while a blind-spot/road-edge gate blocks the change, so the
+        # driver can still complete the turn after the obstruction clears. Cancel only when the maneuver
+        # changes, the driver brakes, the session times out, or the lamp is already off.
+        if physical_on:
+          self.active["held"] = True
+          return []
         return self._cancel(now_ns)
       else:
         self.active["held"] = physical_on
