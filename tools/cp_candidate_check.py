@@ -9,7 +9,7 @@ import json,os,sys,tempfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
-HOST=ROOT.parent/'xpilot'
+HOST=Path(os.environ.get('X',ROOT.parent/'xpilot')).resolve()
 with tempfile.TemporaryDirectory(prefix='cp-switch-e2e-') as temp:
  os.environ['XPILOT_PLUGINS_DIR']=str(Path(temp)/'installed')
  sys.path[:0]=[str(HOST),str(HOST/'opendbc_repo'),str(HOST/'msgq_repo')]
