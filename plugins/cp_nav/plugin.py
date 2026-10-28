@@ -17,11 +17,6 @@ class CPNav(Plugin):
     super().__init__(CP,params)
     self.params=params;self.settings=read(params);self.turns=TurnSignalController();self._msgs=None;self.oem=OemLaneSignals();self._next_oem=0
 
-  def setup(self,CP_SP):
-    from opendbc.sunnypilot.car.tesla.values import TeslaFlagsSP
-    if CP_SP.flags & TeslaFlagsSP.HAS_VEHICLE_BUS:
-      bits=(CP_SP.safetyParam|int(self.MANIFEST.safety['param_bit'],0))&0xffff
-      CP_SP.safetyParam=bits if bits<0x8000 else bits-0x10000
 
   def service_params(self,params):
     self.params=params;self.settings=read(params)

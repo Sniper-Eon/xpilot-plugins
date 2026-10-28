@@ -1,7 +1,7 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "1.5.9",
+  "version": "2.0.0",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",
@@ -20,15 +20,9 @@
     "can.tx:0x3E9:1",
     "alert",
     "source:route",
-    "msg:nav.route"
+    "msg:nav.route",
+    "source:turnsignals"
   ],
-  "safety": {
-    "header": "navassist.h",
-    "param_bit": "0x8000",
-    "tx": [
-      "0x3E9:1"
-    ]
-  },
   "settings": [
     {
       "key": "ExtNavAssistLaneChange",
@@ -178,5 +172,136 @@
       "default": "0",
       "note": "Retired shared-source selector; retained for rollback only. This version always uses TesNav; select the separate CP plugin for CP navigation."
     }
-  }
+  },
+  "rules": [
+    {
+      "type": "template_clone.v1",
+      "tx_address": 1001,
+      "rx_address": 1001,
+      "tx_bus": 1,
+      "rx_bus": 1,
+      "tx_length": 8,
+      "rx_length": 8,
+      "template_ttl_us": 1500000,
+      "min_interval_us": 100000,
+      "session": 2,
+      "max_count": 200,
+      "idle_reset_us": 0,
+      "window_us": 60000000,
+      "counter": {
+        "kind": 1,
+        "bit_offset": 52,
+        "width": 4
+      },
+      "tx_checksum": {
+        "kind": 1,
+        "checksum_byte": 7
+      },
+      "rx_checksum": {
+        "kind": 1,
+        "checksum_byte": 7
+      },
+      "predicate_mask": [
+        0,
+        3,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "predicate_value": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "copy_mask": [
+        255,
+        252,
+        225,
+        255,
+        255,
+        255,
+        15,
+        0
+      ],
+      "constant_mask": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "constant_value": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "fields": [
+        {
+          "bit_offset": 8,
+          "width": 2,
+          "min": 1,
+          "max": 3,
+          "exempt_values": [
+            3
+          ]
+        },
+        {
+          "bit_offset": 17,
+          "width": 4,
+          "min": 4,
+          "max": 8,
+          "exempt_values": [
+            4
+          ]
+        }
+      ],
+      "legal_tuples": [
+        {
+          "field_mask": 3,
+          "values": [
+            1,
+            8
+          ]
+        },
+        {
+          "field_mask": 3,
+          "values": [
+            2,
+            8
+          ]
+        },
+        {
+          "field_mask": 3,
+          "values": [
+            3,
+            4
+          ]
+        }
+      ]
+    }
+  ],
+  "requires": {
+    "rule_abi": 1,
+    "hooks": [
+      "observe_can",
+      "control_sends"
+    ]
+  },
+  "use": "both"
 }

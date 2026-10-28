@@ -1,0 +1,34 @@
+{
+  "id": "lean_mici",
+  "name": "lean mici phone inference",
+  "version": "0.8.2",
+  "api": 1,
+  "use": "both",
+  "category": "perception_model",
+  "entry": "plugin:LeanMici",
+  "author": "xpilot",
+  "description": "BGM1 v4 Walnut V3 phone inference with physical sanity checks and local fallback. Uses the system engaged bounded-wait contract.",
+  "priority": 100,
+  "enable_param": "ExtLeanMici",
+  "claims": [
+    "role:perception.model",
+    "process:lean_modeld",
+    "msg:lean_mici.navigation",
+    "long.target"
+  ],
+  "rules": [],
+  "requires": {"msg": ["lean_mici.navigation"]},
+  "params": {
+    "ExtLeanMici": {
+      "type": "BOOL",
+      "default": "0"
+    },
+    "ExtLeanMiciPeer": {
+      "type": "JSON"
+    }
+  },
+  "platform": {
+    "machine": "aarch64",
+    "python": "cpython-312"
+  }
+}

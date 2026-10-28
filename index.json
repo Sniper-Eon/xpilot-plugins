@@ -4,86 +4,93 @@
     {
       "id": "ambient_light",
       "name": "Blindspot Ambient Lights",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "api": 1,
       "category": "body_comfort",
       "author": "xpilot",
       "description": "Turns the cabin ambient lights red while a car is in the blind spot.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/ambient_light-1.0.0.tar.gz",
-      "sha256": "24b9dc79d3c1f57cc0c5f71e6b3c1e760a11c88e1a8d18b26a191e8cfcee1360",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/ambient_light-1.1.0.tar.gz",
+      "sha256": "cc3f6aa62ecb53fc660dbd0fefa4d46a2f4add74fd78d165f41e34b873293151",
+      "platform": null,
+      "default": false
     },
     {
       "id": "auto_speed",
       "name": "Auto Speed Limit",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "api": 1,
       "category": "longitudinal_planning",
       "author": "xpilot",
       "description": "Sets cruise speed to the car's speed limit plus an offset. Needs openpilot longitudinal and the vehicle bus.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/auto_speed-1.0.0.tar.gz",
-      "sha256": "3f01ed7959683919eeab6d2cd704ad2d3ef8bdebf865505e1c949868b15c3358",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/auto_speed-1.1.0.tar.gz",
+      "sha256": "19fb68b2c79d39017f1bea71daa8b75d8b073f13df8e236b7e02e00fbc3bb229",
+      "platform": null,
+      "default": false
     },
     {
       "id": "blindspot_edges",
       "name": "Blind Spot Edges",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "api": 1,
       "category": "overlays",
       "author": "xpilot",
       "description": "Big screen: red edge on the left or right column while a car is in that blind spot. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/blindspot_edges-1.0.0.tar.gz",
-      "sha256": "a6c440fa92594d2518d9aab821890c7ecdf4c5f8e63aaec95fddae6b823a6224",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/blindspot_edges-1.0.2.tar.gz",
+      "sha256": "e66eb4bb05af6a53c5b6f12881a2f2ece1ce1eda77ccfb04cd79f53477b63ece",
+      "platform": null,
+      "default": true
     },
     {
       "id": "bms",
       "name": "Battery (BMS)",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "api": 1,
       "category": "data_source",
       "author": "xpilot",
       "description": "Big-screen tile: battery charge, pack voltage, current and power from the BMS messages on the vehicle bus. Needs the vehicle-bus harness. Read only.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/bms-1.0.0.tar.gz",
-      "sha256": "b030d6d5cea1baf056fd123f2831f963514736c28cf29eb15e6f89d7cab9d365",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/bms-1.1.0.tar.gz",
+      "sha256": "9fb625a22262b0646327aef2cd6186532f19fd5e943dd3706d482289425d2365",
+      "platform": null,
+      "default": false
     },
     {
       "id": "car_tile",
       "name": "Car Tile",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: cluster speed, gear, blinkers and blind spots. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/car_tile-1.0.0.tar.gz",
-      "sha256": "9606fcbf15a11c49cf821b5d6174482c6f0ae088782dc3528058f7d35398a9fc",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/car_tile-1.0.3.tar.gz",
+      "sha256": "f7c8d66293a0b59ec2d0d3919748183816b600b469751e0332a9f081007015b8",
+      "platform": null,
+      "default": true
     },
     {
       "id": "clock_tile",
       "name": "Clock Tile",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: local time and date. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/clock_tile-1.0.0.tar.gz",
-      "sha256": "9ec465cd3db73f38fb07818d1a7723ef72c6f8f46c8d7cf4cc1180cb513beec3",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/clock_tile-1.0.3.tar.gz",
+      "sha256": "b72801d54f99a3653f477a16c5220e17a72a675f36ffdf7ed924551c52bd1931",
+      "platform": null,
+      "default": true
     },
     {
       "id": "cp_nav",
       "name": "CP Native Navigation",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "Independent CP v2 native Carrot navigation candidate. Separate settings, bounded lamp preparation and cruise targets; passing requires qualified side observations. No camera streaming.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cp_nav-0.1.1.tar.gz",
-      "sha256": "573c0ac0740f459514576c02eac980b81b8dd25546d16de1f3b5ecddee322b4d",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cp_nav-0.2.0.tar.gz",
+      "sha256": "3ccee06cfe6d62c2b1bd261e177197d73f19d91a5ae531a938ac3bfc105aff32",
+      "platform": null,
+      "default": false
     },
     {
       "id": "cruise_settings",
@@ -95,43 +102,76 @@
       "description": "Cruise switches in one plugin: intelligent cruise buttons, smart cruise from vision and map, main-cruise permission and the initial set speed. Writes the host params only while parked.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/cruise_settings-0.1.0.tar.gz",
       "sha256": "281c25052078ef83c3603cab755062cee507124002db1b1a7eadf2d5c147910e",
-      "platform": null
+      "platform": null,
+      "default": false
     },
     {
       "id": "external_compute",
       "name": "External Compute",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "data_source",
       "author": "xpilot",
       "description": "Lets a laptop, LLM server or accelerator exchange data with the device over a cable or WiFi (TCP JSON lines). Peers need the token in /data/params/d/XpilotExternalToken.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/external_compute-1.0.0.tar.gz",
-      "sha256": "f95ac7b785c3522bc4113ceb7e7581e14b244eb3d6137b744b8a5ae918ae8a85",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/external_compute-1.0.3.tar.gz",
+      "sha256": "834f9e8bcdf149c210594a11c162bac5a51348bec2bbb6a9db00f10ac913ee23",
+      "platform": null,
+      "default": false
     },
     {
       "id": "ip_tile",
       "name": "IP Tile",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: the device IP address and network type. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/ip_tile-1.0.0.tar.gz",
-      "sha256": "7b74e9390a570f1de418c6e93470c99ea807cd6e0f7a4c9223960cf45967d7ff",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/ip_tile-1.0.3.tar.gz",
+      "sha256": "62a6e0e5f981c1c95029f24bbc825ec9eb0a9954ac00d2676c058c8ab7dae0fb",
+      "platform": null,
+      "default": true
     },
     {
-      "id": "lead_card",
-      "name": "Lead Card",
+      "id": "lang_zh_chs",
+      "name": "\u7b80\u4f53\u4e2d\u6587\u8bed\u8a00\u5305 / Simplified Chinese",
       "version": "1.0.0",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
+      "description": "Complete Simplified Chinese translation for the xpilot interface.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/lang_zh_chs-1.0.0.tar.gz",
+      "sha256": "8cd4b63a11fcee3bcc0f1fc39ac1be5a37e37a542aacab041ff6aa9b02667be2",
+      "platform": null,
+      "default": false
+    },
+    {
+      "id": "lead_card",
+      "name": "Lead Card",
+      "version": "1.0.3",
+      "api": 1,
+      "category": "ui",
+      "author": "xpilot",
       "description": "Big-screen card: distance and relative speed of the lead car (radarState). Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/lead_card-1.0.0.tar.gz",
-      "sha256": "2dcfbee9bfadc80126d0145405da57133903c1d9f9015e91355b11ebf871c40e",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/lead_card-1.0.3.tar.gz",
+      "sha256": "e12a8e81a8b5ad375ed6bb7b79df13cda54fbe26843fac825dac3f44d20baa41",
+      "platform": null,
+      "default": true
+    },
+    {
+      "id": "lean_mici",
+      "name": "lean mici phone inference",
+      "version": "0.8.2",
+      "api": 1,
+      "category": "perception_model",
+      "author": "xpilot",
+      "description": "BGM1 v4 Walnut V3 phone inference with physical sanity checks and local fallback. Uses the system engaged bounded-wait contract.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/lean_mici-0.8.2.tar.gz",
+      "sha256": "21eb4905f4925e20662e51ed882dda1e29f8e437ad416ee970d95c865bf83a8e",
+      "platform": {
+        "machine": "aarch64",
+        "python": "cpython-312"
+      },
+      "default": false
     },
     {
       "id": "mads_settings",
@@ -143,103 +183,164 @@
       "description": "One place for MADS switches: MADS on/off, lateral steering on brake, unified engagement, and the Tesla screen-button mode. Writes the host MADS params only while parked.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/mads_settings-0.1.1.tar.gz",
       "sha256": "228384e6522aa536806f976aa628de3a07df136d313515dfa13fef70d0f2ae7f",
-      "platform": null
+      "platform": null,
+      "default": false
     },
     {
       "id": "map_tile",
       "name": "Map Tile",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen tile: speed limit, road name and next maneuver from any map or navigation provider. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/map_tile-1.0.0.tar.gz",
-      "sha256": "983d072bf9c0b77120ec8fece91d6e596d5d3d05ea753ec02e680c4e980b0141",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/map_tile-1.0.3.tar.gz",
+      "sha256": "f170e51acb05227f64c52cd6a8ee6cfb72ea2e5bfe270f3c233111e71e422e61",
+      "platform": null,
+      "default": true
+    },
+    {
+      "id": "nav_lane_change",
+      "name": "Navigation Lane Change",
+      "version": "0.4.1",
+      "api": 1,
+      "category": "lateral_planning",
+      "author": "xpilot",
+      "description": "Taps the turn stalk when the phone big model (lean_mici) predicts the driver's blinker (now or within 2 s) for 1 s, in that direction; SP's auto lane change does the rest. Only with an active route that the phone feeds to the model, never on single-lane roads, roundabouts, ramps or in tunnels (phone road data). 8 s apart, never with a car in that blind spot, while you steer, accelerate or brake, or below 30 km/h. Needs lean_mici 0.8+, SP auto lane change and the vehicle-bus harness. Turn signal (on by default): when the route's next maneuver is a turn within the set distance and the car is below 17 km/h (under SP's 20 mph lane-change speed), it taps the stalk once so the blinker signals the turn; needs cruise engaged (panda rule).",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/nav_lane_change-0.4.1.tar.gz",
+      "sha256": "cb81f46e05b4257ed9b9ff26a7a11b170c0d7d54a7d862c9bef97cbbf73e7f5d",
+      "platform": null,
+      "default": false
     },
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "1.5.9",
+      "version": "2.0.0",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-1.5.9.tar.gz",
-      "sha256": "9dc412b37bd2e8d02a7806c44f30cdfc0d2b4e4a410a6b03420c42545a01e67f",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.0.0.tar.gz",
+      "sha256": "93485522e3b4e015032a585217afaba1df60b57a4e8e75b72ced408172d2d357",
+      "platform": null,
+      "default": false
     },
     {
       "id": "op_models",
       "name": "openpilot Model",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "api": 1,
       "category": "perception_model",
       "author": "xpilot",
       "description": "Drive with the model that ships with openpilot (selfdrive/modeld, no downloads). Replaces the SP model manager while on; switch it off to go back.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/op_models-1.0.0.tar.gz",
-      "sha256": "6f160751d990e1ba11e42b6d42f94eb5b9c4ce10175b87f5aabc3fcaf095a4a1",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/op_models-1.0.1.tar.gz",
+      "sha256": "a50da8122b4199d385d15915b8d94472218fb7dafa67b2693aca6631c410e166",
+      "platform": null,
+      "default": false
     },
     {
       "id": "overspeed_warning",
       "name": "Overspeed Warning",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "api": 1,
       "category": "alerts",
       "author": "xpilot",
       "description": "Example plugin: warns when driving faster than the resolved speed limit plus a margin. Shows the manifest, store-backed params, a settings row, an alert hook and a relative import.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/overspeed_warning-1.0.1.tar.gz",
-      "sha256": "8ce582c00afc071d1728c747a31571d5b4248063d42b7172cb8451a17edb4a8d",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/overspeed_warning-1.0.2.tar.gz",
+      "sha256": "7eae4e1493856479dd63ef59fd5d1011cf13f53ab349d406932dc5a7d74b9cea",
+      "platform": null,
+      "default": false
     },
     {
       "id": "phone_vision",
       "name": "Phone side-vehicle vision",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "api": 1,
       "category": "data_source",
       "author": "Sniper-Eon",
       "description": "Optional original single wide-camera vehicle detection transport,640pixels,max4Hz; no camera while disabled.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.1.0.tar.gz",
-      "sha256": "fdd4b6d05ddbd90617d9a450ad1e7006a3ca643cb77c8dbdaaf27b2173731e3a",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.1.1.tar.gz",
+      "sha256": "97731027228a749df8d3cda99dd7120416fa96b8386566abf4457dc22887c67f",
+      "platform": null,
+      "default": false
     },
     {
       "id": "speed_card",
       "name": "Speed Card",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen card: ego speed and the set speed. Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_card-1.0.0.tar.gz",
-      "sha256": "0b9536042aade171f92ca405a3d572a13121f0be931b7a90ee072e62d66ce2d4",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_card-1.0.3.tar.gz",
+      "sha256": "e356e1d0c0644dd52d22905f579026bab0d50f9b50893f0cda690f150d47ef6a",
+      "platform": null,
+      "default": true
     },
     {
       "id": "speed_limit_card",
       "name": "Speed Limit Card",
-      "version": "1.0.0",
+      "version": "1.0.3",
       "api": 1,
       "category": "ui",
       "author": "xpilot",
       "description": "Big-screen card: the speed limit sunnypilot resolved (longitudinalPlanSP). Display only; on by default.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_limit_card-1.0.0.tar.gz",
-      "sha256": "475fa2be0271a79387aa497e0e86bfc5640f4ed2f0960c588fcb5ad8f0d3acc5",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/speed_limit_card-1.0.3.tar.gz",
+      "sha256": "26e59d989e33e976547ee5ff9e279d83c351e07fb701740eea3971c9e8d156bf",
+      "platform": null,
+      "default": true
+    },
+    {
+      "id": "tesla_dynamic_acc",
+      "name": "Tesla Dynamic ACC",
+      "version": "1.2.0",
+      "api": 1,
+      "category": "longitudinal_planning",
+      "author": "xpilot",
+      "description": "Speed-based longitudinal owner, like the old DynamicAutoStock: above High the stock ACC drives, below Low SP drives, in between the current owner stays. With Tesla Traffic Light Stop (tesla_tlssc) on, the stock ACC is proposed whenever the car shows a red/yellow light or a stop line, so the car can stop for it. Optional four-finger touch on the car screen switches to the other owner and keeps that choice until the next touch or until SP disengages (set MADS to 3 or 5 fingers if both are used). Switches while engaged; the host (1 s confirm, 2 s cooldown, gas/brake/AEB/lead/acceleration vetoes) and the panda (DRAIN handoff) decide whether a switch happens. Needs SP longitudinal and the G8 panda firmware. Enable while parked, then restart.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_dynamic_acc-1.2.0.tar.gz",
+      "sha256": "2805eae8f43b147e8baabb5735293d6eb604da41e95296a3280e5e2ad90fba65",
+      "platform": null,
+      "default": false
+    },
+    {
+      "id": "tesla_eap",
+      "name": "Tesla EAP Mode",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "engagement",
+      "author": "xpilot",
+      "description": "Stock Autopilot mode, like t2can Advanced EAP. While on, SP never engages and the panda passes the car's own Autopilot through (stock Autosteer, TACC, Navigate on Autopilot). When Navigate on Autopilot asks for a lane change, it taps the turn stalk after the set delay, only toward a side the car reports free. Needs the vehicle-bus harness and panda firmware with STOCK_AP. Enable while parked, then restart.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_eap-1.0.0.tar.gz",
+      "sha256": "d827f6e9e2da1d6189cfb32bff2e1a031f6830abcdd28167d7622fe577764b06",
+      "platform": null,
+      "default": false
     },
     {
       "id": "tesla_mixed_control",
       "name": "Tesla Mixed Control",
-      "version": "1.1.1",
+      "version": "1.1.2",
       "api": 1,
       "category": "controller",
       "author": "xpilot; dzid26; Haibin Wen and sunnypilot contributors",
       "description": "Angle-based cooperative steering: light driver torque adjusts the SP steering target with speed-dependent effort. SP must own steering; stock Autosteer must not steer at the same time (AP ownership/handoff is not implemented). Enable while parked, then restart. Overrides native TeslaCoopSteering mode for this session without changing its saved setting. Host-tested only; vehicle validation is pending.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_mixed_control-1.1.1.tar.gz",
-      "sha256": "8bcb64b5bcbf6abf9dc04bafa7023b89a6e0517d927dc0b66d748d1de6da2137",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_mixed_control-1.1.2.tar.gz",
+      "sha256": "304cc4848bbabd5f36a1286f01991de5cc72dd18f91d669605a512762d8a4dc3",
+      "platform": null,
+      "default": false
+    },
+    {
+      "id": "tesla_tlssc",
+      "name": "Tesla Traffic Light Stop",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "longitudinal_planning",
+      "author": "xpilot",
+      "description": "Turns on the car's own Traffic Light and Stop Sign Control (TLSSC) between two speeds you set, like t2can: it re-sends the car's UI_autopilotControl (0x3FD mux 0) with bits 38/39 set while cruise is on. The car stops only while the stock ACC drives; Tesla Dynamic ACC 1.1+ hands longitudinal to the stock ACC when the car shows a red/yellow light or a stop line. Needs the vehicle-bus harness. Unverified on this car: whether TLSSC acts while SP steers.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesla_tlssc-1.0.0.tar.gz",
+      "sha256": "cfa9774f3c1aace2985afb7eb1e15a439deaf8dff806b97b871475eadbed1af8",
+      "platform": null,
+      "default": false
     },
     {
       "id": "tesnav",
@@ -251,7 +352,8 @@
       "description": "TesNav phone guidance and recommended-lane display, with optional turn slowdown. No automatic lane changes or steering. Controlled private LAN only.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tesnav-0.1.1.tar.gz",
       "sha256": "03ab88660fa0bd0490f064e739680f16d76dc9f876ca3a9873d15d33db0ba584",
-      "platform": null
+      "platform": null,
+      "default": false
     },
     {
       "id": "tn_long",
@@ -262,23 +364,25 @@
       "author": "xpilot",
       "description": "Replaces SP's longitudinal plan, including lead following, with the TN-NoDEC planner (legacy cruise-obstacle MPC and TN acceleration controller). Prebuilt acados solvers: installs only on the platform it was built for. TN's stopping policy in controlsd is not included.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/tn_long-1.0.1.tar.gz",
-      "sha256": "c5993596bc7bd87fa42d2e100f3a515d593dc58ca73ef7d2593c45335da2244f",
+      "sha256": "e4f4355b4bbc80e733773551cceb912fabf2cd6659ca9f964fc24af2b3e98f3e",
       "platform": {
         "machine": "aarch64",
         "python": "cpython-312"
-      }
+      },
+      "default": false
     },
     {
       "id": "traffic_light",
       "name": "Traffic Light Control (Experimental)",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "api": 1,
       "category": "longitudinal_planning",
       "author": "xpilot",
       "description": "Stops for red lights seen by the car's own traffic-control perception. Only ever slows down.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/traffic_light-1.0.0.tar.gz",
-      "sha256": "e923e02bcdb1857c8706c2abaa240d27fffcc637665dba14e85c5e00e7753140",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/traffic_light-1.1.0.tar.gz",
+      "sha256": "d9f20c4051c6ecf374e8fcb8a8516853f7aa656fe9ded3763d67e0c425446a70",
+      "platform": null,
+      "default": false
     },
     {
       "id": "turn_lane_settings",
@@ -290,19 +394,21 @@
       "description": "Parked settings for existing turn intent and lane-change delay. The master shows the summary tile; saved driving settings are independent.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/turn_lane_settings-1.0.0.tar.gz",
       "sha256": "2a81e1c5b811f6f8d4a396696effa772c9df80b89f2998f6492cda1c4bcc3d8c",
-      "platform": null
+      "platform": null,
+      "default": false
     },
     {
       "id": "zh_cn",
       "name": "Simplified Chinese UI",
-      "version": "1.1.8",
+      "version": "1.1.9",
       "api": 1,
       "category": "ui",
       "author": "Sniper-Eon",
       "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.8.tar.gz",
-      "sha256": "4917ae495197a64133cb7c16b8bd7ef2731b6bf2da61579595465c20c0590331",
-      "platform": null
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.9.tar.gz",
+      "sha256": "1015cfa72efe6b3df5cba0d200bae0820e0c14ff04df64397ad60c5dc07eb8da",
+      "platform": null,
+      "default": false
     }
   ]
 }

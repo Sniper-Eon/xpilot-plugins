@@ -1,8 +1,10 @@
-# Navigation Assist 1.3.1
+# Navigation Assist 2.0.0
 
 Personal fork: [Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot), branch `xpilot`.
-Install this plugin only with the paired host containing `openpilot/tesla/lane_policy.py` and the
-`navassist` panda safety plugin. API 1 alone does not identify that capability.
+Install this release only with the synchronized paired host and runtime-rule
+ABI 1 firmware. Its canonical NAV template rule replaces the old per-feature
+safetyParam bit. The historical release notes below describe older ABIs; the
+current migration section is authoritative. API 1 alone is not sufficient.
 
 ## Migrated behavior
 
@@ -139,3 +141,7 @@ payloads and TTL through the single broker instead of owning pluginMsg directly.
 Deploy the compatible host first. No navigation decisions or settings changed.
 
 Required broker host commit: `fc9afa643497a334f7d69df637042bcaca03777b` or a compatible descendant.
+
+## Upstream runtime-rule migration 2.0.0
+
+Requires the synchronized host f451a13b219930e26d316b8997dafda93fc6784f (or a compatible descendant) and qualified runtime-rule ABI 1 firmware. The old per-feature safetyParam bit/policy reference is retired. Ship a coherent host/store/firmware set; do not copy this package onto the old device host. Existing navigation settings and integration remain, but active physical signal requests now require primary cruise engagement; the earlier MADS-only permission is not equivalent and remains a pre-deployment compatibility item. No device or phone was updated by source synchronization.

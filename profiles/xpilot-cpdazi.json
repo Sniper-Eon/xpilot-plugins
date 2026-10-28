@@ -2,7 +2,7 @@
   "id": "xpilot-cpdazi",
   "host": "Sniper-Eon/xpilot",
   "host_branch": "xpilot",
-  "host_min_commit": "fc9afa643497a334f7d69df637042bcaca03777b",
+  "host_min_commit": "f451a13b219930e26d316b8997dafda93fc6784f",
   "source": "cpdazi",
   "companion": "com.jixiexiaoge.drivingassist",
   "plugins": [
@@ -40,7 +40,11 @@
     "ExtCpNavLaneChanges": "0",
     "ExtCpNavSpeedControl": "0",
     "ExtCpNavSpeedRaise": "0",
-    "ExtCpNavOvertakeMode": "0"
+    "ExtCpNavOvertakeMode": "0",
+    "XpNavLaneChange": "0",
+    "XpTeslaDynamicAcc": "0",
+    "XpTeslaEap": "0",
+    "ExtLeanMici": "0"
   },
   "removed": [
     "stereo"
@@ -55,8 +59,5 @@
     "native_phone_automatic_passing_remains_unavailable"
   ],
   "initial_mode": "independent_CP_observation_no_physical_lamp_crossing_or_speed_target",
-  "host_validated_commits": [
-    "0b49f127a0f90ecd13fc2c015a7afde3a6e6428e",
-    "991d6d31f6bc1b495ecbdcbcd1cd181914232283"
-  ]
+  "host_validated_commits": []
 }

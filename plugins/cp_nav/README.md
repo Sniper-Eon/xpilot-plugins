@@ -1,4 +1,4 @@
-# Independent CP navigation — local candidate 0.1.1
+# Independent CP navigation — local candidate 0.2.0
 
 This is a standalone store plugin with BOOL master `ExtCpNavEnabled`, its own
 settings, process, data receiver and vehicle hooks. TesNav remains integrated
@@ -56,12 +56,11 @@ as available. Unsupported CP App settings are explicitly rejected.
 
 ## Host compatibility and activation
 
-Requires the paired Sniper-Eon/xpilot host commit `964aebf` or a compatible
-descendant supporting exact `safety_provider` references. It reuses the already
-declared navassist firmware rule, with identical header, bit and TX addresses;
-no new Panda slot, frame permission or firmware migration is introduced.
-Older hosts refuse installation. Current onemiless upstream uses a different
-runtime-rule ABI; this artifact must not be installed there as-is.
+Requires the synchronized Sniper-Eon/xpilot host and runtime-rule ABI 1 firmware.
+The plugin declares the canonical NAV template rule; the older safety_provider
+and feature-bit system is no longer supported by this release. Keep host, store
+packages and validated firmware together. Source synchronization alone does not
+change the running device or grant signal/steering authority.
 
 Default master is off. Prepared CP/TesNav profiles select one data source in
 observation mode, with physical lamps, crossing, speed control, increases and
@@ -92,3 +91,7 @@ permissions remain unchanged. Phone connection and road behavior still require
 a post-update device check; loopback protocol tests are not phone validation.
 
 Required broker host commit: `fc9afa643497a334f7d69df637042bcaca03777b` or a compatible descendant.
+
+## Upstream runtime-rule migration 0.2.0
+
+Requires the synchronized host f451a13b219930e26d316b8997dafda93fc6784f (or a compatible descendant) and qualified runtime-rule ABI 1 firmware. The old per-feature safetyParam bit/policy reference is retired. Ship a coherent host/store/firmware set; do not copy this package onto the old device host. Existing navigation settings and integration remain, but active physical signal requests now require primary cruise engagement; the earlier MADS-only permission is not equivalent and remains a pre-deployment compatibility item. No device or phone was updated by source synchronization.

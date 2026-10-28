@@ -198,7 +198,9 @@ def test_turnsignal_controller_sends_once_and_cancels():
   cs.leftBlinker = True
   assert controller.update(intent, cs, cc, now + 200_000_000, enabled=True) == []
   intent["signalRequested"] = False
-  cancel = controller.update(intent, cs, cc, now + 300_000_000, enabled=True)
+  assert controller.update(intent, cs, cc, now + 300_000_000, enabled=True) == []  # retained fork gate-hold repair
+  intent["sessionId"] = "next"
+  cancel = controller.update(intent, cs, cc, now + 400_000_000, enabled=True)
   assert cancel and cancel[0][1][1] == 3
 
 

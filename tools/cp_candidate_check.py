@@ -14,6 +14,19 @@ with tempfile.TemporaryDirectory(prefix='cp-switch-e2e-') as temp:
  os.environ['XPILOT_PLUGINS_DIR']=str(Path(temp)/'installed')
  sys.path[:0]=[str(HOST),str(HOST/'opendbc_repo'),str(HOST/'msgq_repo')]
  from openpilot.tesla import store
+ class Core:
+  def __init__(self):self.values={}
+  def get(self,key,**kwargs):return self.values.get(key)
+  def get_bool(self,key,**kwargs):return key=="IsOffroad" or bool(self.values.get(key,False))
+  def put(self,key,value,**kwargs):self.values[key]=value
+  def put_bool(self,key,value,**kwargs):self.values[key]=bool(value)
+ try:
+  import openpilot.common.params as core_params
+ except (ImportError, OSError):
+  import types
+  sys.modules["openpilot.common.params"] = types.SimpleNamespace(Params=Core, UnknownKeyName=KeyError)
+ else:
+  core_params.Params = Core
  entries={d['id']:d for d in json.loads((ROOT/'index.json').read_text())['plugins']}
  for name in ('navassist','cp_nav'):
   d=entries[name]
@@ -22,12 +35,6 @@ with tempfile.TemporaryDirectory(prefix='cp-switch-e2e-') as temp:
   assert store.install(entry) is None,name
  from openpilot.tesla import plugins
  from openpilot.tesla.ui.offroad import switch_plugin
- class Core:
-  def __init__(self):self.values={}
-  def get(self,key,**kwargs):return self.values.get(key)
-  def get_bool(self,key,**kwargs):return bool(self.values.get(key,False))
-  def put(self,key,value,**kwargs):self.values[key]=value
-  def put_bool(self,key,value,**kwargs):self.values[key]=bool(value)
  params=plugins.view(Core());by_name={p.NAME:p for p in plugins.PLUGINS}
  assert {'navassist','cp_nav'}<=by_name.keys(),plugins.LOAD_ERRORS
  assert not params.get_bool('ExtCpNavEnabled')

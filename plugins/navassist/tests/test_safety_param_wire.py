@@ -1,6 +1,6 @@
 """Before-fix contract for the real card startup crash, not a mock serializer.
 
-Failure modes: bit 15 overflows CarParamsSP's Int16; lower OEM flags change;
+Failure modes: migration to runtime rules still mutates CarParamsSP Int16; native OEM flags change;
 repeated setup flips bits; or the vehicle-harness gate is bypassed. Panda reads
 the signed schema field into uint16_t, so the 16 wire bits must stay identical.
 """
@@ -20,7 +20,7 @@ def test_real_capnp_int16_roundtrip_preserves_panda_uint16_bits(initial):
   cp.safetyParam = initial
   plugin = N(MANIFEST=N(safety={'param_bit':'0x8000'}))
   NavAssist.setup(plugin,cp)
-  expected = (initial | 0x8000) & 0xffff
+  expected = initial & 0xffff
   assert -32768 <= cp.safetyParam <= 32767
   message = convert_to_capnp(cp)
   with custom.CarParamsSP.from_bytes(message.to_bytes()) as decoded:

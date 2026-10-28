@@ -1,8 +1,9 @@
 {
   "id": "speed_card",
   "name": "Speed Card",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "api": 1,
+  "use": "both",
   "category": "ui",
   "entry": "plugin:SpeedCard",
   "author": "xpilot",
@@ -15,5 +16,6 @@
       "type": "BOOL",
       "default": "1"
     }
-  }
+  },
+  "default": true
 }

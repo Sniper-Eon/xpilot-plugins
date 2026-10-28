@@ -1,4 +1,4 @@
-"""The panda plugin stays inactive unless the plugin sets its declared safetyParam bit at car init."""
+"""Runtime rules replace the legacy safetyParam bit; setup must preserve the native bits."""
 from types import SimpleNamespace
 
 import pytest
@@ -18,11 +18,10 @@ def _plugin():
   return plugin
 
 
-def test_setup_sets_bit_with_vehicle_bus():
+def test_setup_preserves_native_bits_with_vehicle_bus():
   cp_sp = SimpleNamespace(flags=TeslaFlagsSP.HAS_VEHICLE_BUS, safetyParam=0)
   _plugin().setup(cp_sp)
-  assert cp_sp.safetyParam & 0xffff == BIT
-  assert cp_sp.safetyParam < 0  # signed CarParamsSP Int16, identical Panda bits
+  assert cp_sp.safetyParam == 0
 
 
 def test_setup_without_vehicle_bus_leaves_bit_clear():

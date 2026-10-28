@@ -1,0 +1,59 @@
+name: lean mici candidate
+on:
+  push:
+    branches: [task/X-20261025-39, task/X-20261025-42]
+  pull_request:
+    paths: [plugins/lean_mici/**, dist/lean_mici-*, .github/workflows/lean_mici.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    env:
+      X: ${{ github.workspace }}/system
+      PYTHONDONTWRITEBYTECODE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: onemiless/xpilot
+          ref: 1b52d017f4e6605cf6751963c92dbd899d38891c  # xpilot PR #15: packet callback does not claim an encoderd publisher
+          path: system
+          lfs: false
+      - name: Matching system dependencies
+        run: git -C system submodule update --init --depth 1 msgq_repo tinygrad_repo opendbc_repo
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pyzmq numpy pycapnp pytest zstandard setproctitle cython scons setuptools cffi tqdm jeepney av
+      - name: Build system IPC bindings
+        run: |
+          (cd system/msgq_repo && scons -j4 msgq/ipc_pyx.so msgq/visionipc/visionipc_pyx.so)
+      - name: Reproducible package and v4 wire and offline replay fixture
+        run: |
+          python tools/build_index.py --check
+          PYTHONPATH=$X:$X/tinygrad_repo:$X/msgq_repo:$X/opendbc_repo python plugins/lean_mici/tests/v4_e2e.py --output /tmp/x39-camera
+      - name: Physical envelope refusals
+        run: PYTHONPATH=$X:$X/tinygrad_repo:$X/msgq_repo:$X/opendbc_repo python plugins/lean_mici/tests/envelope_e2e.py --output /tmp/x39-envelope
+      - name: Worker recovery, parent death and message deadlines
+        run: PYTHONPATH=$X:$X/tinygrad_repo:$X/msgq_repo:$X/opendbc_repo python plugins/lean_mici/tests/recovery_e2e.py --output /tmp/x39-recovery
+      - name: Store, runner, TCP peer, host publication and faults
+        run: PYTHONPATH=$X:$X/tinygrad_repo:$X/msgq_repo:$X/opendbc_repo python plugins/lean_mici/tests/e2e.py --system $X --output /tmp/x39-host
+      - name: Record source identities
+        if: always()
+        run: |
+          mkdir -p /tmp/x39-host
+          git rev-parse HEAD > /tmp/x39-host/plugin-head.txt
+          git -C system rev-parse HEAD > /tmp/x39-host/system-head.txt
+          (cd /tmp/x39-host && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lean-mici-host-evidence
+          path: |
+            /tmp/x39-host
+            /tmp/x39-camera
+            /tmp/x39-envelope
+            /tmp/x39-recovery

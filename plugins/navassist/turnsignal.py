@@ -142,7 +142,7 @@ class TurnSignalController:
         # Keep the lamp for the current maneuver while a blind-spot/road-edge gate blocks the change, so the
         # driver can still complete the turn after the obstruction clears. Cancel only when the maneuver
         # changes, the driver brakes, the session times out, or the lamp is already off.
-        if physical_on:
+        if physical_on and enabled and intent.get("valid") and bool(getattr(cc, "latActive", False)):
           self.active["held"] = True
           return []
         return self._cancel(now_ns)

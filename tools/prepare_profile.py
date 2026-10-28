@@ -36,6 +36,16 @@ def prepare(host, profile, destination):
   os.environ["XPILOT_PLUGINS_DIR"] = str(destination)
   sys.path[:0] = [str(host), str(host / "opendbc_repo"), str(host / "msgq_repo")]
   from openpilot.tesla import store, manifest
+  class IsolatedCore:
+    def get_bool(self,key,**kwargs):return key=="IsOffroad"
+    def get(self,key,**kwargs):return None
+  try:
+   import openpilot.common.params as core_params
+  except (ImportError, OSError):
+   import types
+   sys.modules["openpilot.common.params"] = types.SimpleNamespace(Params=IsolatedCore, UnknownKeyName=KeyError)
+  else:
+   core_params.Params = IsolatedCore
 
   entries = {e["id"]: e for e in json.loads((ROOT / "index.json").read_text())["plugins"]}
   planned = []
