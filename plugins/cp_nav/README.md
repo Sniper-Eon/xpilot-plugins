@@ -1,6 +1,6 @@
 # Independent CP navigation — local candidate 0.2.0
 
-Current release 0.2.1 requires host c1f33cf2f4a2eaa287025369a930e4a468888999 (or compatible descendant) and qualified Panda ABI-2 firmware. Explicit per-rule primary_or_lateral guard preserves native MADS-only lamp permission without changing any ABI-1 rule. Brake, relay, template, counter, checksum, time and session gates still apply. Never install this archive onto the old deployed host/firmware alone.
+Current release 0.2.2 requires host c1f33cf2f4a2eaa287025369a930e4a468888999 (or compatible descendant) and qualified Panda ABI-2 firmware. Explicit per-rule primary_or_lateral guard preserves native MADS-only lamp permission without changing any ABI-1 rule. Brake, relay, template, counter, checksum, time and session gates still apply. Never install this archive onto the old deployed host/firmware alone.
 
 
 This is a standalone store plugin with BOOL master `ExtCpNavEnabled`, its own

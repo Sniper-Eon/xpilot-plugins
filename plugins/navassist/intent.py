@@ -83,12 +83,17 @@ class TurnSignalCoordinator:
   def reset(self):
     self.core = NavTurnSignalCoordinator()
 
-  def update(self, nav, *, speed_mps, now_ns, lookahead_time_s=8., turn_geometry_active=False):
+  def update(self, nav, *, speed_mps, now_ns, lookahead_time_s=8., lookahead_distance_m=None,
+             turn_geometry_active=False):
     n = navigation(nav)
-    plan = NavTurnPlan(bool(nav.get('linked', nav.get('valid', False))) and not nav.get('stale', False),
-                       n.sessionId, n.routeRevision, n.maneuverEventId, n.maneuver, n.maneuverDistanceM)
+    # Route-active but not yet position-matched still carries guidance: arm the lamp early, while lane
+    # change readiness remains gated by the fully valid/matched nav state.
+    armed = bool((nav.get('linked', nav.get('valid', False)) or nav.get('routeActive', False))
+                 and not nav.get('stale', False))
+    plan = NavTurnPlan(armed, n.sessionId, n.routeRevision, n.maneuverEventId, n.maneuver, n.maneuverDistanceM)
     return payload(self.core.update(plan, speed_mps=speed_mps, now_ns=now_ns,
                                    lookahead_time_s=lookahead_time_s,
+                                   lookahead_distance_m=lookahead_distance_m,
                                    turn_geometry_active=turn_geometry_active), nav)
 
 
@@ -143,6 +148,7 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
                  left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
                  steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False):
   turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns, lookahead_time_s=settings.signal_lead_time_s,
+                      lookahead_distance_m=settings.turn_lane_lookahead_m,
                       turn_geometry_active=turn_geometry_active)
   n = navigation(nav)
   intersection = n.maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'turnRight', 'sharpRight', 'uTurnRight')

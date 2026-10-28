@@ -36,7 +36,8 @@ class NavigationRuntime:
     for side in ('left', 'right'):
       topology[side+'CrossingAllowed'] = oem[side+'CrossingAllowed'] and not oem[side+'Blocked']
     usable_nav = dict(nav, valid=bool(nav['valid'] and vehicle_fresh),
-                      linked=bool(nav.get('linked', nav['valid']) and vehicle_fresh))
+                      linked=bool(nav.get('linked', nav['valid']) and vehicle_fresh),
+                      routeActive=bool(nav.get('routeActive') and vehicle_fresh and self.settings.enabled))
     if not self.settings.enabled:
       usable_nav.update(valid=False, linked=False)
       self.turns.reset()

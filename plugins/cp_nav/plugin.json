@@ -1,7 +1,7 @@
 {
   "id": "cp_nav",
   "name": "CP Native Navigation",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:CPNav",
