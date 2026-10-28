@@ -10,3 +10,15 @@
 - Phone companion source/adapters may remain in `companion/`; phone installation must not silently enable C3 features. Keep DS's device engagement fixes, parked settings and Chinese UI.
 - Read CONTRIBUTING.md for archive/index generation and paired-host validation. Write failure contracts/checks before implementation; prefer meaningful integration checks. Do not create unit tests after implementing the behavior.
 - Keep source, local checks, firmware compilation, device installation/activation and road validation distinct. No deployment is implied by a source change. Preserve private settings, device keys and driving logs outside Git.
+
+## Independent CP decision (user, 2026-10-28)
+
+- CP navigation is now a separate store plugin with its own BOOL master/settings,
+  mutually exclusive with TesNav navassist. The earlier shared CP source profile
+  is rollback/reference, not the final requested architecture.
+- User explicitly reauthorized CP's automatic passing and return-to-original-lane
+  behavior. The old automatic-passing removal applies to TesNav only; stereo
+  speed measurement remains removed. Preserve source/authority/freshness checks.
+- Source development does not authorize device deployment. Never describe the
+  cp_nav source foundation as a packaged or activated plugin before entry hooks,
+  original-client integration and release gates are actually complete.
