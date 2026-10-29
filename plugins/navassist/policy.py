@@ -32,6 +32,7 @@ class NavLanePolicy:
     self._phone_t = 0.
     self._phone_states = None
     self._owned_side = None
+    self._manual_side = None
     self._turn_only = False
     self._suppress_turn = False
 
@@ -53,19 +54,39 @@ class NavLanePolicy:
       self._phone_states = self._phone.read(time.monotonic_ns())
     return self._last
 
-  def _blocked(self, side, last):
+  def _driver_lamp(self, carstate, intent):
+    left = bool(getattr(carstate, 'leftBlinker', False))
+    right = bool(getattr(carstate, 'rightBlinker', False))
+    physical = 'left' if left and not right else 'right' if right and not left else None
+    if physical != self._manual_side:
+      self._manual_side = None
+    if physical and self._owned_side is None and not intent.get('signalRequested'):
+      self._manual_side = physical
+    return physical is not None and physical == self._manual_side
+
+  def _blocked(self, side, last, *, navigation=True):
     oem, topology = last.get('oem.lanes') or {}, last.get('lanes.topology') or {}
-    blocked = bool(oem.get(side+'Blocked', oem.get(side+'ExplicitBlock', False)))
+    reasons = oem.get('blockReasons') or []
+    index = 0 if side == 'left' else 1
+    phone_only = len(reasons) > index and reasons[index] == 'phoneBlindspot'
+    # Aggregated phone evidence belongs to navigation preparation. It must not
+    # replace native SP admission for the driver's own lamp. Explicit OEM veto
+    # remains independent of the aggregate's two-frame confirmation.
+    blocked = bool(oem.get(side+'ExplicitBlock'))
+    blocked |= bool(oem.get(side+'Blocked')) and (navigation or not phone_only)
     blocked |= bool(oem.get(side+'AvailabilityBlock')) and not bool(topology.get('valid'))
-    if self._phone.enabled and self._phone_states is not None and side in ('left', 'right'):
+    if navigation and self._phone.enabled and self._phone_states is not None and side in ('left', 'right'):
       blocked |= self._phone_states[0 if side == 'left' else 1].blocked
     return blocked
 
   def allow(self, carstate, direction, default):
     side, last = _side(direction), self._poll()
-    if self._blocked(side, last):
-      return False
     intent = last.get('lanes.intent') or {}
+    manual = self._driver_lamp(carstate, intent)
+    if self._blocked(side, last, navigation=bool(intent.get('signalRequested')) and not manual):
+      return False
+    if manual:
+      return bool(default and not getattr(carstate, side+'Blindspot', False))
     if intent.get('signalRequested'):
       if intent.get('signalPurpose') == 'nativeLaneChange':
         return bool(default and self.settings.lane_change_enabled and intent.get('valid')
@@ -80,6 +101,10 @@ class NavLanePolicy:
     intent = last.get('lanes.intent') or {}
     side = str(intent.get('direction', 'none'))
     left, right = bool(getattr(carstate, 'leftBlinker', False)), bool(getattr(carstate, 'rightBlinker', False))
+    if self._driver_lamp(carstate, intent):
+      physical = 'left' if left else 'right'
+      blocked = self._blocked(physical, last, navigation=False) or bool(getattr(carstate, physical+'Blindspot', False))
+      return LaneChangeLimits(allow_start=not blocked, allow_continue=not blocked)
     if intent.get('valid') and intent.get('signalRequested') and side in ('left', 'right'):
       self._owned_side = side
       delegated = intent.get('signalPurpose') == 'nativeLaneChange'
@@ -103,5 +128,5 @@ class NavLanePolicy:
         return LaneChangeLimits(allow_start=False, allow_continue=False,
                                 turn_only=self._turn_only, suppress_turn=self._suppress_turn)
       self._owned_side = None
-    blocked = self._blocked(_side(direction), last)
+    blocked = self._blocked(_side(direction), last, navigation=False)
     return LaneChangeLimits(allow_start=not blocked, allow_continue=not blocked)

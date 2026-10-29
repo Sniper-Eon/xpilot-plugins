@@ -24,6 +24,7 @@ from .feedback import MODEL_POSITION_PATH
 from .recording import Recorder
 from .vehicle_lines import PATH as VEHICLE_FEEDBACK_PATH, observe as observe_lines
 from .runtime import NavigationRuntime
+from .publication import CyclePublisher
 from .route_geometry import RouteGeometryPublisher
 from .settings import read as read_settings
 from .store import NavAssistStore
@@ -40,6 +41,7 @@ def main():
   params = plugins.view(Params())
   settings = read_settings(params)
   runtime = NavigationRuntime(settings)
+  publisher = CyclePublisher(lambda kind, payload, ttl: plugins.send_msg(NavAssist, kind, payload, ttl))
   map_messages = plugins.PluginMsgs()
   store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
   sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState', 'deviceMotion'])
@@ -108,9 +110,7 @@ def main():
         route_status = route_publisher.update(geometry, now,
           enabled=settings.enabled and plugins.owner(params, 'source:route') == 'navassist')
         plugins.send_msg(NavAssist, 'nav.route', route_status, 1500)
-      for key, kind, ttl in [('nav', 'nav.state', 1000), ('topology', 'lanes.topology', 150),
-                            ('intent', 'lanes.intent', 200), ('oem', 'oem.lanes', 500)]:
-        plugins.send_msg(NavAssist, kind, result[key], ttl)
+      publisher.publish(result, now)
       if now >= next_record:
         next_record = now+100_000_000
         # Explain a preparation that does not start without relaxing any gate.

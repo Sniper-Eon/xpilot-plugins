@@ -219,3 +219,20 @@ result as a model estimate and uses a current-lane marker only when its count ma
 the displayed map lanes and route revision. This does not change C3 route planning.
 
 Fresh CP model estimates participate in route lane alignment when their visible lane count matches the navigation lane total. This does not certify whole-road visibility or absolute position. The existing phone-lane switch controls ownership; disabling restores legacy geometry. Unknown model data uses existing unknown-position preparation rules, with all native crossing checks retained.
+
+## Drive compatibility repair (2.4.1)
+
+Cycle snapshots are independently paced: topology/intent at most 20 Hz, OEM at
+10 Hz, navigation at 5 Hz. Including map/lamp/route, the source emits at most
+63 messages per second in its send-time schedule. Missed slots are skipped; TTLs
+remain 150/200/500/1000 ms. The broker retains its 100 Hz receive-time limit and
+shared CAN rule revocation on faults; the pacing provides room for queue jitter.
+
+Phone side detections remain an extra veto for navigation-requested changes.
+With no navigation lamp request/ownership, a driver's manual lamp uses native SP
+admission plus independent OEM/availability vetoes. Phone-only aggregated flags
+do not impose navigation ownership on manual changes. A clear native BSM bit
+never creates permission: the native decision, road edge, speed, engagement and
+driver checks still apply. Raw explicit OEM veto is honored even before the
+aggregate confirms it. Phone lane numbering and single-frame qualification are
+unchanged. This repair does not establish dashed/solid classification.
