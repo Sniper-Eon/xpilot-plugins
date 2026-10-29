@@ -109,6 +109,7 @@ class PhoneVisionService : Service() {
                 lastTimingReport = mapOf("outcome" to "fetch_error", "error_type" to e.javaClass.simpleName,
                     "fetch_attempts" to fetchAttempts.get(), "report_elapsed_ms" to SystemClock.elapsedRealtime())
             }, SystemClock::elapsedRealtime) else null
+        val cpLane = CpLaneDetector(this@PhoneVisionService)
         try {
             availability.unavailable("正在加载手机车辆模型")
             PhoneVehicleDetector(this@PhoneVisionService, cpuThreads).use { detector ->
@@ -154,8 +155,14 @@ class PhoneVisionService : Service() {
                         val bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.size) ?: error("画面解码失败")
                         timings["jpeg_decode_ms"] = SystemClock.elapsedRealtime()-beforeDecode
                         val beforeDetect = SystemClock.elapsedRealtime()
+                        var laneCandidate: CpLaneResult? = null
                         val detections = try {
                             check(bitmap.width == frame.width && bitmap.height == frame.height) { "图像尺寸不一致" }
+                            if (preferences.getBoolean("cp_lane_enabled", false)) {
+                                val laneStart = SystemClock.elapsedRealtime()
+                                laneCandidate = cpLane.detect(bitmap, if (preferences.getBoolean("cp_lane_night", false)) "vlaneNight.mnn" else "vlaneDay.mnn")
+                                timings["lane_model_ms"] = SystemClock.elapsedRealtime()-laneStart
+                            } else cpLane.close()
                             detector.detect(bitmap).mapNotNull { box ->
                                 val x = (box.x1+box.x2)/2/frame.width; val y = box.y2/frame.height
                                 val side = listOf("left", "right").firstOrNull {
@@ -172,7 +179,7 @@ class PhoneVisionService : Service() {
                         val beforeTrack = SystemClock.elapsedRealtime()
                         val observations = tracker.update(detections, frame.capture_mono_ns, frame.ego_speed_mps)
                         val body = gson.toJson(mapOf("request_id" to frame.request_id, "frame_id" to frame.frame_id,
-                            "left" to observations["left"], "right" to observations["right"]))
+                            "left" to observations["left"], "right" to observations["right"], "lane_cp" to if (preferences.getBoolean("cp_lane_enabled", false)) laneCandidate else null))
                         timings["tracking_ms"] = SystemClock.elapsedRealtime()-beforeTrack
                         val post = Request.Builder().url("${packet.endpoint}/v1/observation").header("Authorization", "Bearer $token")
                             .post(body.toRequestBody("application/json".toMediaType())).build()
@@ -194,7 +201,8 @@ class PhoneVisionService : Service() {
                             val absolute = item.absolute_speed_mps?.let { "；估计平均车速 %.1f km/h".format(it*3.6) } ?: ""
                             return "$distance；$relative$absolute"
                         }
-                        availability.accepted(requestStarted, "手机运算 ${elapsed} ms\n左侧：${line("left")}\n右侧：${line("right")}\n实验估算，限前方广角可见区域")
+                        availability.accepted(requestStarted, "手机运算 ${elapsed} ms\n左侧：${line("left")}\n右侧：${line("right")}\n实验估算，限前方广角可见区域" +
+                            if (preferences.getBoolean("cp_lane_enabled", false)) "\n${cpLane.status}" else "")
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         if (e is ExpiredVisionFrame) expired++
@@ -214,7 +222,7 @@ class PhoneVisionService : Service() {
                     else delay(maxOf(minimumIdleMs, 1000L/targetFps-(SystemClock.elapsedRealtime()-start)))
                 }
             }
-        } finally { prefetched?.close() }
+        } finally { cpLane.close(); prefetched?.close() }
     }
 
     override fun onDestroy() {

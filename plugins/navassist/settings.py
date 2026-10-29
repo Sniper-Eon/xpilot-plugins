@@ -16,6 +16,7 @@ class NavSettings:
   turn_speed_kph: int = 18
   max_lane_changes: int = 5
   phone_assist_enabled: bool = False
+  phone_lane_enabled: bool = False
   beep_enabled: bool = True
 
 
@@ -46,5 +47,6 @@ def read(params) -> NavSettings:
     turn_speed_kph=_int(params, "ExtNavAssistTurnSpeed", 18, 10, 30),
     max_lane_changes=_int(params, "ExtNavAssistMaxChanges", 5, 1, 5),
     phone_assist_enabled=_bool(params, "ExtNavAssistPhoneBlindspot", False),
+    phone_lane_enabled=_bool(params, "ExtNavAssistPhoneLane", False),
     beep_enabled=_bool(params, "ExtNavAssistBeep", True),
   )

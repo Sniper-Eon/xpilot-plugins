@@ -215,13 +215,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "2.1.0",
+      "version": "2.2.0",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.1.0.tar.gz",
-      "sha256": "2fe3772b87b2abf95604ae56221256973b38825ce0d6be35f99ace2d11355773",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.2.0.tar.gz",
+      "sha256": "dd833cffcb0291fd4df99184e7a72959c8c0c5c521f6ffd8ea4a3043cf9693c9",
       "platform": null,
       "default": false
     },
@@ -254,13 +254,13 @@
     {
       "id": "phone_vision",
       "name": "Phone side-vehicle vision",
-      "version": "1.1.1",
+      "version": "1.2.0",
       "api": 1,
       "category": "data_source",
       "author": "Sniper-Eon",
       "description": "Optional original single wide-camera vehicle detection transport,640pixels,max4Hz; no camera while disabled.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.1.1.tar.gz",
-      "sha256": "97731027228a749df8d3cda99dd7120416fa96b8386566abf4457dc22887c67f",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.2.0.tar.gz",
+      "sha256": "4c5fad0b6ffd8fbf6e8badf46826603b43e825b5ae84b3470c0f80c8a70f901b",
       "platform": null,
       "default": false
     },
@@ -413,13 +413,13 @@
     {
       "id": "zh_cn",
       "name": "Simplified Chinese UI",
-      "version": "1.1.10",
+      "version": "1.1.11",
       "api": 1,
       "category": "ui",
       "author": "Sniper-Eon",
       "description": "Chinese option names, values, descriptions and plugin pages. Display only; preserves settings and control behavior.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.10.tar.gz",
-      "sha256": "9fff61e962cbb8502c809b5664423b8ffe933882c370195d55fd37084a341b03",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/zh_cn-1.1.11.tar.gz",
+      "sha256": "6510713e2ad7c080df44606464f1f5a9e3c34db6d3c455bf286f792eddd223f2",
       "platform": null,
       "default": false
     }

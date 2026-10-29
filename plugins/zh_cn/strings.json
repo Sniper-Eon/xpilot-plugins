@@ -3440,5 +3440,8 @@
   "may be another fork": "可能是另一分岔",
   "Fork LEFT": "左侧",
   "Fork RIGHT": "右侧",
-  "Fork BOTH": "两侧"
+  "Fork BOTH": "两侧",
+  "Phone lane model observation": "手机本车车道模型估计",
+  "Vision lane estimate": "视觉车道估计",
+  "Vision lane verified": "视觉与边界核对一致"
 }

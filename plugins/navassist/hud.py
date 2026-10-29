@@ -57,7 +57,12 @@ def present_hud(nav,intent,topology,*,car=None,authority=None):
     if same:status,tone='Vehicle signal confirmed','cyan'
     elif authority is False:status,tone='Auto signal permission unavailable','amber'
     else:status,tone='Waiting for vehicle signal','amber'
-  return dict(active=active,distance=distance,maneuver=nav.get('maneuver') if active else None,
+  phone_lane=nav.get('phoneLaneEvidence', {})
+  phone_lane_message=''
+  if active and phone_lane.get('valid'):
+    label='Vision lane verified' if phone_lane.get('absoluteConfirmed') else 'Vision lane estimate'
+    phone_lane_message=f"{label} {phone_lane['laneNumber']}/{phone_lane['laneCount']}"
+  return dict(phone_lane_message=phone_lane_message,active=active,distance=distance,maneuver=nav.get('maneuver') if active else None,
     status=status,tone=tone,count=count,recommended=recommended,ego=ego,
     lane_status='Lane position confirmed' if ego is not None else 'Lane position pending',
     route_nodes=route_nodes(nav,active),

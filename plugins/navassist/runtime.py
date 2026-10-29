@@ -7,6 +7,7 @@ from .blocker import LaneChangeBlocker
 from .intent import LaneIntentCoordinator, TurnSignalCoordinator, build_intent
 from .navstate import build as build_nav_state
 from .oem import OemLaneSignals
+from .phone_lane import PhoneLaneEvidence
 from .position import AbsolutePosition
 from .topology import from_model
 
@@ -18,12 +19,13 @@ class NavigationRuntime:
     self.oem = OemLaneSignals()
     self.blocker = LaneChangeBlocker()
     self.position = AbsolutePosition()
+    self.phone_lane = PhoneLaneEvidence()
     self.turns = TurnSignalCoordinator()
     self.lanes = LaneIntentCoordinator(max_changes=settings.max_lane_changes)
 
   def tick(self, current, model, model_ns, car, cc, now_ns, *, can_list=(), vehicle_fresh=False,
            left_phone=False, right_phone=False, turn_geometry_active=False,
-           localization_valid=True, map_snapshot=None):
+           localization_valid=True, map_snapshot=None, phone_lane_observation=None):
     self.oem.update(can_list, now_ns)
     oem = self.oem.payload(now_ns)
     topology = from_model(model, now_ns, model_ns)
@@ -40,6 +42,12 @@ class NavigationRuntime:
       evidence = MapData().snapshot(now_ns)
     nav['branchEvidence'] = self.branch.update(nav, evidence, now_ns)
     position = self.position.update(topology, nav, now_ns)
+    candidate = self.phone_lane.update(phone_lane_observation, nav, now_ns,
+      enabled=self.settings.enabled and self.settings.phone_lane_enabled)
+    if candidate['valid'] and position['valid']:
+      candidate['absoluteConfirmed'] = (candidate['laneNumber'] == position['lane_index']
+        and candidate['laneCount'] == position['lane_count'])
+    nav['phoneLaneEvidence'] = candidate
     topology['absoluteEgoIndex'] = position['lane_index']-1 if position['valid'] else None
     left_blocked, right_blocked, reasons = self.blocker.update(oem, topology,
       phone_left=left_phone, phone_right=right_phone)

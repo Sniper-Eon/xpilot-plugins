@@ -1,7 +1,7 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",
@@ -104,6 +104,10 @@
     {
       "key": "ExtNavAssistBeep",
       "label": "Navigation lane-change chime"
+    },
+    {
+      "key": "ExtNavAssistPhoneLane",
+      "label": "Phone lane model observation"
     }
   ],
   "params": {
@@ -173,6 +177,10 @@
       "type": "INT",
       "default": "0",
       "note": "Retired shared-source selector; retained for rollback only. This version always uses TesNav; select the separate CP plugin for CP navigation."
+    },
+    "ExtNavAssistPhoneLane": {
+      "type": "BOOL",
+      "default": "0"
     }
   },
   "rules": [

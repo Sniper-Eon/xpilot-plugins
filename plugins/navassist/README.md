@@ -184,3 +184,14 @@ required; stale data, rerouting and disable clear the evidence. CONSISTENT is ad
 not unique junction identification or target-lane clearance. No maneuver, lamp timing,
 slowdown, unknown-lane behavior, native checks or buzzer behavior is overridden.
 The standalone Tesla Map diagnostic plugin is optional and need not be enabled.
+
+## CP phone lane model observation (2.2.0, local candidate)
+
+Default-off `ExtNavAssistPhoneLane` consumes authenticated frame-bound `lane_cp`
+observations from the independent phone_vision source. Three distinct consistent
+frames provide a visible-corridor lane estimate in the existing HUD. It is not an
+absolute map lane or crossing permission. Only agreement with the existing qualified
+geometric position is labelled corroborated. Missing/expired/bad output, route/stream
+changes and disabling clear the model estimate. No lane-change policy, lamps, sound,
+phone-installed switch or original navigation decision is overridden.
+See companion/tesnav/docs/CP_LANE_LOCAL.md for APK/runtime and validation boundaries.

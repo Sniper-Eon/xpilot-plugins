@@ -41,4 +41,7 @@ class ChineseCatalog:
     matched = re.fullmatch(r'Fork (LEFT|RIGHT|BOTH) (\d+) m - (route unconfirmed|follow route|route consistent|checking route|may be another fork)', text)
     if matched:
       return self.strings['Fork']+' '+self.strings['Fork '+matched[1]]+' '+matched[2]+' 米 - '+self.strings[matched[3]]
+    matched = re.fullmatch(r'(Vision lane estimate|Vision lane verified) ([1-5])/([1-5])', text)
+    if matched:
+      return self.strings[matched[1]]+' '+matched[2]+'/'+matched[3]
     return None

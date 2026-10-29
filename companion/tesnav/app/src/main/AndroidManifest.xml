@@ -27,6 +27,7 @@
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity android:name=".vision.PhoneVisionActivity" android:exported="false" android:label="手机侧方车辆识别" />
+        <service android:name=".vision.CpLaneNativeService" android:process=":cp_lane" android:exported="false" />
         <service android:name=".vision.PhoneVisionService" android:exported="false" android:stopWithTask="false" android:foregroundServiceType="connectedDevice" />
         <meta-data
             android:name="com.amap.api.v2.apikey"

@@ -20,3 +20,12 @@ OpenCV is loaded only after real image demand. The worker can reuse the existing
 under `/data/phone-vision/pydeps` and `/data/wide-capture/pydeps` when the main device venv lacks OpenCV.
 No packages are installed and the host process search path is not modified. Missing/broken dependencies
 leave the observation unavailable; enabling the plugin is not proof that camera capture works.
+
+## Optional CP lane observations (1.2.0, local candidate)
+
+The existing authenticated `/v1/observation` may include `lane_cp`. Request token,
+frame identity, original capture age, ordering and stream lifetime apply unchanged.
+The payload is bounded to known day/night profiles and two 1..3 classes; derived
+numbers must match and `scope=visibleCorridor`, `control_eligible=false` are mandatory.
+Missing/null lane output clears it; no output can grant lane clearance. Side vehicle
+observations keep their original contract. No new capture or automatic switch enabling.

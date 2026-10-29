@@ -21,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 27
-        versionName = "1.14-xpilot-lane-count"
+        versionCode = 28
+        versionName = "1.15-xpilot-cp-lane-local"
 
         manifestPlaceholders["AMAP_API_KEY"] =
             providers.gradleProperty("AMAP_API_KEY").orNull ?: ""
@@ -110,4 +110,14 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+}
+
+// Explicit local-only reference input, never fetched or embedded in the public source tree.
+providers.gradleProperty("CP_LANE_REFERENCE_DIR").orNull?.let { location ->
+    val root = file(location)
+    require(root.resolve("assets/cp-lane-assets.json").isFile) { "Prepare the local CP lane reference first" }
+    android.sourceSets.getByName("tenengkai").apply {
+        assets.srcDir(root.resolve("assets"))
+        jniLibs.srcDir(root.resolve("jniLibs"))
+    }
 }

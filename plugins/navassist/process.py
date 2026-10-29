@@ -15,6 +15,7 @@ from openpilot.tesla import plugins
 from .can_input import can_batches
 from .network import NavigationTransports
 from .phone import PhoneBlindspotAssist
+from .phone_lane import read_observation as read_phone_lane
 from .plugin import NavAssist
 from .position import publish as publish_position
 from .recording import Recorder
@@ -72,7 +73,8 @@ def main():
         can_list=can_batches(messaging.drain_sock(can_socket)), vehicle_fresh=vehicle_fresh,
         left_phone=bool(phone_sides and phone_sides[0].blocked), right_phone=bool(phone_sides and phone_sides[1].blocked),
         turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
-        localization_valid=bool(pose_ok), map_snapshot=map_messages.fresh('nav.map').get('navassist'))
+        localization_valid=bool(pose_ok), map_snapshot=map_messages.fresh('nav.map').get('navassist'),
+        phone_lane_observation=read_phone_lane() if settings.enabled and settings.phone_lane_enabled else None)
       publish_position(result['position'])
       if route_publisher is not None and now >= next_route:
         next_route = now+1_000_000_000
