@@ -42,6 +42,7 @@ object LaneGuidancePresenter {
         val status = presentation?.currentLaneStatus ?: when {
             state.navigationMode != NavigationMode.REALTIME -> "非实时导航 · 无法判定本车车道"
             state.lanes.isEmpty() -> "高德未提供车道引导 · 无法判定"
+            !oem.positionValid && oem.c3LaneEstimate?.valid != true && oem.c3LanePosition?.valid != true -> "原车车道位置未知 · 无法判定"
             else -> "${presentation?.title ?: "车道数据待确认"} · 无法判定"
         }
         return "车道级引导（从左向右编号）\n高德推荐：$recommendation\n本车位置：$position\n${markingText(oem)}\n本车是否在推荐车道：$status" +
@@ -120,7 +121,8 @@ object LaneGuidancePresenter {
                 else -> "原车未报告${direction}侧许可"
             }
             val c3 = lanePositionText(oem) ?: "等待 C3 判断"
-            return "路线建议靠$direction · 原车：$position · $permission · $c3"
+            return listOfNotNull("路线建议靠$direction",
+                if (oem.positionValid) "原车：$position" else null, permission, c3).joinToString(" · ")
         }
         val laneRouteConfirmed = state.unkeyedRouteFactsConfirmed ||
             (state.lanesPathId != null && state.lanesPathId == state.acceptedPathId &&
@@ -158,7 +160,7 @@ object LaneGuidancePresenter {
             state.navigationMode != NavigationMode.REALTIME -> "模拟导航 · 无法判定本车车道"
             !laneRouteConfirmed || state.routeMatched != true || state.routeRecalculating ->
                 "路线与车道提示未对齐 · 无法判定本车车道"
-            !oem.positionValid && c3Index == null -> "原车车道位置未知 · 无法判定"
+            !oem.positionValid && c3Index == null -> null
             lanes.none(LaneState::recommended) -> "高德未推荐车道 · 无法判定"
             state.lanes.size != lanes.size || lanes.indices.any { lanes[it].index != it } ->
                 "高德车道编号不完整 · 无法判定"
@@ -184,7 +186,7 @@ object LaneGuidancePresenter {
                 )
             },
             recommendationSide = side,
-            currentLaneStatus = listOfNotNull(currentLaneStatus, c3Status).joinToString("\n"),
+            currentLaneStatus = listOfNotNull(currentLaneStatus, c3Status).joinToString("\n").takeIf { it.isNotBlank() },
         )
     }
 
@@ -204,6 +206,7 @@ object LaneGuidancePresenter {
     }
 
     fun markingText(oem: OemVehicleLaneState): String {
+        if (oem.c3LaneMarkings?.supported == false) return "车端未提供虚实线类型"
         fun label(code: Int?): String {
             if (code==null) return "未知"
             if (code == -1) return "未报告"

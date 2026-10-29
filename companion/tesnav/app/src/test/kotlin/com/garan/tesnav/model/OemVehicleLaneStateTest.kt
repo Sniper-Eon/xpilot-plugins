@@ -54,7 +54,8 @@ class OemVehicleLaneStateTest {
         )!!
         assertEquals("←", presentation.items.first().symbols)
         assertTrue(presentation.title.contains("路线建议靠左"))
-        assertTrue(presentation.title.contains("车道未知"))
+        assertFalse(presentation.title.contains("车道未知"))
+        assertTrue(presentation.items.none { it.current })
         assertTrue(presentation.title.contains("许可未知"))
         assertFalse(presentation.title.contains("原车报告左侧许可"))
     }

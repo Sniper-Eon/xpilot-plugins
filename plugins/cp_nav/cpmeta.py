@@ -90,6 +90,10 @@ def car_state_frame(cs, sequence):
   def value(name, default=0):
     return getattr(cs, name, default)
 
+  def marking(name):
+    code = value(name, -1)
+    return code if type(code) is int and code in (-1, 0, 1, 10, 11, 20, 21, 30, 31) else -1
+
   gear = str(value("gearShifter", "unknown"))
   payload = struct.pack(
     "<5f?3hf???2hB??2f4f",
@@ -102,8 +106,8 @@ def car_state_frame(cs, sequence):
     bool(value("brakeLights")),
     bool(value("leftBlindspot")),
     bool(value("rightBlindspot")),
-    0,
-    0,
+    marking("leftLaneLine"),
+    marking("rightLaneLine"),
     GEARS.index(gear) if gear in GEARS else 0,
     bool(value("leftBlinker")),
     bool(value("rightBlinker")),
@@ -125,7 +129,7 @@ def model_frame(model, sequence):
   vel = [float(v) for v in model.velocity.x][:2] or [0.0]
   while len(vel) < 2:
     vel.append(vel[0])
-  lines = [_line_points(l) for l in list(model.laneLines)[:4]]
+  lines = [_line_points(line) for line in list(model.laneLines)[:4]]
   edges = [_line_points(e) for e in list(model.roadEdges)[:2]]
   probs = list(model.laneLineProbs)
   stds = list(getattr(model, "laneLineStds", []) or [])

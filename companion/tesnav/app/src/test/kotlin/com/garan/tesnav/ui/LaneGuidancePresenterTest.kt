@@ -14,6 +14,23 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LaneGuidancePresenterTest {
+    // Failure cases: an unsupported OEM position occupies the map; unsupported
+    // marking fields look like a live classifier; a real model lane must remain.
+    @Test fun unknownOemPositionDoesNotOccupyTheMap() {
+        val state = NavigationState(navAssistSourceStatus="healthy", navigationMode=NavigationMode.REALTIME,
+            unkeyedRouteFactsConfirmed=true, routeMatched=true,
+            lanes=listOf(lane(0,true,LaneAction.STRAIGHT),lane(1,false,LaneAction.STRAIGHT)))
+        val p=LaneGuidancePresenter.present(state,OemVehicleLaneState())!!
+        assertNull(p.currentLaneStatus)
+        assertFalse(p.title.contains("原车：车道未知"))
+        assertEquals("车端未提供虚实线类型",LaneGuidancePresenter.markingText(OemVehicleLaneState(
+            c3LaneMarkings=com.garan.tesnav.model.C3LaneMarkings(null,null,false))))
+        val valid=LaneGuidancePresenter.present(state,OemVehicleLaneState(c3LaneEstimate=
+            com.garan.tesnav.model.C3LaneEstimate(true,2,2)))!!
+        assertTrue(valid.currentLaneStatus!!.contains("模型估计"))
+        assertTrue(valid.items[1].current)
+    }
+
     @org.junit.Test fun modelLaneNumberIsDisplayedWithoutGeometricPosition() {
         val state = com.garan.tesnav.model.OemVehicleLaneState(c3LaneEstimate=
             com.garan.tesnav.model.C3LaneEstimate(true,2,3))
@@ -275,7 +292,7 @@ class LaneGuidancePresenterTest {
         val unmatched = LaneGuidancePresenter.present(state.copy(routeMatched = false), left)!!
         val invalid = LaneGuidancePresenter.present(state, left.copy(positionValid = false))!!
         assertTrue(unmatched.currentLaneStatus!!.contains("无法判定"))
-        assertTrue(invalid.currentLaneStatus!!.contains("无法判定"))
+        assertNull(invalid.currentLaneStatus)
         assertFalse(unmatched.items.any { it.current })
         assertFalse(invalid.items.any { it.current })
         assertTrue(LaneGuidancePresenter.present(state.copy(navigationMode = NavigationMode.SIMULATION), left)!!

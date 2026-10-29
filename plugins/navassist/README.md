@@ -242,3 +242,14 @@ unchanged. This repair does not establish dashed/solid classification.
 Lamp diagnostics are capped at 1 Hz, TTL 1500 ms, reducing the combined
 send schedule to at most 59 messages/second. They remain read-only; physical
 lamp control and its feedback checks run at their original rate.
+
+## Lane display/source clarification (2.4.3, companion v32)
+
+The map hides the unsupported OEM position/membership row while retaining fresh
+model lane estimates, arrows and route alignment checks. Detailed observation
+text retains unknown/expired reasons for troubleshooting. Unsupported paint
+fields say they are not provided by the host. CP compact metadata uses -1 for
+absent paint codes; zero is a valid dashed display code and cannot be padding.
+Valid host codes are passed through. Planner useLaneLines is a boolean planning
+choice, not paint classification. Phone MNN count outputs remain lane counts;
+no unverified road-mask channel mapping or crossing permission is added.
