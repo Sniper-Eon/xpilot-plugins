@@ -75,3 +75,14 @@ Fresh valid single-frame output is displayed immediately as an estimate. The
 previous three-frame/corroboration description is historical for 2.2.0 only.
 The user also authorized deployment in the following task; actual installed and
 verified states are recorded in that deployment report, not inferred from this doc.
+
+## First device runtime qualification
+
+The first v28 phone smoke test exposed missing DT_NEEDED dependencies of libVAE:
+libthird_party_libs.so and libbase_utils.so. The local reference preparation now
+includes both, and verify_cp_lane_assets.py checks AArch64 ELF dependency closure
+and hashes before packaging. The corrected v29 package completed JNI inference
+with BOTH profiles on the user's phone in the separate bound worker (synthetic
+gray frame only). This is runtime/linkage evidence, not lane accuracy validation.
+DEVICE_TEST_BUILD_TYPE=tenengkai enables instrumentation and matching variant tests
+without changing normal build defaults. Actual deployment status is in its report.

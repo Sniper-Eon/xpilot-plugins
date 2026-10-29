@@ -7,7 +7,7 @@ p=argparse.ArgumentParser();p.add_argument('--apk',type=Path,required=True);p.ad
 a=p.parse_args();root=Path(__file__).resolve().parents[3]
 assert not a.output.resolve().is_relative_to(root),'keep private assets outside plugin repository'
 assert not a.output.exists(),'refuse to overwrite reference assets'
-files=['lib/arm64-v8a/liblanenet.so','lib/arm64-v8a/libVAE.so','assets/models/vlaneDay.mnn','assets/models/vlaneNight.mnn']
+files=['lib/arm64-v8a/liblanenet.so','lib/arm64-v8a/libVAE.so','lib/arm64-v8a/libthird_party_libs.so','lib/arm64-v8a/libbase_utils.so','assets/models/vlaneDay.mnn','assets/models/vlaneNight.mnn']
 hashes={}
 with zipfile.ZipFile(a.apk) as z:
  for name in files:

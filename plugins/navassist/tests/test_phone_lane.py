@@ -66,3 +66,11 @@ def test_single_frame_has_no_boundary_or_three_frame_wait():
   result=gate.update(sample(100,1),nav,100,enabled=True)
   assert result['valid'] and result['samples']==1
   assert result['laneNumber']==2 and not result['absoluteConfirmed']
+
+
+def test_existing_device_lane_display_is_preserved_beside_phone_estimate():
+  from navassist.hud import present_hud
+  nav=dict(valid=True,phoneLaneEvidence=dict(valid=True,laneNumber=2,laneCount=3))
+  hud=present_hud(nav,{},dict(modelLaneValid=True,modelLaneIndex=1,modelLaneCount=2))
+  assert hud['model_lane']=='Ego lane 1 of 2'
+  assert hud['phone_lane_message']=='Vision lane estimate 2/3'

@@ -82,7 +82,7 @@ class NavAssistOverlay(ScreenOverlay):
         if selected:rl.draw_line_ex(rl.Vector2(bx+8,y+124),rl.Vector2(bx+step-12,y+124),3,CYAN)
         if state['ego']==index:rl.draw_circle(int(bx+step*.5),int(y+141),4,WHITE)
     else:text(FontWeight.MEDIUM,'Waiting for lane guidance',lx,y+74,27,DIM)
-    lines=[state['lane_status'],state['status']]
+    lines=[state['model_lane'],state['lane_status'],state['status']]
     if state['phone_lane_message']:lines[0]=state['phone_lane_message']
     if state['branch_message']:lines.insert(0,state['branch_message'])
     if self.intent.get('signalRequested'):lines.append(signal_status(self.intent))

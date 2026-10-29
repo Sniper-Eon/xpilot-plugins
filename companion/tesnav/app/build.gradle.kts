@@ -6,6 +6,7 @@ fun String.asBuildConfigString(): String =
     "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 
 android {
+    testBuildType = providers.gradleProperty("DEVICE_TEST_BUILD_TYPE").orNull ?: "debug"
     namespace = "com.garan.tesnav"
     compileSdk {
         version = release(37)
@@ -21,8 +22,8 @@ android {
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 28
-        versionName = "1.15-xpilot-cp-lane-local"
+        versionCode = 29
+        versionName = "1.15.1-xpilot-cp-lane-runtime"
 
         manifestPlaceholders["AMAP_API_KEY"] =
             providers.gradleProperty("AMAP_API_KEY").orNull ?: ""

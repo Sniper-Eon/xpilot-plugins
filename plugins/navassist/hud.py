@@ -57,6 +57,12 @@ def present_hud(nav,intent,topology,*,car=None,authority=None):
     if same:status,tone='Vehicle signal confirmed','cyan'
     elif authority is False:status,tone='Auto signal permission unavailable','amber'
     else:status,tone='Waiting for vehicle signal','amber'
+  mlane=topology.get('modelLaneIndex')
+  mcount=topology.get('modelLaneCount')
+  mvalid=bool(topology.get('modelLaneValid')) and type(mlane) is int and type(mcount) is int and 1<=mlane<=mcount
+  model_lane=f'Ego lane {mlane} of {mcount}' if mvalid else 'Ego lane --'
+  if mvalid and topology.get('modelLaneChanging'):
+    model_lane+=' (changing)'
   phone_lane=nav.get('phoneLaneEvidence', {})
   phone_lane_message=''
   if active and phone_lane.get('valid'):
@@ -64,6 +70,7 @@ def present_hud(nav,intent,topology,*,car=None,authority=None):
     phone_lane_message=f"{label} {phone_lane['laneNumber']}/{phone_lane['laneCount']}"
   return dict(phone_lane_message=phone_lane_message,active=active,distance=distance,maneuver=nav.get('maneuver') if active else None,
     status=status,tone=tone,count=count,recommended=recommended,ego=ego,
+    model_lane=model_lane,model_lane_valid=mvalid,model_ego=(mlane-1) if mvalid else None,
     lane_status='Lane position confirmed' if ego is not None else 'Lane position pending',
     route_nodes=route_nodes(nav,active),
     branch_message=nav.get('branchEvidence', {}).get('message', '') if active else '')

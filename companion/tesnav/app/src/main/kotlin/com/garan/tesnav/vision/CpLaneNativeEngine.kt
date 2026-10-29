@@ -64,7 +64,7 @@ internal class CpLaneNativeEngine(private val context: Context) : AutoCloseable 
             val rc = native!!.nativeInferCompact(handle, y, width, height,
                 width, FloatArray(0), scores)
             val result = if (rc == 0) CpLaneCore.decode(scores, model) else null
-            status = result?.let { "视觉估计：第 ${it.laneNumber}/${it.laneCount} 车道，待地图与边界核对" }
+            status = if (rc != 0) "车道模型推理返回错误 $rc" else result?.let { "视觉估计：第 ${it.laneNumber}/${it.laneCount} 车道，待地图与边界核对" }
                 ?: "车道模型本帧未确认"
             result
         } catch (e: Exception) { status = "车道模型本帧失败"; null }
