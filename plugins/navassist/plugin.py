@@ -29,6 +29,7 @@ class NavAssist(Plugin):
     self.turns = TurnSignalController()
     self.map = MapData()
     self._next_map = 0
+    self._next_lamp = 0
     self._msgs = None
 
 
@@ -57,8 +58,15 @@ class NavAssist(Plugin):
 
   def control_sends(self, CS, CC, now_ns: int) -> list:
     # enabled=False still drives an active request through its cancel path.
-    return self.turns.update(self._fresh_intent(), CS, CC, now_ns,
-                             enabled=self.settings.enabled and self.settings.turn_signal_enabled)
+    intent=self._fresh_intent()
+    enabled=self.settings.enabled and self.settings.turn_signal_enabled
+    frames=self.turns.update(intent,CS,CC,now_ns,enabled=enabled)
+    if now_ns >= self._next_lamp:
+      from openpilot.tesla import plugins
+      self._next_lamp=now_ns+200_000_000
+      plugins.send_msg(type(self),'nav.lamp',self.turns.diagnostics(intent,CS,CC,now_ns,
+        enabled=enabled,frames=frames),500)
+    return frames
 
   @classmethod
   def processes(cls) -> list:

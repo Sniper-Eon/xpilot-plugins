@@ -44,7 +44,7 @@ object LaneGuidancePresenter {
             state.lanes.isEmpty() -> "高德未提供车道引导 · 无法判定"
             else -> "${presentation?.title ?: "车道数据待确认"} · 无法判定"
         }
-        return "车道级引导（从左向右编号）\n高德推荐：$recommendation\n原车位置：$position\n本车是否在推荐车道：$status" +
+        return "车道级引导（从左向右编号）\n高德推荐：$recommendation\n本车位置：$position\n${markingText(oem)}\n本车是否在推荐车道：$status" +
             if (presentation?.currentLaneStatus == null) decisionText(oem)?.let { "\n$it" }.orEmpty() else ""
     }
 
@@ -63,7 +63,8 @@ object LaneGuidancePresenter {
     private fun presentDisplay(state: NavigationState, oem: OemVehicleLaneState,
                                nowWallMs: Long?): LaneGuidancePresentation? {
         if (state.navigationMode !in setOf(NavigationMode.REALTIME, NavigationMode.SIMULATION)) return null
-        val c3Status = listOfNotNull(decisionText(oem), lanePositionText(oem))
+        val c3Status = listOfNotNull(decisionText(oem), lanePositionText(oem),
+            oem.c3LaneMarkings?.let { markingText(oem) }, lampText(oem.c3LampStatus))
             .takeIf { it.isNotEmpty() }?.joinToString(" · ")
         if (state.navigationMode == NavigationMode.REALTIME && state.navAssistSourceStatus != "healthy") {
             val title = if (state.routeRecalculating) "路线已变化 · 请结束后重新规划" else when (state.navAssistSourceStatus) {
@@ -105,7 +106,7 @@ object LaneGuidancePresenter {
 
         val recommendedIndices = lanes.filter(LaneState::recommended).map(LaneState::index)
         val side = recommendationSide(lanes, recommendedIndices)
-        val position = when (oem.position.takeIf { oem.positionValid }) {
+        val position = lanePositionText(oem) ?: when (oem.position.takeIf { oem.positionValid }) {
             OemLanePosition.LEFTMOST -> "最左车道"
             OemLanePosition.MIDDLE -> "中间车道"
             OemLanePosition.RIGHTMOST -> "最右车道"
@@ -194,11 +195,34 @@ object LaneGuidancePresenter {
         }
         val position = oem.c3LanePosition ?: return null
         if (!position.valid || position.laneNumber == null) return null
+        if (position.source=="cpPhoneVision") return "模型估计：第${position.laneNumber}条/可见共${position.laneCount}条"
         return if (position.laneCount != null) {
             "C3 第${position.laneNumber}条/共${position.laneCount}条"
         } else {
             "C3 第${position.laneNumber}条"
         }
+    }
+
+    fun markingText(oem: OemVehicleLaneState): String {
+        fun label(code: Int?): String {
+            if (code==null) return "未知"
+            if (code == -1) return "未报告"
+            val color=when(code/10) { 1 -> "白色"; 2 -> "黄色"; 3 -> "蓝色"; else -> "" }
+            return color + if(code%10==0) "虚线" else "实线"
+        }
+        return "左线${label(oem.c3LaneMarkings?.leftCode)} · 右线${label(oem.c3LaneMarkings?.rightCode)}"
+    }
+
+    private fun lampText(reason: String?): String? = when(reason) {
+        "templateMissing" -> "打灯等待：缺少原车控制模板"
+        "templateStale" -> "打灯等待：原车控制模板过期"
+        "feedbackTimeout" -> "打灯失败：未收到实体灯反馈"
+        "lateralInactive" -> "打灯等待：横向辅助未激活"
+        "driverBrake" -> "打灯取消：驾驶员制动"
+        "driverOppositeSignal" -> "打灯让位：驾驶员反向灯"
+        "physicalConfirmed" -> "实体转向灯已确认"
+        "requestBuilt" -> "已生成灯请求 · 等待实体灯反馈"
+        else -> null
     }
 
     fun decisionText(oem: OemVehicleLaneState): String? {

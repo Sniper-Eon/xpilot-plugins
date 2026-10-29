@@ -6,12 +6,21 @@ import time
 POSITION_PATH = Path("/dev/shm/road_lane_position.json")
 MAX_AGE_MS = 2000
 REQUEST_TYPE = "lane_position_request"
+MODEL_POSITION_PATH = Path('/dev/shm/phone_lane_estimate.json')
 
 
-def lane_position_feedback(snapshot, *, path: Path = POSITION_PATH, now_ns: int | None = None) -> dict:
+def lane_position_feedback(snapshot, *, path: Path = POSITION_PATH, now_ns: int | None = None, model_path=MODEL_POSITION_PATH) -> dict:
   unknown = {"version": 1, "valid": False, "laneIndex": None, "laneCount": None,
              "numbering": "leftToRight", "source": "commaCamera", "ageMs": 0,
              "validForMs": MAX_AGE_MS, "routeRevision": snapshot.route_revision}
+  try:
+    if model_path.stat().st_size <= 4096 and json.loads(model_path.read_text()).get('enabled') is True:
+      model=lane_model_feedback(snapshot,path=model_path,now_ns=now_ns)
+      return dict(unknown,valid=model['valid'],laneIndex=model['laneNumber'],laneCount=model['laneCount'],
+        source='cpPhoneVision',scope='visibleCorridor',absoluteConfirmed=False,reason='modelEstimate',
+        ageMs=model['ageMs'],validForMs=model['validForMs'])
+  except (OSError,ValueError,TypeError,AttributeError):
+    pass
   try:
     if path.stat().st_size > 4096:
       return unknown
@@ -32,9 +41,6 @@ def lane_position_feedback(snapshot, *, path: Path = POSITION_PATH, now_ns: int 
                       "ageMs": (current - captured + 999_999) // 1_000_000}
   except (OSError, ValueError, TypeError, AttributeError):
     return unknown
-
-
-MODEL_POSITION_PATH = Path('/dev/shm/phone_lane_estimate.json')
 
 
 def lane_model_feedback(snapshot, *, path=MODEL_POSITION_PATH, now_ns=None):

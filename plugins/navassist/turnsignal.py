@@ -179,3 +179,22 @@ class TurnSignalController:
     }
     counter = (decode(self.template)["counter"] + 1) % 16
     return self._emit(direction, counter, now_ns)
+
+  def diagnostics(self, intent, cs, cc, now_ns, *, enabled, frames):
+    direction=intent.get('direction','none')
+    left,right=bool(getattr(cs,'leftBlinker',False)),bool(getattr(cs,'rightBlinker',False))
+    physical=left if direction=='left' else right if direction=='right' else False
+    reason='waitingFeedback'
+    if not enabled:reason='disabled'
+    elif not intent.get('valid') or not intent.get('signalRequested'):reason='noRequest'
+    elif not getattr(cc,'latActive',False):reason='lateralInactive'
+    elif getattr(cs,'brakePressed',False):reason='driverBrake'
+    elif (direction=='left' and right) or (direction=='right' and left):reason='driverOppositeSignal'
+    elif physical:reason='physicalConfirmed'
+    elif self._key(intent)==self._failed_key:reason='feedbackTimeout'
+    elif self.template is None:reason='templateMissing'
+    elif now_ns-self.template_ns>TEMPLATE_MAX_AGE_NS:reason='templateStale'
+    if frames:reason='cancelBuilt' if decode(frames[-1][1])['turn']==3 else 'requestBuilt'
+    return dict(reason=reason,framesBuilt=len(frames),physicalFeedback=physical,
+      lastFrameBuiltAgeMs=None if self._last_send_ns is None else max(0,(now_ns-self._last_send_ns)//1_000_000),
+      templateAgeMs=None if self.template is None else max(0,(now_ns-self.template_ns)//1_000_000))

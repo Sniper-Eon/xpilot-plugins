@@ -15,6 +15,7 @@ import com.garan.tesnav.model.OemLanePosition
 import com.garan.tesnav.model.OemVehicleLaneState
 import com.garan.tesnav.model.C3LaneDecision
 import com.garan.tesnav.model.C3LanePosition
+import com.garan.tesnav.model.C3LaneMarkings
 import com.garan.tesnav.model.C3LaneEstimate
 import com.garan.tesnav.model.OemNavigationTelemetry
 import java.net.DatagramPacket
@@ -41,7 +42,7 @@ internal data class NavAssistV3UdpAck(val host: String, val vehicleLane: OemVehi
 internal object NavAssistV3AckParser {
     const val MAX_ACK_BYTES = 2 * 1024
     private val REQUIRED_ACK_KEYS = setOf("messageType", "schemaVersion", "sessionId", "sequence")
-    private val ALLOWED_ACK_KEYS = REQUIRED_ACK_KEYS + setOf("vehicleLane", "vehicleTelemetry", "laneAnnouncement", "laneDecision", "lanePosition", "laneEstimate")
+    private val ALLOWED_ACK_KEYS = REQUIRED_ACK_KEYS + setOf("vehicleLane", "vehicleTelemetry", "laneAnnouncement", "laneDecision", "lanePosition", "laneEstimate", "vehicleLines", "lampStatus")
     private val TELEMETRY_KEYS = setOf(
         "gpsStatus", "latitude", "longitude", "accuracyValue", "hdop", "headingDeg", "speedValue",
         "mapAvailable", "controllerHealth", "alcState", "forkState", "abortReason", "navAvailable",
@@ -117,7 +118,8 @@ internal object NavAssistV3AckParser {
                         ?.let { integer(p, "laneCount", 1L..16L).toInt() }
                 require(!valid || number != null)
                 C3LanePosition(valid, number, count,
-                    p["reason"]?.takeUnless { it.isJsonNull }?.asString)
+                    p["reason"]?.takeUnless { it.isJsonNull }?.asString,
+                    p["source"]?.takeUnless { it.isJsonNull }?.asString ?: "commaCamera")
             }
         }.getOrNull()
         val laneEstimate = runCatching {
@@ -132,6 +134,18 @@ internal object NavAssistV3AckParser {
                 C3LaneEstimate(valid,number,count,age,ttl,receivedAtElapsedMs,integer(p,"routeRevision"))
             }
         }.getOrNull()
+        val markings=runCatching {
+            ack.getAsJsonObject("vehicleLines")?.let { p ->
+                require(integer(p,"version",1L..1L)==1L && string(p,"source")=="carState")
+                fun code(side: String): Int? = p[side]?.takeUnless { it.isJsonNull }
+                    ?.let { integer(p,side,-1L..31L).toInt().also { n ->
+                        require(n in setOf(-1,0,1,10,11,20,21,30,31)) } }
+                C3LaneMarkings(code("leftCode"),code("rightCode"),boolean(p,"supported"),
+                    if(p.has("ageMs")) integer(p,"ageMs",0L..500L) else 0L,receivedAtElapsedMs)
+            }
+        }.getOrNull()
+        val lamp=runCatching { ack["lampStatus"]?.let { string(ack,"lampStatus") }
+            ?.also { require(it.matches(Regex("[A-Za-z]{1,40}"))) } }.getOrNull()
         val telemetry = runCatching { parseTelemetry(ack.getAsJsonObject("vehicleTelemetry")) }.getOrNull()
         val decision = runCatching {
             ack.getAsJsonObject("laneDecision")?.let { value ->
@@ -153,9 +167,9 @@ internal object NavAssistV3AckParser {
                 LaneAnnouncement(id, sessionId, direction, receivedAtElapsedMs)
             }
         }.getOrNull()
-        val state = if (telemetry == null && decision == null && lanePosition == null && laneEstimate == null) feedback else
+        val state = if (telemetry == null && decision == null && lanePosition == null && laneEstimate == null && markings == null && lamp == null) feedback else
             (feedback ?: OemVehicleLaneState(receivedAtMs = receivedAtMs, receivedAtElapsedMs = receivedAtElapsedMs))
-                .copy(navigationTelemetry = telemetry, c3LaneDecision = decision, c3LanePosition = lanePosition, c3LaneEstimate = laneEstimate)
+                .copy(navigationTelemetry = telemetry, c3LaneDecision = decision, c3LanePosition = lanePosition, c3LaneEstimate = laneEstimate, c3LaneMarkings = markings, c3LampStatus = lamp)
         NavAssistV3UdpAck(host, state, announcement)
     }.getOrNull()
 
@@ -170,7 +184,7 @@ internal object NavAssistV3AckParser {
                 JsonToken.NUMBER -> JsonParser.parseString(reader.nextString())
                 JsonToken.BOOLEAN -> JsonPrimitive(reader.nextBoolean())
                 JsonToken.NULL -> { reader.nextNull(); JsonNull.INSTANCE }
-                JsonToken.BEGIN_OBJECT -> if (allowFeedback && key in setOf("vehicleLane", "vehicleTelemetry", "laneAnnouncement", "laneDecision", "lanePosition", "laneEstimate")) readObject(reader) else {
+                JsonToken.BEGIN_OBJECT -> if (allowFeedback && key in setOf("vehicleLane", "vehicleTelemetry", "laneAnnouncement", "laneDecision", "lanePosition", "laneEstimate", "vehicleLines", "lampStatus")) readObject(reader) else {
                     reader.skipValue(); JsonArray() // Preserve an invalid composite, not a nullable number.
                 }
                 else -> { reader.skipValue(); JsonArray() }
@@ -325,6 +339,8 @@ internal class JvmUdpNavAssistV3Client(private val trace: ((String) -> Unit)? = 
                 val estimateQuery = """{"messageType":"lane_position_request","sessionId":"$sessionId","sequence":$sequence,"laneEstimateVersion":1}""".toByteArray(Charsets.UTF_8)
                 targets.forEach { target -> runCatching { socket.send(DatagramPacket(estimateQuery,estimateQuery.size,target,UDP_PORT)) } }
                 var modelFeedback: C3LaneEstimate? = null
+                var lineFeedback:C3LaneMarkings? = null
+                var lampFeedback:String? = null
                 var deadlineNs = System.nanoTime() + NAVASSIST_UDP_RECEIVE_WINDOW_MS * NANOS_PER_MILLISECOND
                 mark("receive_window=${NAVASSIST_UDP_RECEIVE_WINDOW_MS}")
                 var legacyAck: NavAssistV3UdpAck? = null
@@ -353,9 +369,11 @@ internal class JvmUdpNavAssistV3Client(private val trace: ((String) -> Unit)? = 
                     if (parsedAck == null) { mark("reject=parse_or_sequence"); continue }
                     if (legacyAck != null && parsedAck.host != legacyAck.host) { mark("reject=host"); continue }
                     parsedAck.vehicleLane?.c3LaneEstimate?.let { modelFeedback=it }
-                    val ack=if (modelFeedback==null) parsedAck else parsedAck.copy(vehicleLane=
+                    parsedAck.vehicleLane?.c3LaneMarkings?.let { lineFeedback=it }
+                    parsedAck.vehicleLane?.c3LampStatus?.let { lampFeedback=it }
+                    val ack=if (modelFeedback==null && lineFeedback==null && lampFeedback==null) parsedAck else parsedAck.copy(vehicleLane=
                         (parsedAck.vehicleLane ?: OemVehicleLaneState(receivedAtMs=receivedAtElapsedMs,receivedAtElapsedMs=receivedAtElapsedMs))
-                            .copy(c3LaneEstimate=modelFeedback))
+                            .copy(c3LaneEstimate=modelFeedback,c3LaneMarkings=lineFeedback,c3LampStatus=lampFeedback))
                     mark("accepted=${ack.host}")
                     if (ack.announcement != null) return finish(ack, "announcement")
                     if (legacyAck == null || ack.vehicleLane?.navigationTelemetry != null ||

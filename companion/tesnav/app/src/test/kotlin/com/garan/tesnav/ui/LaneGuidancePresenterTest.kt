@@ -339,6 +339,20 @@ class LaneGuidancePresenterTest {
             .contains("路线与车道提示未对齐 · 无法判定"))
     }
 
+    @Test fun originalPositionSlotUsesModelAndMissingLineTypesStayUnknown() {
+        val oem=OemVehicleLaneState(receivedAtMs=1,c3LanePosition=
+            com.garan.tesnav.model.C3LanePosition(true,2,3,source="cpPhoneVision"))
+        val state=NavigationState(navAssistSourceStatus="healthy",navigationMode=NavigationMode.REALTIME,
+            unkeyedRouteFactsConfirmed=true,routeMatched=true,
+            lanes=listOf(lane(0,true,LaneAction.STRAIGHT),lane(1,false,LaneAction.STRAIGHT),lane(2,false,LaneAction.STRAIGHT)))
+        val text=LaneGuidancePresenter.observationText(state,oem)
+        assertTrue(text.contains("本车位置：模型估计：第2条/可见共3条"))
+        assertFalse(LaneGuidancePresenter.present(state,oem)!!.title.contains("原车位置未知"))
+        assertEquals("左线未知 · 右线未知",LaneGuidancePresenter.markingText(OemVehicleLaneState()))
+        assertEquals("左线白色虚线 · 右线黄色实线",LaneGuidancePresenter.markingText(oem.copy(
+            c3LaneMarkings=com.garan.tesnav.model.C3LaneMarkings(10,21,true))))
+    }
+
     private fun lane(index: Int, recommended: Boolean, vararg actions: LaneAction) = LaneState(
         index = index,
         allowedActions = actions.toList(),

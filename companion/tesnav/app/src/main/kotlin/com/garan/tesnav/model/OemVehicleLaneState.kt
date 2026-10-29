@@ -15,7 +15,11 @@ data class C3LanePosition(
     val laneNumber: Int? = null,
     val laneCount: Int? = null,
     val reason: String? = null,
+    val source: String = "commaCamera",
 )
+
+data class C3LaneMarkings(val leftCode: Int?, val rightCode: Int?, val supported: Boolean,
+    val ageMs: Long = 0, val receivedAtElapsedMs: Long = 0)
 
 data class C3LaneEstimate(
     val valid: Boolean, val laneNumber: Int? = null, val laneCount: Int? = null,
@@ -55,13 +59,18 @@ data class OemVehicleLaneState(
     val c3LaneDecision: C3LaneDecision? = null,
     val c3LanePosition: C3LanePosition? = null,
     val c3LaneEstimate: C3LaneEstimate? = null,
+    val c3LaneMarkings: C3LaneMarkings? = null,
+    val c3LampStatus: String? = null,
 ) {
     fun remainingDisplayMs(nowElapsedMs: Long, budgetMs: Long): Long {
         val received = receivedAtElapsedMs ?: return 0L
         if (received < 0L || nowElapsedMs < received || budgetMs <= 0L) return 0L
         val age = nowElapsedMs - received
         val remaining = if (age >= budgetMs) 0L else budgetMs - age
-        return c3LaneEstimate?.takeIf { it.valid }?.let { minOf(remaining, it.remainingMs(nowElapsedMs)) } ?: remaining
+        val modelRemaining=c3LaneEstimate?.takeIf { it.valid }?.let { minOf(remaining,it.remainingMs(nowElapsedMs)) } ?: remaining
+        val marks=c3LaneMarkings?.takeIf { it.leftCode!=null || it.rightCode!=null }
+        return if(marks==null) modelRemaining else minOf(modelRemaining,
+            (500L-marks.ageMs-(nowElapsedMs-marks.receivedAtElapsedMs)).coerceAtLeast(0))
     }
 
     fun forDisplay(nowElapsedMs: Long, budgetMs: Long): OemVehicleLaneState =

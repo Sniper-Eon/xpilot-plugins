@@ -7,6 +7,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NavAssistV3AckParserTest {
+    @Test fun flatMarkingCodesAndSenderDiagnosticsReachExistingFeedback() {
+        val lines="""{"version":1,"source":"carState","supported":true,"leftCode":10,"rightCode":21}"""
+        val body=core().dropLast(1)+",\"vehicleLines\":"+lines+",\"lampStatus\":\"templateMissing\"}"
+        val state=parse(body)!!.vehicleLane!!
+        assertEquals(10,state.c3LaneMarkings!!.leftCode)
+        assertEquals(21,state.c3LaneMarkings!!.rightCode)
+        assertEquals("templateMissing",state.c3LampStatus)
+    }
+
     @Test fun `lane decision is session bound and cannot corrupt vehicle feedback`() {
         val base = JsonParser.parseString(fixture().decodeToString()).asJsonObject
         val decision = """{"sessionId":"$session","reason":"efficiencySafetyBlocked","signalRequested":false,"direction":"none"}"""

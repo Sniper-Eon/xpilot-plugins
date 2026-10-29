@@ -22,6 +22,7 @@ from .plugin import NavAssist
 from .position import publish as publish_position
 from .feedback import MODEL_POSITION_PATH
 from .recording import Recorder
+from .vehicle_lines import PATH as VEHICLE_FEEDBACK_PATH, observe as observe_lines
 from .runtime import NavigationRuntime
 from .route_geometry import RouteGeometryPublisher
 from .settings import read as read_settings
@@ -95,6 +96,12 @@ def main():
       publish_position(dict(result['nav']['phoneLaneEvidence'],version=1,enabled=settings.enabled and settings.phone_lane_enabled,navSessionId=result['nav'].get('sessionId'),
         routeRevision=result['nav'].get('routeRevision')),path=MODEL_POSITION_PATH)
       publish_position(result['position'])
+      result['lamp'] = map_messages.fresh('nav.lamp').get('navassist',{})
+      lines = observe_lines(cs,int(sm.logMonoTime['carState']),now,
+        enabled=settings.enabled,vehicle_fresh=vehicle_fresh)
+      publish_position(dict(enabled=settings.enabled,captureMonoNs=int(sm.logMonoTime['carState']),
+        sessionId=result['nav'].get('sessionId'),routeRevision=result['nav'].get('routeRevision'),
+        lines=lines,intent=result['intent'],lamp=result['lamp']),path=VEHICLE_FEEDBACK_PATH)
       if route_publisher is not None and now >= next_route:
         next_route = now+1_000_000_000
         geometry = transports.geometry.current(store.current(now), now)

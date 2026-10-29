@@ -13,6 +13,7 @@ from .rate import ClientRateLimiter
 from .wire import NavAssistProtocolError
 from .store import NavAssistStore
 from .route_geometry import RouteGeometryCache
+from .vehicle_lines import feedback as vehicle_feedback
 
 UDP_SNAPSHOT_PORT = 4213
 MAX_UDP_SNAPSHOT_BYTES = 8 * 1024
@@ -112,6 +113,7 @@ class NavAssistUDPServer:
           if query.get("laneEstimateVersion") == 1:
             estimate = lane_model_feedback(current.snapshot)
             if estimate is not None:ack["laneEstimate"] = estimate
+            ack.update(vehicle_feedback(current.snapshot))
           try:
             self._socket.sendto(json.dumps(ack, allow_nan=False, separators=(",", ":")).encode(), address)
           except OSError:
