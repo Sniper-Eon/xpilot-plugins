@@ -14,6 +14,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LaneGuidancePresenterTest {
+    @org.junit.Test fun modelLaneNumberIsDisplayedWithoutGeometricPosition() {
+        val state = com.garan.tesnav.model.OemVehicleLaneState(c3LaneEstimate=
+            com.garan.tesnav.model.C3LaneEstimate(true,2,3))
+        org.junit.Assert.assertEquals("模型估计：第2条/可见共3条",LaneGuidancePresenter.lanePositionText(state))
+        org.junit.Assert.assertNull(LaneGuidancePresenter.lanePositionText(state.copy(c3LaneEstimate=null)))
+    }
+
     @Test
     fun `unconfirmed source hides directional guidance even with permissive OEM feedback`() {
         for (status in listOf("unconfirmed", "budgetsUnconfirmed", "requiresExplicitStart")) {

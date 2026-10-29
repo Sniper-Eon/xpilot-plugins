@@ -32,3 +32,26 @@ def lane_position_feedback(snapshot, *, path: Path = POSITION_PATH, now_ns: int 
                       "ageMs": (current - captured + 999_999) // 1_000_000}
   except (OSError, ValueError, TypeError, AttributeError):
     return unknown
+
+
+MODEL_POSITION_PATH = Path('/dev/shm/phone_lane_estimate.json')
+
+
+def lane_model_feedback(snapshot, *, path=MODEL_POSITION_PATH, now_ns=None):
+  """Opt-in model feedback; never relabel a visible corridor as absolute geometry."""
+  unknown = dict(version=1,valid=False,laneNumber=None,laneCount=None,source='cpPhoneVision',
+    scope='visibleCorridor',ageMs=0,validForMs=800,routeRevision=snapshot.route_revision)
+  try:
+    if path.stat().st_size>4096:return unknown
+    d=json.loads(path.read_text())
+    if d.get('enabled') is False:return None
+    now=time.monotonic_ns() if now_ns is None else now_ns
+    stamp=d.get('captureMonoNs');index,count=d.get('laneNumber'),d.get('laneCount')
+    if (type(stamp) is not int or not 0<=now-stamp<800_000_000 or d.get('valid') is not True
+        or type(d.get('version')) is not int or d['version']!=1
+        or d.get('source')!='cpPhoneVision' or d.get('scope')!='visibleCorridor'
+        or d.get('controlEligible') is not False or d.get('navSessionId')!=snapshot.session_id
+        or type(d.get('routeRevision')) is not int or d['routeRevision']!=snapshot.route_revision
+        or type(index) is not int or type(count) is not int or not 1<=index<=count<=5):return unknown
+    return dict(unknown,valid=True,laneNumber=index,laneCount=count,ageMs=(now-stamp+999_999)//1_000_000)
+  except (OSError,ValueError,TypeError,AttributeError):return unknown

@@ -94,3 +94,17 @@ def test_lane_position_query_is_opt_in_and_bound_to_latest_navigation(monkeypatc
     assert send(port,json.dumps(query | {'sequence':2}).encode()) is None
   finally:
     stop_server(server,thread)
+
+
+def test_model_lane_feedback_requires_explicit_query_opt_in(monkeypatch):
+  from navassist import udp as receiver
+  _,server,thread=run_server()
+  try:
+    port=server.server_address[1];send(port,encode(payload()))
+    query=dict(messageType='lane_position_request',sessionId='session-a',sequence=1)
+    monkeypatch.setattr(receiver,'lane_model_feedback',lambda snapshot:dict(valid=True,laneNumber=2,laneCount=3))
+    assert 'laneEstimate' not in send(port,json.dumps(query).encode())
+    response=send(port,json.dumps(dict(query,laneEstimateVersion=1)).encode())
+    assert response['laneEstimate']['laneNumber']==2 and 'lanePosition' in response
+    assert send(port,json.dumps(dict(query,laneEstimateVersion=True)).encode()) is None
+  finally:stop_server(server,thread)

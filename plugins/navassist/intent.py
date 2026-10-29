@@ -1,6 +1,7 @@
 """Adapt plugin messages to the verified legacy preparation state machines.
 
-Only fresh absolute evidence translates map indices. Same-direction edge fallback
+Fresh absolute evidence or explicitly enabled, count-matched phone estimates
+translate map indices. Same-direction edge fallback
 remains separate evidence and inherits the bounded source-continuity checks.
 """
 from __future__ import annotations
@@ -45,10 +46,15 @@ class LanePlan:
   speed: float = 0.
 
 
+def planning_ego_index(topology):
+  # Model ownership clears stale geometry fallback when its observation is unknown.
+  return topology.get('estimatedEgoIndex') if topology.get('phoneLanePlanningEnabled') else topology.get('absoluteEgoIndex')
+
+
 def lane_plan(nav, topology, settings, *, v_ego):
   n = navigation(nav)
   count, ego = int(topology.get('visibleLaneCount', 0)), int(topology.get('egoLaneIndexFromLeft', -1))
-  absolute = topology.get('absoluteEgoIndex')
+  absolute = planning_ego_index(topology)
   if type(absolute) is not int:
     absolute = None
   core = build_lane_plan(n, N(visibleLaneCount=count, egoLaneIndexFromLeft=ego),
@@ -59,7 +65,7 @@ def lane_plan(nav, topology, settings, *, v_ego):
   # The facade's target is adjacent; the core retains the actual route target.
   adjacent = NavLaneIntentCoordinator._adjacent_target_index(ego, direction) if direction else -1
   return LanePlan('left' if direction == LaneIntentDirection.left else 'right' if direction else 'none',
-                  adjacent, -1, 'edgeFallback' if core.heuristic else 'absoluteLane', absolute is not None,
+                  adjacent, -1, 'edgeFallback' if core.heuristic else 'modelLane' if topology.get('phoneLanePlanningEnabled') else 'absoluteLane', absolute is not None,
                   core, topology, v_ego)
 
 
@@ -160,7 +166,7 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
     left_blinker=left_blinker, right_blinker=right_blinker, brake_pressed=brake_pressed,
     gas_pressed=gas_pressed, steering_pressed=steering_pressed, model_state=model_state,
     model_direction=model_direction, allow_new_lane_change=n.maneuverDistanceM > 0 and not approaching)
-  if (n.maneuver in RELATIVE_ROUTE_MANEUVERS and topology.get('absoluteEgoIndex') is None
+  if (n.maneuver in RELATIVE_ROUTE_MANEUVERS and planning_ego_index(topology) is None
       and out.get('relativeStepComplete')):
     out.update(signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False, reason='heuristicChangeLimit')
     return out

@@ -17,6 +17,15 @@ data class C3LanePosition(
     val reason: String? = null,
 )
 
+data class C3LaneEstimate(
+    val valid: Boolean, val laneNumber: Int? = null, val laneCount: Int? = null,
+    val ageMs: Long = 0, val validForMs: Long = 800,
+    val receivedAtElapsedMs: Long = 0, val routeRevision: Long = 0,
+) {
+    fun remainingMs(now: Long): Long = if (!valid || now < receivedAtElapsedMs) 0 else
+        (validForMs - ageMs - (now - receivedAtElapsedMs)).coerceAtLeast(0)
+}
+
 data class OemVehicleLaneState(
     val position: OemLanePosition = OemLanePosition.UNKNOWN,
     val positionValid: Boolean = false,
@@ -45,12 +54,14 @@ data class OemVehicleLaneState(
     val navigationTelemetry: OemNavigationTelemetry? = null,
     val c3LaneDecision: C3LaneDecision? = null,
     val c3LanePosition: C3LanePosition? = null,
+    val c3LaneEstimate: C3LaneEstimate? = null,
 ) {
     fun remainingDisplayMs(nowElapsedMs: Long, budgetMs: Long): Long {
         val received = receivedAtElapsedMs ?: return 0L
         if (received < 0L || nowElapsedMs < received || budgetMs <= 0L) return 0L
         val age = nowElapsedMs - received
-        return if (age >= budgetMs) 0L else budgetMs - age
+        val remaining = if (age >= budgetMs) 0L else budgetMs - age
+        return c3LaneEstimate?.takeIf { it.valid }?.let { minOf(remaining, it.remainingMs(nowElapsedMs)) } ?: remaining
     }
 
     fun forDisplay(nowElapsedMs: Long, budgetMs: Long): OemVehicleLaneState =

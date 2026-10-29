@@ -132,10 +132,12 @@ object LaneGuidancePresenter {
             LaneRecommendationSide.MIXED -> "高德变道引导 · 推荐车道已标绿"
             LaneRecommendationSide.NONE -> "高德车道引导"
         }
+        val estimate=oem.c3LaneEstimate?.takeIf { it.valid && it.routeRevision==state.routeRevision
+            && it.laneCount==lanes.size && it.laneNumber!=null && it.laneNumber in 1..lanes.size }
         val c3 = oem.c3LanePosition?.takeIf {
-            it.valid && it.laneNumber != null && it.laneNumber in 1..lanes.size
+            oem.c3LaneEstimate==null && it.valid && it.laneNumber != null && it.laneNumber in 1..lanes.size
         }
-        val c3Index = c3?.laneNumber?.minus(1)
+        val c3Index = estimate?.laneNumber?.minus(1) ?: c3?.laneNumber?.minus(1)
         val comparisonReady = state.navigationMode == NavigationMode.REALTIME &&
             laneRouteConfirmed && state.routeMatched == true && !state.routeRecalculating &&
             state.lanes.size == lanes.size && lanes.indices.all { lanes[it].index == it } &&
@@ -162,9 +164,9 @@ object LaneGuidancePresenter {
             else -> when {
                 possibleIndices.isEmpty() -> "原车位置与高德车道数无法对应 · 无法判定"
                 possibleIndices.all { lanes[it].recommended } ->
-                    if (c3Index != null) "C3 报告：在推荐车道" else "原车报告：在推荐车道"
+                    if (estimate != null) "模型估计：在推荐车道" else if (c3Index != null) "C3 报告：在推荐车道" else "原车报告：在推荐车道"
                 possibleIndices.none { lanes[it].recommended } ->
-                    if (c3Index != null) "C3 报告：不在推荐车道" else "原车报告：不在推荐车道"
+                    if (estimate != null) "模型估计：不在推荐车道" else if (c3Index != null) "C3 报告：不在推荐车道" else "原车报告：不在推荐车道"
                 else -> "原车只报告中间车道 · 无法区分具体车道"
             }
         }
@@ -186,6 +188,10 @@ object LaneGuidancePresenter {
     }
 
     fun lanePositionText(oem: OemVehicleLaneState): String? {
+        oem.c3LaneEstimate?.let {
+            return if (it.valid && it.laneNumber!=null && it.laneCount!=null)
+                "模型估计：第${it.laneNumber}条/可见共${it.laneCount}条" else "模型车道未知"
+        }
         val position = oem.c3LanePosition ?: return null
         if (!position.valid || position.laneNumber == null) return null
         return if (position.laneCount != null) {

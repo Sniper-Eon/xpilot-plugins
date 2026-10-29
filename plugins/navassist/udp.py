@@ -8,7 +8,7 @@ import socket
 import threading
 import time
 
-from .feedback import REQUEST_TYPE, lane_position_feedback
+from .feedback import REQUEST_TYPE, lane_position_feedback, lane_model_feedback
 from .rate import ClientRateLimiter
 from .wire import NavAssistProtocolError
 from .store import NavAssistStore
@@ -100,13 +100,18 @@ class NavAssistUDPServer:
         continue
       if isinstance(query, dict) and query.get("messageType") == REQUEST_TYPE:
         current = self.store.current()
-        if (len(body) <= 512 and set(query) == {"messageType", "sessionId", "sequence"} and
+        if (len(body) <= 512 and (set(query) == {"messageType", "sessionId", "sequence"} or
+             (set(query) == {"messageType", "sessionId", "sequence", "laneEstimateVersion"}
+              and type(query["laneEstimateVersion"]) is int and query["laneEstimateVersion"] == 1)) and
             current is not None and not self.store.is_stale() and self._accepted_source == source_host and
             query["sessionId"] == current.snapshot.session_id and
             type(query["sequence"]) is int and 0 <= int(current.snapshot.sequence) - int(query["sequence"]) <= 5):
           ack = {"messageType": UDP_ACK_TYPE, "schemaVersion": 3,
                  "sessionId": current.snapshot.session_id, "sequence": int(query["sequence"]),
                  "lanePosition": lane_position_feedback(current.snapshot)}
+          if query.get("laneEstimateVersion") == 1:
+            estimate = lane_model_feedback(current.snapshot)
+            if estimate is not None:ack["laneEstimate"] = estimate
           try:
             self._socket.sendto(json.dumps(ack, allow_nan=False, separators=(",", ":")).encode(), address)
           except OSError:

@@ -74,3 +74,31 @@ def test_existing_device_lane_display_is_preserved_beside_phone_estimate():
   hud=present_hud(nav,{},dict(modelLaneValid=True,modelLaneIndex=1,modelLaneCount=2))
   assert hud['model_lane']=='Ego lane 1 of 2'
   assert hud['phone_lane_message']=='Vision lane estimate 2/3'
+
+
+def test_model_planning_index_requires_matching_map_count_and_master():
+  from navassist.phone_lane import planning_index
+  candidate=dict(valid=True,laneNumber=2,laneCount=3)
+  assert planning_index(candidate,dict(valid=True,laneTotalCount=3),enabled=True)==1
+  assert planning_index(candidate,dict(valid=True,laneTotalCount=4),enabled=True) is None
+  assert planning_index(candidate,dict(valid=True,laneTotalCount=3),enabled=False) is None
+  assert planning_index(dict(candidate,valid=False),dict(valid=True,laneTotalCount=3),enabled=True) is None
+
+
+def test_model_index_drives_recommended_lane_plan_without_absolute_promotion():
+  from navassist.intent import lane_plan, planning_ego_index
+  from navassist.settings import NavSettings
+  nav=dict(valid=True,sessionId='s',routeRevision=1,maneuver='merge_left',distanceM=300,
+    laneTotalCount=3,lanes=[dict(index=0,recommended=True)])
+  topology=dict(valid=True,visibleLaneCount=3,egoLaneIndexFromLeft=1,
+    phoneLanePlanningEnabled=True,estimatedEgoIndex=1,absoluteEgoIndex=0)
+  plan=lane_plan(nav,topology,NavSettings(phone_lane_enabled=True),v_ego=20)
+  assert plan.direction=='left' and plan.reason=='modelLane'
+  assert topology['absoluteEgoIndex']==0
+  topology['estimatedEgoIndex']=0
+  plan=lane_plan(nav,topology,NavSettings(phone_lane_enabled=True),v_ego=20)
+  assert plan.direction=='none'
+  topology['estimatedEgoIndex']=None
+  assert planning_ego_index(topology) is None
+  topology['phoneLanePlanningEnabled']=False
+  assert planning_ego_index(topology)==0

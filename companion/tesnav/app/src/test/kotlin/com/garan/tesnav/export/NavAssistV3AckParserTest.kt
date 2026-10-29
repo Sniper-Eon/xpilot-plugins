@@ -48,6 +48,18 @@ class NavAssistV3AckParserTest {
         assertNull(unknownAck.vehicleLane!!.c3LanePosition!!.laneNumber)
     }
 
+    @Test fun `model lane feedback is separate and cannot renew source age`() {
+        val estimate = """{"version":1,"valid":true,"laneNumber":2,"laneCount":3,"source":"cpPhoneVision","scope":"visibleCorridor","ageMs":500,"validForMs":800,"routeRevision":2}"""
+        val ack=parse(core().dropLast(1)+",\"laneEstimate\":"+estimate+"}")!!
+        val state=ack.vehicleLane!!
+        assertEquals(2,state.c3LaneEstimate!!.laneNumber)
+        assertNull(state.c3LanePosition)
+        assertEquals(300L,state.remainingDisplayMs(456L,1000L))
+        assertEquals(0L,state.remainingDisplayMs(756L,1000L))
+        val bad=parse(core().dropLast(1)+",\"laneEstimate\":"+estimate.replace("visibleCorridor","absolute")+"}")!!
+        assertNull(bad.vehicleLane?.c3LaneEstimate)
+    }
+
     private val session = "00000000-0000-0000-0000-000000000001"
     private fun core(sequence: String = "1") =
         """{"messageType":"navassist_udp_ack","schemaVersion":3,"sessionId":"$session","sequence":$sequence}"""

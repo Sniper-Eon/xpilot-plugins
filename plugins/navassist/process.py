@@ -20,6 +20,7 @@ from .phone import PhoneBlindspotAssist
 from .phone_lane import read_observation as read_phone_lane
 from .plugin import NavAssist
 from .position import publish as publish_position
+from .feedback import MODEL_POSITION_PATH
 from .recording import Recorder
 from .runtime import NavigationRuntime
 from .route_geometry import RouteGeometryPublisher
@@ -91,6 +92,8 @@ def main():
         payload.update(modelLaneStatus=lane_geometry['status'], modelLaneWidthM=lane_geometry['widthM'],
           modelLaneIndex=lane_state['index'], modelLaneCount=lane_state['count'], modelLaneValid=lane_state['valid'],
           modelLaneChanging=lane_state['changing'], modelLaneAgeMs=lane_state['ageMs'])
+      publish_position(dict(result['nav']['phoneLaneEvidence'],version=1,enabled=settings.enabled and settings.phone_lane_enabled,navSessionId=result['nav'].get('sessionId'),
+        routeRevision=result['nav'].get('routeRevision')),path=MODEL_POSITION_PATH)
       publish_position(result['position'])
       if route_publisher is not None and now >= next_route:
         next_route = now+1_000_000_000
@@ -122,6 +125,7 @@ def main():
       route_publisher.close()
     recorder.close()
     transports.close()
+    publish_position(dict(version=1,valid=False),path=MODEL_POSITION_PATH)
     publish_position(dict(version=1, valid=False, absolute_confirmed=False, capture_mono_ns=time.monotonic_ns()))
 
 

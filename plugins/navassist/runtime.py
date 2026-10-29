@@ -7,7 +7,7 @@ from .blocker import LaneChangeBlocker
 from .intent import LaneIntentCoordinator, TurnSignalCoordinator, build_intent
 from .navstate import build as build_nav_state
 from .oem import OemLaneSignals
-from .phone_lane import PhoneLaneEvidence
+from .phone_lane import PhoneLaneEvidence, planning_index
 from .position import AbsolutePosition
 from .topology import from_model
 
@@ -45,6 +45,9 @@ class NavigationRuntime:
     candidate = self.phone_lane.update(phone_lane_observation, nav, now_ns,
       enabled=self.settings.enabled and self.settings.phone_lane_enabled)
     nav['phoneLaneEvidence'] = candidate
+    topology['estimatedEgoIndex'] = planning_index(candidate, nav,
+      enabled=self.settings.enabled and self.settings.phone_lane_enabled)
+    topology['phoneLanePlanningEnabled'] = self.settings.enabled and self.settings.phone_lane_enabled
     topology['absoluteEgoIndex'] = position['lane_index']-1 if position['valid'] else None
     left_blocked, right_blocked, reasons = self.blocker.update(oem, topology,
       phone_left=left_phone, phone_right=right_phone)

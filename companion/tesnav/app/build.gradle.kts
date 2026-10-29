@@ -22,8 +22,8 @@ android {
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 29
-        versionName = "1.15.1-xpilot-cp-lane-runtime"
+        versionCode = 30
+        versionName = "1.16-xpilot-lane-feedback"
 
         manifestPlaceholders["AMAP_API_KEY"] =
             providers.gradleProperty("AMAP_API_KEY").orNull ?: ""

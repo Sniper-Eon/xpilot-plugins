@@ -62,3 +62,14 @@ class PhoneLaneEvidence:
     elif key != self.key:return reject()
     return dict(unknown,valid=True,laneNumber=left,laneCount=left+right-1,
                 samples=self.samples,captureMonoNs=stamp,frameId=frame,streamId=stream,model=lane['model'])
+
+
+def planning_index(candidate, nav, *, enabled=False):
+  """Use a route-matched estimate for planning, without declaring it absolute."""
+  if not enabled or not nav.get('valid') or not candidate.get('valid'):
+    return None
+  count, index = candidate.get('laneCount'), candidate.get('laneNumber')
+  if (type(count) is not int or type(index) is not int or not 1 <= index <= count <= 5
+      or type(nav.get('laneTotalCount')) is not int or count != nav['laneTotalCount']):
+    return None
+  return index-1

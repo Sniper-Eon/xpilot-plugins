@@ -205,3 +205,17 @@ frame; original timestamps, frame identity, model contract, disable and expiry
 checks remain. Visible-corridor estimates are not relabelled absolute-map lanes.
 Native BSM, paint, road-edge, driver and engagement checks are unchanged.
 This supersedes the confirmation behavior described in the 2.2.0 candidate above.
+
+## Model feedback to the companion app (2.3.0)
+
+The HUD's phoneLaneEvidence is now also published, with its original capture time
+and current navigation session/revision, to /dev/shm/phone_lane_estimate.json.
+An explicitly negotiated laneEstimateVersion=1 query returns laneEstimate separately
+from the legacy absolute lanePosition. Old query and ACK shapes are unchanged.
+The Android client retains legacy queries for old hosts and preserves model evidence
+when a legacy ACK arrives later in the same receive window. Original age reduces the
+phone display lifetime; ACK receipt cannot renew old source data. The APK labels the
+result as a model estimate and uses a current-lane marker only when its count matches
+the displayed map lanes and route revision. This does not change C3 route planning.
+
+Fresh CP model estimates participate in route lane alignment when their visible lane count matches the navigation lane total. This does not certify whole-road visibility or absolute position. The existing phone-lane switch controls ownership; disabling restores legacy geometry. Unknown model data uses existing unknown-position preparation rules, with all native crossing checks retained.
