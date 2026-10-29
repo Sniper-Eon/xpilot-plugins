@@ -13,6 +13,9 @@ internal class CpLaneNativeEngine(private val context: Context) : AutoCloseable 
     private var handle = 0L
     private var selected = ""
     private var failedModel = ""
+    private var roadScores = FloatArray(0)
+    var road: CpRoadMask? = null
+        private set
     var status = "未启用车道模型"
         private set
 
@@ -57,14 +60,21 @@ internal class CpLaneNativeEngine(private val context: Context) : AutoCloseable 
         }
     }
 
-    fun detect(y: ByteArray, width: Int, height: Int, model: String): CpLaneResult? {
+    fun detect(y: ByteArray, width: Int, height: Int, model: String, roadEnabled: Boolean = false): CpLaneResult? {
+        road = null
         if (!prepare(model)) return null
         return try {
+            val shape = if (roadEnabled) try { native!!.nativeRoadShape(handle) }
+                catch (_: LinkageError) { IntArray(0) } else IntArray(0)
+            val roadSize = CpRoadMaskCore.size(shape) ?: 0
+            if (roadScores.size != roadSize) roadScores = FloatArray(roadSize)
+            roadScores.fill(Float.NaN) // An incomplete JNI copy must not reuse the previous frame.
             val scores = FloatArray(8) { Float.NaN }
             val rc = native!!.nativeInferCompact(handle, y, width, height,
-                width, FloatArray(0), scores)
+                width, roadScores, scores)
+            if (rc == 0 && roadSize > 0) road = CpRoadMaskCore.fromScores(shape,roadScores)
             val result = if (rc == 0) CpLaneCore.decode(scores, model) else null
-            status = if (rc != 0) "车道模型推理返回错误 $rc" else result?.let { "视觉估计：第 ${it.laneNumber}/${it.laneCount} 车道，待地图与边界核对" }
+            status = if (rc != 0) "车道模型推理返回错误 $rc" else result?.let { "视觉估计：第 ${it.laneNumber}/${it.laneCount} 可见车道（估计）" }
                 ?: "车道模型本帧未确认"
             result
         } catch (e: Exception) { status = "车道模型本帧失败"; null }
@@ -72,6 +82,7 @@ internal class CpLaneNativeEngine(private val context: Context) : AutoCloseable 
     }
 
     override fun close() {
+        road = null; roadScores = FloatArray(0)
         val current = handle; handle = 0L; selected = ""
         if (current != 0L) try { native?.nativeRelease(current) } catch (_: Exception) { } catch (_: LinkageError) { }
         native = null

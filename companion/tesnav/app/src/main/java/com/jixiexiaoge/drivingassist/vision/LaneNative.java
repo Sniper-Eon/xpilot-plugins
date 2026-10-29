@@ -6,6 +6,7 @@ package com.jixiexiaoge.drivingassist.vision;
 public final class LaneNative {
     public native String nativeLoadStatus();
     public native long nativeInit(String path);
+    public native int[] nativeRoadShape(long handle);
     public native int nativeInferCompact(long handle, byte[] y, int width, int height,
                                          int stride, float[] scratch, float[] scores);
     public native void nativeSetRoi(float x, float y);
