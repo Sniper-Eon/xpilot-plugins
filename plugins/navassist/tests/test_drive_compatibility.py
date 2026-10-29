@@ -82,3 +82,18 @@ def test_cycle_publisher_bounds_bursts_and_keeps_control_ttl():
   for kind, maximum_gap in [('lanes.topology', 50_000_000), ('lanes.intent', 50_000_000)]:
     stamps = [s for s, k, _ in sent if k == kind and s < 1_500_000_000]
     assert all(b-a == maximum_gap for a, b in zip(stamps, stamps[1:]))
+
+
+def test_lamp_diagnostics_are_not_a_continuous_five_hz_stream(monkeypatch):
+  from navassist.plugin import NavAssist
+  from openpilot.tesla import plugins
+  sent = []
+  monkeypatch.setattr(plugins, 'send_msg', lambda *args: sent.append(args))
+  p = NavAssist.__new__(NavAssist)
+  p.settings = N(enabled=True, turn_signal_enabled=True)
+  p._next_lamp = 0
+  p._fresh_intent = lambda: {}
+  p.turns = N(update=lambda *a, **kw: [], diagnostics=lambda *a, **kw: {})
+  for now in range(0, 3_000_000_000, 10_000_000):
+    p.control_sends(N(), N(), now)
+  assert len(sent) == 3

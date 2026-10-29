@@ -9,7 +9,7 @@
 from openpilot.tesla.plugin import Plugin
 # Import-time capability gate for the shared, single-publisher message broker.
 from openpilot.tesla.plugin_msgd import socket_path as _required_message_broker  # noqa: F401
-from openpilot.tesla.lane_policy import LaneChangeLimits  # noqa: F401; refuse hosts without the required lane context
+from openpilot.tesla.lane_policy import LaneChangeLimits  # noqa: F401 -- refuse hosts without the required lane context
 
 from .map_data import MapData
 from .settings import read as read_settings
@@ -63,9 +63,9 @@ class NavAssist(Plugin):
     frames=self.turns.update(intent,CS,CC,now_ns,enabled=enabled)
     if now_ns >= self._next_lamp:
       from openpilot.tesla import plugins
-      self._next_lamp=now_ns+200_000_000
+      self._next_lamp=now_ns+1_000_000_000
       plugins.send_msg(type(self),'nav.lamp',self.turns.diagnostics(intent,CS,CC,now_ns,
-        enabled=enabled,frames=frames),500)
+        enabled=enabled,frames=frames),1500)
     return frames
 
   @classmethod

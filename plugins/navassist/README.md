@@ -236,3 +236,9 @@ never creates permission: the native decision, road edge, speed, engagement and
 driver checks still apply. Raw explicit OEM veto is honored even before the
 aggregate confirms it. Phone lane numbering and single-frame qualification are
 unchanged. This repair does not establish dashed/solid classification.
+
+## Deployment refinement (2.4.2)
+
+Lamp diagnostics are capped at 1 Hz, TTL 1500 ms, reducing the combined
+send schedule to at most 59 messages/second. They remain read-only; physical
+lamp control and its feedback checks run at their original rate.
