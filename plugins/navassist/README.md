@@ -253,3 +253,9 @@ absent paint codes; zero is a valid dashed display code and cannot be padding.
 Valid host codes are passed through. Planner useLaneLines is a boolean planning
 choice, not paint classification. Phone MNN count outputs remain lane counts;
 no unverified road-mask channel mapping or crossing permission is added.
+
+## User-selected compatibility default (2.4.4)
+
+Per the explicit 2026-10-29 user decision, missing compact left/right line fields
+retain wire value 0, superseding 2.4.3's -1 default. Existing native codes are
+still forwarded. This changes no actuation checks or phone UI.

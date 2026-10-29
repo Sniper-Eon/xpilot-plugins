@@ -1,6 +1,6 @@
 """CP compact metadata: native car state only; no image or invented side radar.
 
-Missing line categories use -1 (unreported), never dashed zero. Existing native
+Missing line categories retain compatibility zero per the user policy. Existing native
 codes are forwarded; neither road geometry nor phone lane count invents paint.
 
 CP-only fields absent in SP (softHold/carrotCruise/gearStep/line categories/urea/
@@ -34,7 +34,7 @@ def car_state_frame(cs, sequence):
     return getattr(cs, name, default)
 
   def marking(name):
-    code = value(name, -1)
+    code = value(name, 0)
     return code if type(code) is int and code in (-1, 0, 1, 10, 11, 20, 21, 30, 31) else -1
 
   gear = str(value("gearShifter", "unknown"))

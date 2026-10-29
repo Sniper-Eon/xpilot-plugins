@@ -91,7 +91,7 @@ def car_state_frame(cs, sequence):
     return getattr(cs, name, default)
 
   def marking(name):
-    code = value(name, -1)
+    code = value(name, 0)
     return code if type(code) is int and code in (-1, 0, 1, 10, 11, 20, 21, 30, 31) else -1
 
   gear = str(value("gearShifter", "unknown"))

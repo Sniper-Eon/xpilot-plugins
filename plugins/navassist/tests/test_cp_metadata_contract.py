@@ -27,12 +27,12 @@ def test_native_bsm_binary_layout_and_no_side_radar():
   assert len(b) == 73
 
 
-def test_missing_line_categories_never_encode_dashed_zero():
-  # Failures: padding zero is interpreted as dashed by the CP app; unsupported
-  # or malformed categories must be -1, while genuine native codes survive.
+def test_missing_line_categories_preserve_user_selected_zero():
+  # Failure contract: missing fields retain compatibility zero per user request;
+  # genuine native codes and invalid-value handling must remain unchanged.
   import struct
   from cp_nav.cpmeta import car_state_frame as cp_frame
   for encode in (car_state_frame, cp_frame):
-    assert struct.unpack_from('<2h', encode(N(), 1), 42) == (-1, -1)
+    assert struct.unpack_from('<2h', encode(N(), 1), 42) == (0, 0)
     assert struct.unpack_from('<2h', encode(N(leftLaneLine=10,rightLaneLine=21),1),42) == (10,21)
     assert struct.unpack_from('<2h', encode(N(leftLaneLine=True,rightLaneLine=99),1),42) == (-1,-1)
