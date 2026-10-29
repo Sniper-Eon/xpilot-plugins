@@ -1,4 +1,4 @@
-"""Frame-bound CP phone lane candidates. No model-only absolute lane promotion."""
+"""Frame-bound CP phone lane candidates. Single-frame estimates; no model-only absolute lane promotion."""
 from .phone import bounded_json, OBSERVATION_PATH
 
 
@@ -23,7 +23,9 @@ class PhoneLaneEvidence:
                    source='cpPhoneVision',scope='visibleCorridor',samples=0,controlEligible=False)
     identity = (nav.get('sessionId'),nav.get('routeRevision'))
     if not enabled or not nav.get('valid') or not identity[0] or identity != self.identity:
+      previous = (self.last_stamp, self.last_frame, self.stream)
       self.__init__()
+      self.last_stamp, self.last_frame, self.stream = previous
       self.identity = identity
       if not enabled or not nav.get('valid') or not identity[0]:return unknown
     def reject():
@@ -58,5 +60,5 @@ class PhoneLaneEvidence:
       self.samples=self.samples+1 if key==self.key and stamp-self.last_stamp<=800_000_000 else 1
       self.key,self.last_stamp,self.last_frame=key,stamp,frame
     elif key != self.key:return reject()
-    return dict(unknown,valid=self.samples>=3,laneNumber=left,laneCount=left+right-1,
+    return dict(unknown,valid=True,laneNumber=left,laneCount=left+right-1,
                 samples=self.samples,captureMonoNs=stamp,frameId=frame,streamId=stream,model=lane['model'])

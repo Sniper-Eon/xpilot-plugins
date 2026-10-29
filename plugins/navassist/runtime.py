@@ -44,9 +44,6 @@ class NavigationRuntime:
     position = self.position.update(topology, nav, now_ns)
     candidate = self.phone_lane.update(phone_lane_observation, nav, now_ns,
       enabled=self.settings.enabled and self.settings.phone_lane_enabled)
-    if candidate['valid'] and position['valid']:
-      candidate['absoluteConfirmed'] = (candidate['laneNumber'] == position['lane_index']
-        and candidate['laneCount'] == position['lane_count'])
     nav['phoneLaneEvidence'] = candidate
     topology['absoluteEgoIndex'] = position['lane_index']-1 if position['valid'] else None
     left_blocked, right_blocked, reasons = self.blocker.update(oem, topology,

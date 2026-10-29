@@ -195,3 +195,13 @@ geometric position is labelled corroborated. Missing/expired/bad output, route/s
 changes and disabling clear the model estimate. No lane-change policy, lamps, sound,
 phone-installed switch or original navigation decision is overridden.
 See companion/tesnav/docs/CP_LANE_LOCAL.md for APK/runtime and validation boundaries.
+
+## Single-frame mode (2.2.1, user decision 2026-10-29)
+
+The user explicitly removed both geometric corroboration and the three-frame wait.
+A valid fresh frame now displays the phone's lane estimate immediately, without
+consulting the existing geometric position. Route changes still discard the old
+frame; original timestamps, frame identity, model contract, disable and expiry
+checks remain. Visible-corridor estimates are not relabelled absolute-map lanes.
+Native BSM, paint, road-edge, driver and engagement checks are unchanged.
+This supersedes the confirmation behavior described in the 2.2.0 candidate above.

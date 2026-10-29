@@ -67,3 +67,11 @@ packaging, signature, old native-library byte preservation and ELF/JNI exports c
 No Android JNI inference, Binder death/timeout execution, phone load/heat/latency,
 recognition accuracy, device deployment or road validation performed. Local candidate
 only, with both model opt-ins default off.
+
+## User update, 2026-10-29
+
+navassist 2.2.1 removes the three-frame wait and geometric corroboration label.
+Fresh valid single-frame output is displayed immediately as an estimate. The
+previous three-frame/corroboration description is historical for 2.2.0 only.
+The user also authorized deployment in the following task; actual installed and
+verified states are recorded in that deployment report, not inferred from this doc.

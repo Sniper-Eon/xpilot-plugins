@@ -26,7 +26,7 @@ def test_distinct_frames_route_and_missing_data():
 def test_repeated_frames_bad_numbers_and_no_geometric_promotion():
   gate=PhoneLaneEvidence();nav=dict(valid=True,sessionId='nav',routeRevision=1)
   for _ in range(5):r=gate.update(sample(100,1),nav,100,enabled=True)
-  assert not r['valid']
+  assert r['valid'] and r['samples']==1
   record=sample(200,2);record['lane_cp']['laneNumber']=1
   assert not gate.update(record,nav,200,enabled=True)['valid']
   record=sample(300,3);record['lane_cp']['leftClass']=True
@@ -59,3 +59,10 @@ def test_transport_to_nav_hud_preserves_capture_and_never_sets_absolute_position
   assert hud['phone_lane_message']=='Vision lane estimate 2/3' and hud['ego'] is None
   store.new_stream()
   assert not gate.update(json.loads(store.output.read_text()),nav,now[0],enabled=True)['valid']
+
+
+def test_single_frame_has_no_boundary_or_three_frame_wait():
+  gate=PhoneLaneEvidence();nav=dict(valid=True,sessionId='nav',routeRevision=1)
+  result=gate.update(sample(100,1),nav,100,enabled=True)
+  assert result['valid'] and result['samples']==1
+  assert result['laneNumber']==2 and not result['absoluteConfirmed']
