@@ -3,9 +3,11 @@ package com.garan.tesnav.vision
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.InputType
 import android.widget.*
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collectLatest
 
 class PhoneVisionActivity : Activity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -25,6 +27,19 @@ class PhoneVisionActivity : Activity() {
         val night = Switch(this).apply { text = "使用夜间车道模型"; isChecked = preferences.getBoolean("cp_lane_night", false)
             setOnCheckedChangeListener { _, checked -> preferences.edit().putBoolean("cp_lane_night", checked).apply() } }
         val laneNotice = TextView(this).apply { text = "默认关闭。模型只提供可见车道估计，缺模型或结果不可靠时显示未知；不会开启 C3 导航或授权变道。" }
+        val paint = Switch(this).apply { text="实验：标线颜色与虚实估计（只读）"
+            isChecked=preferences.getBoolean("cp_paint_enabled",false)
+            setOnCheckedChangeListener { _,checked ->
+                preferences.edit().putBoolean("cp_paint_enabled",checked).apply()
+                if(!checked)CpPaintPreview.clear()
+            }
+        }
+        val paintNotice=TextView(this).apply { text="结合模型边界与彩色画面；偏色、遮挡或画面不足时保留未知。红绿蓝预览是调试色，不代表标线颜色。" }
+        val paintStatus=TextView(this).apply { text="等待新鲜道路画面";textSize=16f }
+        val paintImage=ImageView(this).apply { adjustViewBounds=true;maxHeight=600 }
+        val replay=Button(this).apply { text="查看离线验证画面"
+            setOnClickListener { CpPaintPreview.showReplay(this@PhoneVisionActivity) }
+        }
         val status = TextView(this).apply { textSize = 18f; setPadding(0, 24, 0, 24) }
         val start = Button(this).apply { text = "开始手机运算"; setOnClickListener {
             if (host.text.isBlank() || token.text.length < 32) { Toast.makeText(this@PhoneVisionActivity, "请填写 C3 地址与连接码", Toast.LENGTH_SHORT).show(); return@setOnClickListener }
@@ -34,9 +49,21 @@ class PhoneVisionActivity : Activity() {
         } }
         val stop = Button(this).apply { text = "停止"; setOnClickListener { stopService(Intent(this@PhoneVisionActivity, PhoneVisionService::class.java)); PhoneVisionService.status.value = "已停止" } }
         val back = Button(this).apply { text = "返回导航，保持运算"; setOnClickListener { finish() } }
-        listOf(title, description, host, token, lane, night, laneNotice, start, stop, back, status).forEach { layout.addView(it) }
+        listOf(title, description, host, token, lane, night, laneNotice,paint,paintNotice,paintStatus,paintImage,replay,
+            start, stop, back, status).forEach { layout.addView(it) }
         setContentView(ScrollView(this).apply { addView(layout) })
         scope.launch { PhoneVisionService.status.collect { status.text = it } }
+        scope.launch { CpPaintPreview.state.collectLatest { value ->
+            val current=CpPaintPreview.fresh(value,SystemClock.elapsedRealtime())
+            paintStatus.text=current?.let { CpPaintPreview.text(it.estimate) } ?: "等待新鲜道路画面"
+            paintImage.setImageBitmap(current?.bitmap)
+            if(current!=null) {
+                delay((current.expiresMs-SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                paintStatus.text="等待新鲜道路画面";paintImage.setImageDrawable(null)
+            }
+        } }
     }
+    override fun onStart() { super.onStart();CpPaintPreview.renderImages=true }
+    override fun onStop() { CpPaintPreview.renderImages=false;super.onStop() }
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
 }

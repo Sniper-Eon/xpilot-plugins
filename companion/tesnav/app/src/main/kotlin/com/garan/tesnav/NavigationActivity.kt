@@ -166,6 +166,16 @@ class NavigationActivity : Activity() {
         naviView.setLazyOverviewButtonView(overviewButton)
         configureMap()
         configureActions()
+        activityScope.launch {
+            com.garan.tesnav.vision.CpPaintPreview.state.collectLatest { value ->
+                val frame=com.garan.tesnav.vision.CpPaintPreview.fresh(value,SystemClock.elapsedRealtime())
+                laneGuidanceView.setPhonePaint(frame?.let { com.garan.tesnav.vision.CpPaintPreview.text(it.estimate) })
+                if(frame!=null) {
+                    delay((frame.expiresMs-SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                    laneGuidanceView.setPhonePaint(null)
+                }
+            }
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) {
                 stopNavigationAndFinish()

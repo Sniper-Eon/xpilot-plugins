@@ -63,6 +63,7 @@ class PhoneVisionService : Service() {
             while (isActive) {
                 delay(250)
                 availability.expire(SystemClock.elapsedRealtime())
+                CpPaintPreview.expire(SystemClock.elapsedRealtime())
                 if (SystemClock.elapsedRealtime() >= renewAt) {
                     wakeLock?.let { if (it.isHeld) it.release(); it.acquire(10*60*1000L) }
                     renewAt=SystemClock.elapsedRealtime()+5*60*1000L
@@ -85,6 +86,7 @@ class PhoneVisionService : Service() {
     private suspend fun runVision(host: String, token: String) = coroutineScope {
         require(host.matches(Regex("[A-Za-z0-9.-]+(?::[0-9]{1,5})?"))) { "C3 地址格式不正确" }
         val preferences = getSharedPreferences("phone_vision", MODE_PRIVATE)
+        val paintTracker = CpPaintTracker()
         val client = OkHttpClient.Builder().connectTimeout(2, TimeUnit.SECONDS).readTimeout(2, TimeUnit.SECONDS)
             .callTimeout(3, TimeUnit.SECONDS).build()
         val gson = Gson()
@@ -121,6 +123,7 @@ class PhoneVisionService : Service() {
                 while (currentCoroutineContext().isActive) {
                     val start = SystemClock.elapsedRealtime()
                     var requestStarted = start
+                    var paintImage: android.graphics.Bitmap? = null
                     attempts++
                     val timings = linkedMapOf<String, Any>("attempt" to attempts, "cpu_threads" to cpuThreads,
                         "target_fps" to targetFps, "prefetch" to prefetchEnabled, "minimum_idle_ms" to minimumIdleMs)
@@ -139,10 +142,12 @@ class PhoneVisionService : Service() {
                         // A frame from the previous host must never be posted to the new C3.
                         if (packet.host != (PhoneVisionC3Address.navigationHost ?: host)) throw ExpiredVisionFrame()
                         if (packet.host != activeHost) {
+                            paintTracker.clear();CpPaintPreview.clear()
                             activeHost = packet.host; tracker = SideVehicleTracker(); lastCapture = -1L; streamId = null
                             preferences.edit().putString("host", packet.host).apply()
                         }
                         if (streamId != frame.stream_id) {
+                            paintTracker.clear();CpPaintPreview.clear()
                             streamId = frame.stream_id; lastCapture = -1L; tracker = SideVehicleTracker()
                         }
                         if (frame.capture_mono_ns <= lastCapture) {
@@ -156,11 +161,27 @@ class PhoneVisionService : Service() {
                         timings["jpeg_decode_ms"] = SystemClock.elapsedRealtime()-beforeDecode
                         val beforeDetect = SystemClock.elapsedRealtime()
                         var laneCandidate: CpLaneResult? = null
+                        var paintCandidate: CpPaintEstimate? = null
+                        val paintEnabled=preferences.getBoolean("cp_paint_enabled",false) && frame.capture_age_ms!=null
+                        val laneEnabled=preferences.getBoolean("cp_lane_enabled",false)
+                        val laneModel=if(preferences.getBoolean("cp_lane_night",false))"vlaneNight.mnn" else "vlaneDay.mnn"
                         val detections = try {
                             check(bitmap.width == frame.width && bitmap.height == frame.height) { "图像尺寸不一致" }
-                            if (preferences.getBoolean("cp_lane_enabled", false)) {
+                            if (laneEnabled || paintEnabled) {
                                 val laneStart = SystemClock.elapsedRealtime()
-                                laneCandidate = cpLane.detect(bitmap, if (preferences.getBoolean("cp_lane_night", false)) "vlaneNight.mnn" else "vlaneDay.mnn")
+                                val laneResult = cpLane.detect(bitmap,laneModel,roadEnabled=paintEnabled)
+                                if(laneEnabled)laneCandidate=laneResult
+                                if(paintEnabled)cpLane.lastRoad?.let { mask ->
+                                    try {
+                                        val pixels=IntArray(bitmap.width*bitmap.height)
+                                        bitmap.getPixels(pixels,0,bitmap.width,0,0,bitmap.width,bitmap.height)
+                                        paintCandidate=CpPaintCore.estimate(pixels,bitmap.width,bitmap.height,mask)
+                                        if(CpPaintPreview.renderImages)paintImage=CpPaintPreview.image(bitmap,mask)
+                                    } catch (_:Exception) {
+                                        paintCandidate=null;paintImage?.recycle();paintImage=null
+                                        paintTracker.clear();CpPaintPreview.clear()
+                                    }
+                                }
                                 timings["lane_model_ms"] = SystemClock.elapsedRealtime()-laneStart
                             } else cpLane.close()
                             detector.detect(bitmap).mapNotNull { box ->
@@ -192,6 +213,17 @@ class PhoneVisionService : Service() {
                                 error("结果被拒绝（${response.code}）")
                             }
                         }
+                        val paintNow=SystemClock.elapsedRealtime()
+                        val remaining=CpPaintPreview.remaining(frame.capture_age_ms,paintNow-requestStarted,frame.bridge_wait_ms)
+                        if(preferences.getBoolean("cp_paint_enabled",false) && paintCandidate!=null && remaining>0 &&
+                            packet.host==(PhoneVisionC3Address.navigationHost ?: host) && laneModel==
+                            (if(preferences.getBoolean("cp_lane_night",false))"vlaneNight.mnn" else "vlaneDay.mnn")) {
+                            val estimate=paintTracker.update(paintCandidate!!,frame.stream_id+":"+laneModel,
+                                frame.capture_mono_ns,frame.ego_speed_mps)
+                            CpPaintPreview.state.value=CpPaintPreview.Frame(estimate,paintImage,paintNow,paintNow+remaining,
+                                frame.frame_id,laneModel)
+                            paintImage=null // Ownership transferred to immutable UI state.
+                        } else { paintTracker.clear();CpPaintPreview.clear() }
                         timings["post_ms"] = SystemClock.elapsedRealtime()-beforePost
                         accepted++; timings["outcome"]="accepted"
                         fun line(side: String): String {
@@ -201,9 +233,16 @@ class PhoneVisionService : Service() {
                             val absolute = item.absolute_speed_mps?.let { "；估计平均车速 %.1f km/h".format(it*3.6) } ?: ""
                             return "$distance；$relative$absolute"
                         }
+                        val modelInfo=when {
+                            preferences.getBoolean("cp_lane_enabled",false) -> cpLane.status
+                            preferences.getBoolean("cp_paint_enabled",false) ->
+                                if(cpLane.lastRoad!=null)"标线边界已提取（只读）" else "标线输出不可用：${cpLane.status}"
+                            else -> ""
+                        }
                         availability.accepted(requestStarted, "手机运算 ${elapsed} ms\n左侧：${line("left")}\n右侧：${line("right")}\n实验估算，限前方广角可见区域" +
-                            if (preferences.getBoolean("cp_lane_enabled", false)) "\n${cpLane.status}" else "")
+                            if(modelInfo.isNotEmpty())"\n$modelInfo" else "")
                     } catch (e: Exception) {
+                        paintTracker.clear();CpPaintPreview.clear()
                         if (e is CancellationException) throw e
                         if (e is ExpiredVisionFrame) expired++
                         timings["outcome"] = if (e is ExpiredVisionFrame) "expired" else "error"
@@ -211,6 +250,7 @@ class PhoneVisionService : Service() {
                         availability.unavailable(e.message ?: "等待 C3 画面")
                         delay(if (e is ExpiredVisionFrame) 80 else 1000)
                     } finally {
+                        paintImage?.recycle()
                         timings["total_ms"] = SystemClock.elapsedRealtime()-requestStarted
                         timings["report_elapsed_ms"] = SystemClock.elapsedRealtime()
                         timings["fetch_attempts"] = fetchAttempts.get()
@@ -222,10 +262,11 @@ class PhoneVisionService : Service() {
                     else delay(maxOf(minimumIdleMs, 1000L/targetFps-(SystemClock.elapsedRealtime()-start)))
                 }
             }
-        } finally { cpLane.close(); prefetched?.close() }
+        } finally { paintTracker.clear();CpPaintPreview.clear();cpLane.close(); prefetched?.close() }
     }
 
     override fun onDestroy() {
+        CpPaintPreview.clear()
         availability.stopped()
         scope.cancel()
         wakeLock?.let { if (it.isHeld) it.release() }

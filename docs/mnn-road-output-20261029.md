@@ -9,3 +9,21 @@ Empirical channel overlays: 1/2 align left/right boundary curves and bridge dash
 Private camera replay frames came from the user's existing ecamera HEVC logs (never driver camera). Keep raw images/models/APKs outside Git. A native AVFoundation wrapper decoded no-B-frame capture for the local replay; no production dependency was added. A slow temporary PyAV download was cancelled. Replay input/output hashes are in result-stage1.json. Source/build/native-device/camera-road accuracy are distinct: extraction passed; live-camera paint classification is still in development.
 
 Post-device-replay source cleanup also clears lastRoad immediately on worker disconnection; it does not change tensor decoding. Device v33 replay predates that one callback assignment; source and device equivalence must be rechecked for the final candidate.
+
+## Stage 2: experimental read-only phone paint preview (2026-10-30)
+
+Candidate v34 combines the empirically observed boundary channels with original RGB stripe contrast and gap evidence. This is a heuristic estimate, not a new trained MNN paint head or an established tensor-class definition. White/yellow and dashed/continuous evidence are independent. Broad highlights, weak traces, ambiguous colour and short boundaries stay unknown. A continuous single-frame fragment is not labelled solid: the tracker requires at least five fresh observations spanning 12 metres of reported movement, with capture order, stream/model continuity and boundary-position checks. This threshold is an experimental filter, not proof of paint classification accuracy.
+
+The phone's `cp_paint_enabled` switch defaults off and does not enable a C3 plugin. It can extract the mask without enabling the lane-count feature. The local navigation overlay and phone vision page show the estimate; the latter can show channel debug colours with an explicit legend. The private offline replay dialog never populates live state. Current capture age bounds the display lifetime; missing age, stale frames, rejected observations, disconnects and disabling clear the result. The observation request body and canonical `carState` line fields remain unchanged, including the user's required missing-field wire default 0. No paint estimate, raw mask or additional message is sent to C3; no crossing authority is added.
+
+Failure-first checks cover one dash fragment becoming solid, stationary confirmation, stale/changed streams, absent paint, broad curb highlights, ambiguous colours and receipt-time freshness renewal. The previous source lacked the new cores and failed the new checks at compilation. Final local Android run: 367 tests, zero failures/errors, one skipped; app and instrumentation APKs compile. The configured private replay includes 18 native masks: unmarked daytime scenes stay unknown; night colours remain unknown and two right-boundary samples provide continuous-fragment evidence only. Positive colour/style cases currently use synthetic fixtures. Road accuracy and moving-camera validation remain outstanding.
+
+APK package/signature match the installed application, and all 28 native/model archive members are byte-identical to v32. At this checkpoint v34 has **not** been installed or activated: ADB is disconnected. The native replay of v33 does not count as v34 UI or live-pipeline verification. `CpPaintUiDeviceTest` is compiled but not run; its optional activation method requires explicit `activateReadOnlyPaint=true` and changes only the phone paint preference. C3 plugins, host and firmware are unchanged. Private artifacts and hashes are recorded outside Git in `xpilot-workspace/mnn-paint-20261029/result-stage2.json`.
+
+Validation command (private asset/replay paths supplied outside Git):
+
+```sh
+CP_PAINT_REPLAY_DIR="$PRIVATE_REPLAY" ./gradlew :app:testTenengkaiUnitTest :app:assembleTenengkai :app:assembleTenengkaiAndroidTest -PDEVICE_TEST_BUILD_TYPE=tenengkai -PCP_LANE_REFERENCE_DIR="$PRIVATE_ASSETS"
+```
+
+Upstream AGENTS/XPILOT, plugin API/manifest and store contributing document revisions were rechecked on 2026-10-30 and match the prior snapshots. This phone-only stage consumes no new host hook or firmware ABI.
