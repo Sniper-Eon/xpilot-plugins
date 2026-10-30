@@ -62,3 +62,40 @@ matched ONNX vs compiled weights: the latest branch updated only the compiled
 artifact after the historical ONNX. Then run actual inference and evaluate target
 USB+AMD compatibility, timing and failure fallback. No GPU, firmware compilation,
 device activation or road validation has occurred in this trial.
+
+## Continuation: recurrent runner and actual artifact availability
+
+Added `tools/nav_model_sequence.py`: pinned size and streaming SHA256 verification
+before loading ONNX; validates every prepared frame against runtime input names,
+dtypes and shapes before starting; initializes state heads to zero and advances
+all next-state heads per frame; rejects malformed/nonfinite state/output. Saves
+raw outputs and per-frame CPU timings without interpreting them as road accuracy.
+Prepared NPZ contains each non-state input with an added leading frame dimension;
+for example new_img is [T,2,6,128,256]. No camera warp is silently fabricated.
+
+Validation:
+- New failure contract initially failed importing absent runner (exit 1).
+- Both unittest modules: 12 tests passed (exit 0).
+- An actual ONNX Runtime session ran a deliberately tiny recurrence fixture for
+  140 frames; output 1..140 exactly. This verifies runner state plumbing ONLY,
+  and is explicitly not the official model or navigation performance.
+- Store index check and diff whitespace check passed (exit 0).
+- Prior paired-host gate limitations remain unresolved. No host or runtime plugin
+  changed; no firmware, GPU, vehicle activation or road validation performed.
+- Isolated environment in the sibling private trial directory now contains onnx
+  and onnxruntime; repository runtime dependencies have not changed.
+
+The expected 814591106-byte ONNX was NOT found locally. Its official LFS batch
+request returns object 404. GitHub media and the official HuggingFace historical
+content-addressed URL also return 404. HuggingFace main currently references a
+DIFFERENT SHA256 and was deliberately not substituted. Official lfs-history
+README reports deletion of 437 objects on 2026-10-19 and partial recovery;
+this context does not establish why this particular object is unavailable.
+The provided ZIP lists the weights and prepared camera frames as excluded external
+files on the original Windows workspace. Existing local HEVC clips do not provide
+verified matched route/GPS/preprocessing. Official inference remains unexecuted.
+
+Recovery target: original big_driving_supercombo.onnx with SHA256
+`1d18c42ea4cd95c8bffab4635844b78b8e2d4e25b9de44a9c5ac2e0961371a2e`,
+plus verified prepared camera feeds or a matched capture with calibration. The
+runner is ready for those inputs; no alternate model is silently accepted.
