@@ -121,3 +121,48 @@ folder. No original prepared-frames.npz was found. Existing ego*.npz contain onl
 time/speed arrays, not model camera tensors. Synchronized camera/route/GPS inputs
 and target-GPU qualification remain outstanding; the missing-weight blocker is
 resolved. No claim is made about unmounted Windows storage or inaccessible folders.
+
+## Actual official CPU inference completed
+
+Added repeatable end-to-end diagnostic `tools/nav_model_diagnostic.py` with failure
+assertions declared before the experiment (nonfinite/missing states, ABI mismatch,
+aliasing of shared history, nonrepeatability, and withdrawal history effects).
+Run from the plugin repository with the isolated trial environment:
+
+```
+python -u -m tools.nav_model_diagnostic MODEL.onnx MAP.png NEW_OUTPUT_DIRECTORY
+```
+
+Actual pinned official ONNX inference: 474 invocations, CPUExecutionProvider,
+all outputs finite. Includes 140 zero-input warmup frames, six single-frame
+branches from identical copied history, then paired baseline vs 24 navigation-on
+and 140 withdrawn-input frames. All five next-state tensors are carried forward.
+Identical-history blank repeat was bit-exact and shared snapshot was unchanged.
+Raw results: sibling `official-nav-trial-20261030/real-diagnostic/result.json` and
+`outputs.npz`; model/map/source/output SHA256 recorded with the results.
+
+Median inference 0.4520 s, P95 0.5079 s on this desktop CPU. This does not establish
+20 Hz target-GPU operation. Input effects relative to the common blank baseline
+were observed for map-only, left, right and nav-only branches. Statistics compare
+RAW action/plan heads (including distribution parameters), not decoded physical
+steering, actual road positioning error or driving quality.
+
+After withdrawing BOTH map and navigation, action/plan heads still differed from
+baseline at sampled withdrawn frames 1 and 20; sampled frames 60, 128 and 140 were
+exactly equal. This is evidence that current-frame input removal is not immediate
+history removal. It is NOT a universal 60-frame timeout or proof of a safe switch.
+No state-reset or safety policy was added to the vehicle as a consequence.
+
+Critical scope: all camera tensors were synthetic black, map was a historical
+Careland image unrelated to any camera, traffic convention/action_t were fixed.
+No synchronized road replay, camera warp verification, GPU compilation, installed
+plugin path, device activation or road validation is claimed. Local model
+execution and recurrent/input plumbing are now actually exercised; complete
+xpilot navigation integration is still outstanding.
+
+Checks on this final tool: 12 unittest cases passed, store index --check passed,
+diff whitespace check passed. The real 474-inference experiment passed all embedded
+assertions (exit 0). Paired-host full gate set attempted once again: 5/23 passed;
+remaining environment/legacy-interface failures recorded in sibling
+`host-gates-real/result.json`. Host source is unchanged; full host gates remain
+unresolved and are not reported as passing.
