@@ -191,7 +191,17 @@ object NavAssistV2Mapper {
         val maneuver = NavigationMappers.maneuverWireValue(state.maneuver)
         val (turnSignalHold, turnSignalCountdownS) = trafficLightTurnHold(state, sourceWallTimeMs, validForMs)
         val location = location(state)
-        val guidance = state.guidanceObservedAtMs?.let { observedAtMs ->
+        val guidance = state.guidanceObservedAtMs?.let { progressObservedAtMs ->
+            // SDK callbacks and route progress have separate clocks. Repeated
+            // matched callbacks renew delivery, never the source gate's moving
+            // progress budget. Sender heartbeats cannot advance either clock.
+            val progressElapsed = state.guidanceReceivedElapsedMs
+            val callbackElapsed = state.guidanceCallbackElapsedMs
+            val delta = if (progressElapsed != null && callbackElapsed != null &&
+                progressElapsed >= 0 && callbackElapsed >= progressElapsed) callbackElapsed - progressElapsed else null
+            val observedAtMs = if (progressObservedAtMs >= 0 && delta != null &&
+                delta <= Long.MAX_VALUE - progressObservedAtMs && progressObservedAtMs + delta <= sourceWallTimeMs)
+                progressObservedAtMs + delta else progressObservedAtMs
             NavAssistV2Guidance(
                 observedAtMs = observedAtMs,
                 maneuver = maneuver,

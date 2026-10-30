@@ -176,6 +176,27 @@ class NavAssistV2ProtocolTest {
         assertTrue(json.contains("\"items\":[]"))
     }
 
+    @Test fun `real unchanged SDK callback renews delivery time but sender heartbeat does not`() {
+        // Failure: progress time is exported as callback time, so C3 rejects a
+        // fresh unchanged SDK observation. Sender time must never repair it.
+        val state = activeState().copy(guidanceReceivedElapsedMs = 100L,
+            guidanceCallbackElapsedMs = 5_100L)
+        fun snapshot(now: Long) = NavAssistV2Mapper.snapshot(state, "test-session", 1L, now, 500L)
+        assertEquals(7_000L, snapshot(7_000L).guidance?.observedAtMs)
+        assertEquals(7_000L, snapshot(8_000L).guidance?.observedAtMs)
+        assertEquals(2_000L, state.guidanceObservedAtMs)
+        assertEquals(100L, state.guidanceReceivedElapsedMs)
+    }
+
+    @Test fun `invalid SDK callback clocks cannot manufacture a fresh observation`() {
+        for (callback in listOf(99L, Long.MAX_VALUE)) {
+            val state = activeState().copy(guidanceReceivedElapsedMs = 100L,
+                guidanceCallbackElapsedMs = callback)
+            assertEquals(2_000L, NavAssistV2Mapper.snapshot(state, "test-session", 1L, 8_000L, 500L)
+                .guidance?.observedAtMs)
+        }
+    }
+
     @Test
     fun `snapshot preserves independent observation times and maps fields`() {
         val snapshot = NavAssistV2Mapper.snapshot(
