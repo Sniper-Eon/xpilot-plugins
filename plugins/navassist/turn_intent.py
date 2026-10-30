@@ -9,9 +9,9 @@ class NavTurnSignalCoordinator:
   SIGNAL_TIMEOUT_NS = 60_000_000_000
   PLAN_GAP_GRACE_NS = 1_500_000_000
   LOOKAHEAD_TIME_S = 8.0
-  MIN_LOOKAHEAD_M = 40.0
+  MIN_LOOKAHEAD_M = 20.0
   MAX_LOOKAHEAD_M = 250.0
-  LOOKAHEAD_MARGIN_M = 20.0
+  LOOKAHEAD_MARGIN_M = 1.5
   TURN_CLEAR_STABLE_NS = 500_000_000
   MANEUVER_DIRECTIONS = {
     "slightLeft": LaneIntentDirection.left,
@@ -48,8 +48,7 @@ class NavTurnSignalCoordinator:
     return NavLaneIntent(reason=reason)
 
   def update(self, plan: NavTurnPlan, *, speed_mps: float, now_ns: int,
-             turn_geometry_active: bool = False, lookahead_time_s: float | None = None,
-             lookahead_distance_m: float | None = None) -> NavLaneIntent:
+             turn_geometry_active: bool = False, lookahead_time_s: float | None = None) -> NavLaneIntent:
     direction = self.MANEUVER_DIRECTIONS.get(plan.maneuver, LaneIntentDirection.none)
     event_key = (plan.session_id, plan.route_revision, plan.maneuver_event_id)
 
@@ -108,10 +107,6 @@ class NavTurnSignalCoordinator:
     lookahead_m = max(self.MIN_LOOKAHEAD_M, min(
       self.MAX_LOOKAHEAD_M, max(0.0, speed_mps) * (self.LOOKAHEAD_TIME_S if lookahead_time_s is None else lookahead_time_s) + self.LOOKAHEAD_MARGIN_M,
     ))
-    if lookahead_distance_m:
-      # Turn-lane lookahead (UI setting) extends the lamp window so an announced turn arms the lamp
-      # hundreds of metres out; 300 m keeps it from blinking through an entire road.
-      lookahead_m = min(300.0, max(lookahead_m, float(lookahead_distance_m)))
     if not 0.0 < plan.distance_m <= lookahead_m:
       return self._reset("turnOutsideWindow")
 

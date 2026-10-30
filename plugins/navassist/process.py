@@ -71,9 +71,13 @@ def main():
           params.put_bool('ExtNavAssistPairingReset', False)
       model_good = healthy(sm, ['modelV2'], now, 150_000_000)
       model = sm['modelV2'] if model_good else None
-      if settings.phone_lane_enabled:
+      phone_lane_record = read_phone_lane() if settings.enabled and settings.phone_lane_enabled else None
+      phone_lane_capture = phone_lane_record.get('capture_mono_ns') if isinstance(phone_lane_record, dict) else None
+      phone_lane_usable = bool(isinstance(phone_lane_record, dict) and phone_lane_record.get('valid') is True
+                               and type(phone_lane_capture) is int and 0 <= now - phone_lane_capture <= 800_000_000)
+      if settings.phone_lane_enabled and phone_lane_usable:
         lane_tracker.reset()
-        lane_geometry = dict(status='DisabledByPhone', widthM=None)
+        lane_geometry = dict(status='PhoneLane', widthM=None)
         lane_state = dict(index=None,count=None,valid=False,changing=False,ageMs=0.)
       else:
         lateral_state = str(model.meta.laneChangeState) if model_good else None
@@ -90,7 +94,7 @@ def main():
         left_phone=bool(phone_sides and phone_sides[0].blocked), right_phone=bool(phone_sides and phone_sides[1].blocked),
         turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
         localization_valid=bool(pose_ok), map_snapshot=map_messages.fresh('nav.map').get('navassist'),
-        phone_lane_observation=read_phone_lane() if settings.enabled and settings.phone_lane_enabled else None)
+        phone_lane_observation=phone_lane_record)
       for payload in (result['topology'], result['intent']):
         payload.update(modelLaneStatus=lane_geometry['status'], modelLaneWidthM=lane_geometry['widthM'],
           modelLaneIndex=lane_state['index'], modelLaneCount=lane_state['count'], modelLaneValid=lane_state['valid'],

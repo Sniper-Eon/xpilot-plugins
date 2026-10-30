@@ -54,6 +54,17 @@ class NavigationRuntime:
     oem.update(leftBlocked=left_blocked, rightBlocked=right_blocked, blockReasons=list(reasons))
     for side in ('left', 'right'):
       topology[side+'CrossingAllowed'] = oem[side+'CrossingAllowed'] and not oem[side+'Blocked']
+    # OEM-primary: a fresh Tesla ALC permission is the primary evidence that the adjacent lane is usable.
+    # The model still vetoes an explicit road edge or an invalid topology; BSM/brake/speed gates stay below.
+    if topology.get('valid') and topology.get('visibleLaneCount', 0) >= 2:
+      name = str(oem.get('alcName', 'UNKNOWN'))
+      for side in ('left', 'right'):
+        allowed = bool(oem.get('alcFresh')) and (name == 'AVAILABLE_BOTH' or name == 'AVAILABLE_ONLY_' + side[0].upper())
+        allowed = bool(allowed and not oem.get(side+'ExplicitBlock') and not oem.get(side+'AvailabilityBlock')
+                       and topology.get(side+'CrossingAllowed') and not topology.get(side+'RoadEdge'))
+        if allowed and topology.get(side+'NeighborExists') is not True:
+          topology[side+'NeighborExists'] = True
+          topology[side+'OemPrimary'] = True
     usable_nav = dict(nav, valid=bool(nav['valid'] and vehicle_fresh),
                       linked=bool(nav.get('linked', nav['valid']) and vehicle_fresh),
                       routeActive=bool(nav.get('routeActive') and vehicle_fresh and self.settings.enabled))

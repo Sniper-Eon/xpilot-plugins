@@ -64,11 +64,6 @@ class RelativeLaneConsistencyFilter:
       self._presence_since_ns = None
       self._absence_since_ns = None
       return self._status(False, "laneChangeTransition")
-    if steering_pressed:
-      self._presence_since_ns = None
-      self._absence_since_ns = None
-      return self._status(False, "driverSteering")
-
     # Missing outer paint is not evidence that the road ends. Keep confirmed
     # history, but never accumulate presence/absence time from unknown frames.
     if neighbor_exists is None:

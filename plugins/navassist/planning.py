@@ -60,7 +60,7 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
       return NavLanePlan(ready, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
                          lane_count, (target,), heuristic=True,
                          edge_direction=LaneIntentDirection.left if fallback_side == 'left' else LaneIntentDirection.right,
-                         relative_change_limit=1)
+                         relative_change_limit=1, allow_unknown_crossing=True)
     if not (nav_valid and lanes and recommended and 0 <= amap_ego_index < len(lanes)
             and 0 <= int(topology.egoLaneIndexFromLeft) < lane_count):
       return NavLanePlan(False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),

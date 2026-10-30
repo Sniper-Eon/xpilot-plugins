@@ -28,6 +28,19 @@
       "default": false
     },
     {
+      "id": "blendful",
+      "name": "Blendful Lane Center",
+      "version": "0.1.0",
+      "api": 1,
+      "category": "lateral_planning",
+      "author": "xpilot plugin port; Blendful by Discountchubbs, royjr, nayan8teen, rav4kumar and sunnypilot contributors",
+      "description": "Alpha lane-center blend: adds a clipped curvature correction toward the visual lane center and draws a blue center line. Enable while parked. The host caps the correction at 0.5 m/s^2 and SP's clip_curvature still applies.",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/blendful-0.1.0.tar.gz",
+      "sha256": "fd1ced834dc86ea62b482fda7951482ae28455d9ac7fae5081bea6278db0111f",
+      "platform": null,
+      "default": false
+    },
+    {
       "id": "blindspot_edges",
       "name": "Blind Spot Edges",
       "version": "1.0.2",
@@ -215,13 +228,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "2.4.5",
+      "version": "2.4.5-final",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.4.5.tar.gz",
-      "sha256": "257cb9e4f9d1c770c7cb32562e94f91f4fc93c7efaf3af5bc0d90990ff9de1b1",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.4.5-final.tar.gz",
+      "sha256": "29e80f7d7f11b47239e35f7851b64b99028945ad13d86e6dfed462f5a399c2c0",
       "platform": null,
       "default": false
     },

@@ -79,7 +79,7 @@ def test_navigation_turn_signal_supports_right_turns_and_waits_until_lookahead_w
   coordinator = NavTurnSignalCoordinator()
 
   early = coordinator.update(turn_plan(maneuver="turnRight", distance=200.0), speed_mps=15.0, now_ns=0)
-  active = coordinator.update(turn_plan(maneuver="turnRight", distance=130.0), speed_mps=15.0, now_ns=1_000_000_000)
+  active = coordinator.update(turn_plan(maneuver="turnRight", distance=120.0), speed_mps=15.0, now_ns=1_000_000_000)
 
   assert not early.signal_requested
   assert active.signal_requested
@@ -133,10 +133,10 @@ def test_navigation_turn_signal_waits_for_sp_turn_geometry_to_clear_after_event_
 
 def test_navigation_turn_signal_does_not_survive_a_route_revision_change():
   coordinator = NavTurnSignalCoordinator()
-  coordinator.update(turn_plan(), speed_mps=10.0, now_ns=0)
+  coordinator.update(turn_plan(distance=50.0), speed_mps=10.0, now_ns=0)
 
   changed = coordinator.update(
-    turn_plan(revision=2, event=12), speed_mps=6.0, now_ns=1_000_000_000,
+    turn_plan(revision=2, event=12, distance=40.0), speed_mps=6.0, now_ns=1_000_000_000,
     turn_geometry_active=True,
   )
 
@@ -145,7 +145,7 @@ def test_navigation_turn_signal_does_not_survive_a_route_revision_change():
 
 def test_navigation_turn_signal_holds_through_recorded_snapshot_gaps_until_maneuver_changes():
   coordinator = NavTurnSignalCoordinator()
-  started = coordinator.update(turn_plan(maneuver="turnRight", distance=120.0), speed_mps=13.5, now_ns=0)
+  started = coordinator.update(turn_plan(maneuver="turnRight", distance=100.0), speed_mps=13.5, now_ns=0)
   first_gap = coordinator.update(
     turn_plan(valid=False, maneuver="turnRight", distance=11.0), speed_mps=2.0, now_ns=17_946_000_000,
   )

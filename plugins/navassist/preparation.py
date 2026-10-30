@@ -14,7 +14,12 @@ class LanePreparation:
   PLAN_RECOVERY_MAX_RETRIES = 2
 
 
-  MISMATCH_STABLE_NS = 500_000_000
+  MISMATCH_STABLE_NS = 250_000_000
+
+
+  # AMap already named the adjacent recommendation; a shorter bounded confirmation is enough
+  # for the observation phase, while blind spot, crossing and OEM vetoes stay mandatory.
+  AMAP_OBSERVATION_NS = 250_000_000
 
 
   CROSSING_STABLE_NS = 300_000_000
@@ -147,7 +152,8 @@ class LanePreparation:
       self._observation_recovery_ns = now_ns
     if recovering:
       self._observation_missing_since_ns = None
-    stable_ns = self.OBSERVATION_RECOVERY_NS if self._observation_lamp_released else self.MISMATCH_STABLE_NS
+    stable_ns = self.OBSERVATION_RECOVERY_NS if self._observation_lamp_released else (
+      self.MISMATCH_STABLE_NS if self._candidate is None or self._candidate[4] else self.AMAP_OBSERVATION_NS)
     if recovering and now_ns - self._observation_recovery_ns >= stable_ns:
       self._phase = "signaling"
       self._phase_since_ns = now_ns
@@ -197,7 +203,7 @@ class LanePreparation:
         return self._abort(saved_key, "lanePositionRouteChanged")
       if not plan.valid and not plan.observation_interrupted:
         return self._abort(saved_key, "lanePositionNavigationUnavailable")
-      if not vehicle_healthy or vehicle.steering_pressed or not allow_new_lane_change:
+      if not vehicle_healthy or not allow_new_lane_change:
         return self._abort(saved_key, "lanePositionRecoveryCancelled")
       if vehicle.lane_change_state in (ObservedLaneChangeState.starting, ObservedLaneChangeState.finishing):
         return self._abort(saved_key, "lanePositionUnexpectedChange")
@@ -236,7 +242,7 @@ class LanePreparation:
 
     recoverable = bool(
       not plan.valid and plan.observation_interrupted and vehicle_healthy
-      and allow_new_lane_change and not vehicle.steering_pressed
+      and allow_new_lane_change
       and vehicle.lane_change_state in (ObservedLaneChangeState.off, ObservedLaneChangeState.pre)
       and self._phase in ("signaling", "ready", "observing") and self._candidate is not None
       and self._candidate[0] == event_key

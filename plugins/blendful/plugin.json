@@ -1,0 +1,22 @@
+{
+  "id": "blendful",
+  "name": "Blendful Lane Center",
+  "version": "0.1.0",
+  "api": 1,
+  "use": "onroad",
+  "category": "lateral_planning",
+  "entry": "plugin:BlendfulPlugin",
+  "author": "xpilot plugin port; Blendful by Discountchubbs, royjr, nayan8teen, rav4kumar and sunnypilot contributors",
+  "description": "Alpha lane-center blend: adds a clipped curvature correction toward the visual lane center and draws a blue center line. Enable while parked. The host caps the correction at 0.5 m/s^2 and SP's clip_curvature still applies.",
+  "priority": 50,
+  "enable_param": "ExtBlendfulEnabled",
+  "claims": ["lat.correction"],
+  "requires": {"hooks": ["lat_correction"]},
+  "settings": [
+    {"key": "ExtBlendfulShowLine", "label": "Show blue lane-center line"}
+  ],
+  "params": {
+    "ExtBlendfulEnabled": {"type": "BOOL", "default": "0"},
+    "ExtBlendfulShowLine": {"type": "BOOL", "default": "1"}
+  }
+}

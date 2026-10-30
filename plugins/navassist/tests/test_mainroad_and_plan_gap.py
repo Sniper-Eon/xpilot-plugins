@@ -69,7 +69,7 @@ def test_repeated_bad_plan_frames_keep_original_missing_and_total_budgets():
  assert not r.signal_requested and r.reason=='crossingWaitTimeout'
 
 
-@pytest.mark.parametrize('changes',[{'left_blinker':True},{'steering_pressed':True},{'brake_pressed':True}])
+@pytest.mark.parametrize('changes',[{'left_blinker':True},{'brake_pressed':True}])
 def test_driver_override_still_ends_preparation_during_a_plan_gap(changes):
  c,p,t,v,_=preparation()
  gap=replace(p,valid=False,recommended_indices=(),observation_interrupted=True)

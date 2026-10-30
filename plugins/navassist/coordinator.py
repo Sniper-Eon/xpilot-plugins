@@ -22,7 +22,7 @@ class NavLaneIntentCoordinator(LanePreparation):
       self._plan_recovery_count_key = event_key
       self._plan_recovery_count = 0
     vehicle_healthy = bool(
-      vehicle.lateral_active and not vehicle.brake_pressed and not vehicle.gas_pressed
+      vehicle.lateral_active and not vehicle.brake_pressed
       and vehicle.speed_mps <= self.MAX_SPEED_MPS
       and (self._phase == "changing" or vehicle.speed_mps >= self.MIN_SPEED_MPS)
     )
@@ -117,7 +117,7 @@ class NavLaneIntentCoordinator(LanePreparation):
         return self._abort(event_key, "noNeighbor")
       if (neighbor is None and not plan.force_fork) or self._phase == "observing":
         waiting = self._observe_before_start(
-          now_ns, recovering=(neighbor is True or plan.force_fork) and not vehicle.steering_pressed,
+          now_ns, recovering=(neighbor is True or plan.force_fork),
         )
         if waiting is not None:
           return waiting
@@ -207,7 +207,7 @@ class NavLaneIntentCoordinator(LanePreparation):
     if (relative_status is not None and not relative_status.ready and not plan.force_fork
         and self._phase != "changing" and not relative_cycle_active):
       if (same_preparation and relative_status.reason in ("stabilizingNeighbor", "stabilizingNewNeighbor")
-          and not vehicle.steering_pressed):
+          ):
         self._crossing_since_ns = 0
         return NavLaneIntent(
           signal_requested=True, direction=direction, request_id=self._request_id,

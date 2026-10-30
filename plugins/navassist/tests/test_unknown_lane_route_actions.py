@@ -119,5 +119,6 @@ def test_aborted_lane_preparation_cannot_restart_as_turn_only_lamp():
       lateral_active=True,gas_pressed=gas,turns=turns,lanes=lanes)
   for ms in (0,500,1000,1300):out=tick(ms)
   assert out['signalRequested'] and out['targetLaneIndex']>=0
-  assert not tick(1400,gas=True)['signalRequested']
-  assert not tick(1500)['signalRequested']
+  # Gas is no longer a cancellation gate; the request remains until the route/plan ends.
+  assert tick(1400,gas=True)['signalRequested']
+  assert tick(1500)['signalRequested']

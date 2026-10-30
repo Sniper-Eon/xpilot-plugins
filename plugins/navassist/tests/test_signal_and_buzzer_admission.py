@@ -56,10 +56,11 @@ def test_explicit_route_action_needs_local_corridor_not_absolute_number(maneuver
       blindspot_left=veto == 'bsm' and side == 'left', blindspot_right=veto == 'bsm' and side == 'right',
       lateral_active=True, left_blinker=side == 'left', right_blinker=side == 'right',
       gas_pressed=veto == 'gas', turns=turns, lanes=lanes)
-  if veto == 'none':
+  if veto in ('none', 'paint', 'gas'):
     assert out['signalRequested'] and out['laneChangeAllowed']
     assert out['targetLaneIndex'] == (0 if side == 'left' else 2)
   else:
+    # BSM and a road-edge/absent neighbor remain hard vetoes.
     assert not out['laneChangeAllowed']
 
 

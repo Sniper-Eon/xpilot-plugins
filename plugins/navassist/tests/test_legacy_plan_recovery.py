@@ -42,7 +42,7 @@ def test_interrupted_recovery_restarts_three_second_stability():
  assert i.reason=='lanePositionRecoveryStabilizing'
  assert r.tick().reason=='lanePositionRecovered'
 
-@pytest.mark.parametrize('changes',[{'gas_pressed':True},{'brake_pressed':True},{'lateral_active':False},{'speed_mps':5},{'speed_mps':35},{'steering_pressed':True}])
+@pytest.mark.parametrize('changes',[{'brake_pressed':True},{'lateral_active':False},{'speed_mps':5},{'speed_mps':35}])
 def test_driver_or_vehicle_health_cancellation_never_rearms(changes):
  r=Run();r.active();r.lost();i=r.tick(v=replace(CAR,**changes));assert not i.signal_requested
  assert r.c._blocked_key==('session',1,10)
