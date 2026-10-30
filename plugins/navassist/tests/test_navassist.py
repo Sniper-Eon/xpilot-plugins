@@ -125,6 +125,22 @@ def test_speed_activates_and_releases():
   assert released is not None and released > 5.0
 
 
+def test_speed_accepts_70_kph_but_releases_above_boundary():
+  """Regression: 60..70 rejected; >70 admitted; crossing the limit retains an active ceiling."""
+  ceiling = NavigationSpeedCeiling(NavSettings(turn_speed_kph=25))
+  nav = {"valid": True, "stale": False, "maneuver": "turn_right", "distanceM": 170.0,
+         "sessionId": "s", "routeRevision": 1, "maneuverEventId": 7}
+  assert ceiling.update(nav, v_ego=70/3.6, v_cruise=80/3.6, enabled=True,
+                        driver_override=False) == pytest.approx(25/3.6)
+  assert ceiling.is_active
+  released = ceiling.update(nav, v_ego=70/3.6+.001, v_cruise=80/3.6, enabled=True,
+                            driver_override=False)
+  assert not ceiling.is_active and released > 25/3.6
+  fresh = NavigationSpeedCeiling(NavSettings(turn_speed_kph=25))
+  assert fresh.update(nav, v_ego=70/3.6+.001, v_cruise=80/3.6, enabled=True,
+                      driver_override=False) is None
+
+
 def test_turn_coordinator_window():
   turns = TurnSignalCoordinator()
   now = time.monotonic_ns()
