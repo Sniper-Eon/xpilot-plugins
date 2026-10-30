@@ -27,3 +27,11 @@ CP_PAINT_REPLAY_DIR="$PRIVATE_REPLAY" ./gradlew :app:testTenengkaiUnitTest :app:
 ```
 
 Upstream AGENTS/XPILOT, plugin API/manifest and store contributing document revisions were rechecked on 2026-10-30 and match the prior snapshots. This phone-only stage consumes no new host hook or firmware ABI.
+
+### Device activation update, 2026-10-30
+
+The earlier pending-install checkpoint is superseded: source e150143 was installed as v34 using the same package/signature. The installed APK SHA256 matches the built candidate (`9a786a0c8b4f9248db31af68cfae0e0862e5c3af6d5d064cc273d5cb1fd23294`). A verified v33 rollback APK remains in the phone's private deployment area. To avoid repeating a slow full transfer, unchanged ZIP payloads were reused from that backup; the complete reconstructed APK was hash-verified before Android installed it, and its installed-file hash was verified afterward.
+
+`CpPaintUiDeviceTest` passed both tests in 1.965s, including the explicitly requested read-only phone switch activation and preservation of the existing lane-count switch. The replay screenshot was pulled and visually checked: readable Chinese text, channel-colour legend, right continuous fragment pending confirmation, and no single-frame solid classification. `CpRoadMaskReplayDeviceTest` was rerun on v34: one test passed in 2.219s, all 18 native masks returned with controlEligible=false. Navigation and phone vision foreground services were restored and verified; existing lane-count and night-model preferences remain true, and the new read-only paint preference is true.
+
+C3 at its previous address remains unreachable. No C3 plugin, firmware or control setting changed. Live camera integration, real movement confirmation and road paint accuracy are still unverified; offline/native/UI success does not establish those outcomes. Current private evidence is in result-stage2.json and the device test outputs alongside it.
