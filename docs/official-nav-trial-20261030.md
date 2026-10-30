@@ -166,3 +166,23 @@ assertions (exit 0). Paired-host full gate set attempted once again: 5/23 passed
 remaining environment/legacy-interface failures recorded in sibling
 `host-gates-real/result.json`. Host source is unchanged; full host gates remain
 unresolved and are not reported as passing.
+
+## Recorded-frame feed connection
+
+Added `tools/nav_model_feed.py` to join per-frame JSONL navigation/map envelopes
+with prepared camera/base inputs into a complete NPZ accepted by the existing
+recurrent ONNX runner. Each map is loaded separately, checked through build_inputs,
+and absent/disabled/stale inputs get zeros rather than a held previous image.
+It is an offline ingestion interface, NOT a live domestic-map SDK or phone bridge.
+The SDK producer, model-grade phone route input and Jetlink navigation transport
+remain unimplemented. The historical Careland page is a manually driven prototype,
+not evidence of a current continuous rendering service. No available live SDK
+credentials were established in this task.
+
+Checks: prior-to-implementation import of the new feature failed; 13 unittest
+cases now pass. Store index and diff whitespace checks pass. File-to-file joining
+of 8 synthetic-camera/historical-map frames generated 4 ready and 4 disabled
+inputs, and these complete feeds ran through the real pinned official ONNX with
+finite outputs (exit 0). Neither camera synchronization nor live map integration
+is claimed. Artifacts are in sibling `joined/` and `joined-inference/` directories.
+Prior full host gates remain unresolved; no runtime host/plugin changed.
