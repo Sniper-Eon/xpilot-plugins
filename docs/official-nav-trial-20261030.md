@@ -99,3 +99,25 @@ Recovery target: original big_driving_supercombo.onnx with SHA256
 `1d18c42ea4cd95c8bffab4635844b78b8e2d4e25b9de44a9c5ac2e0961371a2e`,
 plus verified prepared camera feeds or a matched capture with calibration. The
 runner is ready for those inputs; no alternate model is silently accepted.
+
+## Weight recovery completed
+
+The previously missing ONNX has now been recovered from the release linked by
+Deggory/openpilot-models-onnx README:
+https://github.com/happymaj11r/openpilot-models/releases/download/big-nav-model-integration-1d18c42e/big_driving_supercombo.onnx
+
+Downloaded into sibling private trial `weights/big_driving_supercombo.onnx`.
+Size 814591106 and full SHA256
+`1d18c42ea4cd95c8bffab4635844b78b8e2d4e25b9de44a9c5ac2e0961371a2e`
+match the official pointer and research package. ONNX loaded successfully and all
+11 input names/shapes match the historical inspection. This confirms the recovered
+bytes, not merely the release label. Private recovery.json records provenance.
+No inference or deployment was performed during retrieval.
+
+Search covered Documents/Desktop/Downloads/cache filenames, exact-sized files in
+Documents/Desktop/Downloads (including Git object directories), Spotlight exact
+names, and 33 ZIP files across the project and accessible October WeChat file
+folder. No original prepared-frames.npz was found. Existing ego*.npz contain only
+time/speed arrays, not model camera tensors. Synchronized camera/route/GPS inputs
+and target-GPU qualification remain outstanding; the missing-weight blocker is
+resolved. No claim is made about unmounted Windows storage or inaccessible folders.
