@@ -30,13 +30,13 @@
     {
       "id": "blendful",
       "name": "Blendful Lane Center",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "api": 1,
       "category": "lateral_planning",
       "author": "xpilot plugin port; Blendful by Discountchubbs, royjr, nayan8teen, rav4kumar and sunnypilot contributors",
       "description": "Alpha lane-center blend: adds a clipped curvature correction toward the visual lane center and draws a blue center line. Enable while parked. The host caps the correction at 0.5 m/s^2 and SP's clip_curvature still applies.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/blendful-0.1.1.tar.gz",
-      "sha256": "422cf686d7bb33f15debb698916df86477234979ba32689b60f0700813be9a6e",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/blendful-0.1.2.tar.gz",
+      "sha256": "e6f2532df2761d0c82a50773ee8f20081eec1bb29dac0739e104e8232cf52df5",
       "platform": null,
       "default": false
     },

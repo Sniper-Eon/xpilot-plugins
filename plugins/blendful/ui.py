@@ -46,6 +46,7 @@ class BlendfulRoadOverlay(RoadOverlay):
       return
     center = np.asarray(points[1]).copy()
     center[:, 1] = (left + right) / 2.0
-    poly = road.polygon(center, 0.15)
+    poly = road.polygon(center, 0.25)
     if poly.size:
-      draw_polygon(road.rect, poly, color=rl.Color(*BLENDFUL_COLOR, int(255 * self._trust)))
+      alpha = int(255 * max(self._trust, 0.35))
+      draw_polygon(road.rect, poly, color=rl.Color(*BLENDFUL_COLOR, alpha))
