@@ -68,7 +68,10 @@ def lane_center(model, v_ego: float) -> tuple[float, float] | None:
   if center is None:
     return None
   y, lp, rp = center
-  trust = lp + rp - lp * rp
-  trust *= confidence(lp, float(model.laneLineStds[1]))
-  trust *= confidence(rp, float(model.laneLineStds[2]))
+  # Confidence already includes each lane probability. Apply it once, then
+  # combine the two independent lines; multiplying the probabilities again
+  # collapses trust (0.78/0.08 became 0.024 and never reached the 0.05 draw gate).
+  left = confidence(lp, float(model.laneLineStds[1]))
+  right = confidence(rp, float(model.laneLineStds[2]))
+  trust = left + right - left * right
   return y, float(np.clip(trust, 0.0, 1.0))

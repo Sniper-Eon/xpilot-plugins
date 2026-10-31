@@ -24,6 +24,12 @@ def test_centered_lane_has_high_trust():
   assert trust > 0.9
 
 
+def test_asymmetric_real_lane_still_reaches_draw_gate():
+  center, trust = lane_center(model(lp=0.78, rp=0.08, ls=0.14, rs=0.40), 5.0)
+  assert abs(center) < 1e-6
+  assert trust > 0.05
+
+
 def test_wide_lane_is_rejected():
   assert lane_center(model(left=-3.0, right=3.0), 10.0) is None
 
@@ -31,4 +37,4 @@ def test_wide_lane_is_rejected():
 def test_low_probability_has_low_trust():
   center, trust = lane_center(model(lp=0.1, rp=0.1), 10.0)
   assert abs(center) < 1e-6
-  assert trust < 0.05
+  assert trust < 0.2

@@ -1,7 +1,7 @@
 {
   "id": "blendful",
   "name": "Blendful Lane Center",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "api": 1,
   "use": "onroad",
   "category": "lateral_planning",
