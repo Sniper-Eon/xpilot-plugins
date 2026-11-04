@@ -4,6 +4,8 @@
 saturation windup; inactive state leakage/resume snap; learned safety VM;
 disabled baseline/COOP mutation; non-finite input (including held frames);
 exception/non-finite output fallback; card phase/limiter-order mismatch.
+- final cooperative limiter remains pinned to 5 after the car port moves to 8,
+  or the driver-override slew scale is unintentionally raised with it.
 - M1 mixed switch off: stock Autosteer signal/event is hidden or SP engages.
 - M2 mixed switch on: real stock Autosteer setting is cleared, event remains, or SP cannot engage.
 - M3 no mixed plugin: stock Autosteer signal/event is hidden or SP engages.
@@ -190,6 +192,11 @@ def run(output):
     checks.append("enabled setup: only COOP bit cleared; persistent TeslaCoopSteering untouched")
 
     ctl = controller()
+    controller_ns = sys.modules[ctl.plugin.__class__.__module__]
+    assert controller_ns.CoopSteeringCarControllerParams.ANGLE_LIMITS is CarControllerParams.ANGLE_LIMITS
+    assert controller_ns.CoopSteeringCarControllerParams.ANGLE_LIMITS.MAX_ANGLE_RATE == 8
+    assert controller_ns.OVERRIDE_MAX_ANGLE_RATE == 5
+    checks.append("1.2.0 final limiter follows the 8 deg/frame car port; override slew remains 5 deg/frame")
     ref = reference.CoopSteeringCarController()
     ref_cp = structs.CarParamsSP(flags=TeslaFlagsSP.COOP_STEERING.value)
     pre_last = last = 0.0
