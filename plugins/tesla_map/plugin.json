@@ -1,0 +1,24 @@
+{
+  "id": "tesla_map",
+  "name": "Tesla Map Data",
+  "version": "1.0.0",
+  "api": 1,
+  "use": "onroad",
+  "category": "ui",
+  "entry": "plugin:TeslaMap",
+  "author": "xpilot",
+  "description": "Tile: Tesla's own map data from 0x238 on the vehicle bus - map speed limit next to the car's fused limit, road class / controlled access, next branch and lane rejects. Read-only, display only.",
+  "priority": 100,
+  "enable_param": "ExtTeslaMap",
+  "claims": [],
+  "params": {
+    "ExtTeslaMap": {
+      "type": "BOOL",
+      "default": "0"
+    },
+    "ExtTeslaMapState": {
+      "type": "JSON",
+      "note": "card -> tile snapshot of 0x238 UI_driverAssistMapData, schema v1"
+    }
+  }
+}

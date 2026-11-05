@@ -9,6 +9,7 @@ from openpilot.tesla import plugins
 from openpilot.tesla.ui.plugin_ui import HudOverlay, ScreenOverlay
 from openpilot.tesla.ui.tile import Tile
 from openpilot.tesla.ui.tiles import TileSpec
+from .manual_page import TnFollowPage
 
 
 class TnFollowHud(HudOverlay):
@@ -18,7 +19,7 @@ class TnFollowHud(HudOverlay):
     self._level = -1
     self._applied_ms = -1
     self._next_read = 0.0
-    self._font = gui_app.font(FontWeight.BOLD)
+    self._font = None
 
   def update(self) -> None:
     now = rl.get_time()
@@ -39,6 +40,8 @@ class TnFollowHud(HudOverlay):
       text = f"TN {self._level + 1}/7  {self._applied_ms / 1000.0:.2f}s"
     else:
       text = f"TN {self._level + 1}/7  ramping"
+    if self._font is None:
+      self._font = gui_app.font(FontWeight.BOLD)
     pad_x, pad_y, height = 18, 10, 46
     size = min(30, max(22, rect.height / 22))
     width = 14 + size * 0.62 * len(text)
@@ -49,6 +52,7 @@ class TnFollowHud(HudOverlay):
 
 class TnFollowTile(Tile):
   SPEC = TileSpec("tn_follow", "TN Follow", sizes=("small", "medium"), show="always", hz=2, order=60)
+  PAGE = TnFollowPage
 
   def __init__(self):
     self._params = None
@@ -81,7 +85,7 @@ class TnFollowOverlay(ScreenOverlay):
     self._level = -1
     self._applied_ms = -1
     self._next_read = 0.0
-    self._font = gui_app.font(FontWeight.BOLD)
+    self._font = None
 
   def update(self, sm) -> None:
     now = rl.get_time()
@@ -106,6 +110,8 @@ class TnFollowOverlay(ScreenOverlay):
       text = f"TN {self._level + 1}/7  {self._applied_ms / 1000.0:.2f}s"
     else:
       text = f"TN {self._level + 1}/7  ramping"
+    if self._font is None:
+      self._font = gui_app.font(FontWeight.BOLD)
     size = 30
     width = 24 + size * 0.62 * len(text)
     box = rl.Rectangle(rect.x + 24, rect.y + 24, width, 48)

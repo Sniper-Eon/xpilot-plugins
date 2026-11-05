@@ -1,0 +1,24 @@
+{
+  "id": "jetlink",
+  "name": "Jetlink Accelerator",
+  "version": "0.1.0",
+  "api": 1,
+  "use": "onroad",
+  "category": "perception_model",
+  "entry": "plugin:Jetlink",
+  "author": "xpilot",
+  "description": "Owns role:perception.model in the plugin repo. Runs a plugin-owned Jetlink USB gadget and local modeld; big-model attach is the next step.",
+  "priority": 100,
+  "enable_param": "ExtJetlinkEnabled",
+  "claims": ["role:perception.model", "process:jet_modeld", "process:jetlinkd"],
+  "params": {
+    "ExtJetlinkEnabled": {"type": "BOOL", "default": "0"},
+    "ExtJetlinkLink": {"type": "INT", "default": "0"},
+    "ExtJetlinkOffroad": {"type": "BOOL", "default": "1"},
+    "ExtJetlinkProgress": {"type": "JSON", "default": ""},
+    "ExtJetlinkSpec": {"type": "JSON", "default": ""},
+    "ExtJetlinkPointers": {"type": "JSON", "default": ""},
+    "ExtJetlinkBigModel": {"type": "JSON", "default": ""},
+    "ExtJetlinkCatalog": {"type": "JSON", "default": ""}
+  }
+}

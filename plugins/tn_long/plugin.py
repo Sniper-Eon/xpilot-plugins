@@ -22,7 +22,8 @@ from opendbc.car.tesla.values import CANBUS
 from openpilot.tesla.plugin import Plugin
 
 
-STW_ACTN_RQ_ADDR = 568
+STW_ACTN_RQ_ADDR = 0x238  # source 2 (autopilot party) is STW_ACTN_RQ; source 1 is UI_driverAssistMapData on this car
+VCLEFT_SWITCH_ADDR = 0x3C2  # VCLEFT_switchStatus (vehicle bus): right-scroll ticks are in mux index 1
 SCROLL_LEVEL_PARAM = "ExtTnScrollLevel"
 DTR_LEVEL = {0: 0, 33: 1, 66: 2, 100: 3, 133: 4, 166: 5, 200: 6}
 
@@ -116,17 +117,50 @@ class TnLong(Plugin):
     self.last_level: int | None = None
     self.pending_level: int | None = None
     self.pending_count = 0
+    self._last_tilt_left = 0
+    self._last_tilt_right = 0
+    self._engaged = False
+
+  def control_sends(self, CS, CC, now_ns: int) -> list:
+    self._engaged = bool(getattr(CC, "enabled", False) and getattr(CS, "cruiseState", None) is not None
+                         and getattr(CS.cruiseState, "enabled", False))
+    return []
+
+  def _scroll_level(self, direction: int) -> None:
+    try:
+      current = int(self.params.get(SCROLL_LEVEL_PARAM, return_default=True))
+    except (TypeError, ValueError):
+      current = -1
+    if not 0 <= current < len(FOLLOW_TIME):
+      current = 2  # first use: standard, 1.45 s
+    level = max(0, min(len(FOLLOW_TIME) - 1, current + direction))
+    if level != current:
+      self.params.put(SCROLL_LEVEL_PARAM, level)
+
+  def _observe_switch(self, data: bytes) -> None:
+    if len(data) < 2 or (int(data[0]) & 0x03) != 1:
+      return
+    # Right scroll wheel left/right tilt, two bits each in mux1.
+    left = (int(data[1]) >> 0) & 0x03
+    right = (int(data[1]) >> 2) & 0x03
+    if left and not self._last_tilt_left and self._engaged and self.enabled:
+      self._scroll_level(-1)
+    if right and not self._last_tilt_right and self._engaged and self.enabled:
+      self._scroll_level(1)
+    self._last_tilt_left = left
+    self._last_tilt_right = right
 
   def observe_can(self, can_list, now_ns: int) -> list:
     if not self.enabled:
       return []
     for _mono_time, frames in can_list:
       for address, data, source in frames:
-        if address != STW_ACTN_RQ_ADDR or source != CANBUS.vehicle or len(data) < 2:
-          continue
-        level = DTR_LEVEL.get(int(data[1]))
-        if level is not None:
-          self._observe_level(level)
+        if address == VCLEFT_SWITCH_ADDR and source in (CANBUS.party, CANBUS.vehicle):
+          self._observe_switch(data)
+        elif address == STW_ACTN_RQ_ADDR and source == CANBUS.autopilot_party and len(data) >= 2:
+          level = DTR_LEVEL.get(int(data[1]))
+          if level is not None:
+            self._observe_level(level)
     return []
 
   def _observe_level(self, level: int) -> None:

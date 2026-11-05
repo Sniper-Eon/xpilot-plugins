@@ -26,6 +26,18 @@
       "platform": null
     },
     {
+      "id": "blendful",
+      "name": "Blendful Lane Center",
+      "version": "0.1.0",
+      "api": 1,
+      "category": "lateral_planning",
+      "author": "xpilot plugin port; Blendful by Discountchubbs, royjr, nayan8teen, rav4kumar and sunnypilot contributors",
+      "description": "Alpha lane-center blend: adds a clipped curvature correction toward the visual lane center and draws a blue center line. Enable while parked. The host caps the correction at 0.5 m/s^2 and SP's clip_curvature still applies.",
+      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/blendful-0.1.0.tar.gz",
+      "sha256": "84e8411d7649c6122e76e9f272f40d54f23746bbfc94390dbba711fee688be9e",
+      "platform": null
+    },
+    {
       "id": "blindspot_edges",
       "name": "Blind Spot Edges",
       "version": "1.0.1",
@@ -185,6 +197,18 @@
       "platform": null
     },
     {
+      "id": "tesla_map",
+      "name": "Tesla Map Data",
+      "version": "1.0.0",
+      "api": 1,
+      "category": "ui",
+      "author": "xpilot",
+      "description": "Tile: Tesla's own map data from 0x238 on the vehicle bus - map speed limit next to the car's fused limit, road class / controlled access, next branch and lane rejects. Read-only, display only.",
+      "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/tesla_map-1.0.0.tar.gz",
+      "sha256": "64784af06f09deb57941fb669672c728609385c2df725b22d6f27043b27fc810",
+      "platform": null
+    },
+    {
       "id": "tesla_mixed_control",
       "name": "Tesla Mixed Control",
       "version": "1.1.0",
@@ -205,7 +229,7 @@
       "author": "xpilot",
       "description": "Replaces SP's longitudinal plan with the TN-NoDEC planner. The card plugin also reads Tesla STW_ACTN_RQ.DTR_Dist_Rq from the right scroll wheel and the planner applies seven t_follow levels (1.05..2.10 s). Prebuilt acados solvers: installs only on the platform it was built for. TN's stopping policy in controlsd is not included.",
       "url": "https://raw.githubusercontent.com/onemiless/xpilot-plugins/main/dist/tn_long-1.1.0.tar.gz",
-      "sha256": "bd90815324ed009163d9ae0f344383ba95b9f322b71b4d570be7b1b1a826722f",
+      "sha256": "0d54cb44da20b1aea56d5939050046d3ffe441aea9a21d8e97835c9d36d5986f",
       "platform": {
         "machine": "aarch64",
         "python": "cpython-312"

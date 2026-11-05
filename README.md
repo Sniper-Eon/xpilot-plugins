@@ -50,6 +50,8 @@ Trust comes from this reviewed repository, so only merge what you have read.
 
 - `plugins/overspeed_warning`: example. Alerts category, one store-backed setting, an `alert` claim, a relative import.
 - `plugins/tn_long`: TN longitudinal (TN-NoDEC) as a `long_planner`, with prebuilt acados solvers. See its README.
+- `plugins/tesla_map`: display-only tile for Tesla's `0x238 UI_driverAssistMapData` (map limit vs fused limit, road
+  class, next branch, lane rejects). See its README; no claims and no control output.
 - `plugins/tesla_mixed_control`: dzid26 angle-based cooperative steering. Enable while parked and restart;
   SP must own steering and stock Autosteer must not steer concurrently. See its README for timing and host-only validation limits.
 
