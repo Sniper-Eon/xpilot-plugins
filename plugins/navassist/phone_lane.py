@@ -69,7 +69,10 @@ def planning_index(candidate, nav, *, enabled=False):
   if not enabled or not nav.get('valid') or not candidate.get('valid'):
     return None
   count, index = candidate.get('laneCount'), candidate.get('laneNumber')
-  if (type(count) is not int or type(index) is not int or not 1 <= index <= count <= 5
-      or type(nav.get('laneTotalCount')) is not int or count != nav['laneTotalCount']):
+  if type(count) is not int or type(index) is not int or not 1 <= index <= count <= 5:
+    return None
+  # 高德多数时候不给 laneTotalCount；缺省时信任手机的车道总数，只有两边都给出且矛盾才拒绝。
+  total = nav.get('laneTotalCount')
+  if type(total) is int and total > 0 and count != total:
     return None
   return index-1
