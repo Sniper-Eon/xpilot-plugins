@@ -39,13 +39,15 @@ class NavigationChime:
               and 0 <= now_ns-sm.logMonoTime[service] <= 250_000_000):
         return []
     meta = sm['modelV2'].meta
-    if meta.laneChangeState != log.LaneChangeState.laneChangeStarting:
-      return []
-    raw_direction = getattr(meta.laneChangeDirection, 'raw', meta.laneChangeDirection)
+    # capnp returns DynamicEnum here; int()/enum == raises TypeError and faults the hook every frame.
     try:
-      model_direction = DIRECTIONS.get(int(raw_direction))
-    except (TypeError, ValueError):
-      model_direction = None
+      lane_state = str(getattr(meta, 'laneChangeState', 'off')).split('.')[-1]
+      direction_text = str(getattr(meta, 'laneChangeDirection', 'none')).lower()
+    except Exception:
+      return []
+    if lane_state != 'laneChangeStarting':
+      return []
+    model_direction = 'left' if 'left' in direction_text else 'right' if 'right' in direction_text else None
     cs = sm['carState']
     physical = 'left' if cs.leftBlinker and not cs.rightBlinker else 'right' if cs.rightBlinker and not cs.leftBlinker else None
     if model_direction is None or physical != model_direction or not sm['carControl'].latActive:

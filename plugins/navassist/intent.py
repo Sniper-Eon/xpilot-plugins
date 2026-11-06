@@ -48,7 +48,14 @@ class LanePlan:
 
 def planning_ego_index(topology):
   # Model ownership clears stale geometry fallback when its observation is unknown.
-  return topology.get('estimatedEgoIndex') if topology.get('phoneLanePlanningEnabled') else topology.get('absoluteEgoIndex')
+  absolute = topology.get('absoluteEgoIndex')
+  if isinstance(absolute, int) and absolute >= 0:
+    return absolute
+  if topology.get('phoneLanePlanningEnabled'):
+    estimated = topology.get('estimatedEgoIndex')
+    if isinstance(estimated, int):
+      return estimated
+  return None
 
 
 def lane_plan(nav, topology, settings, *, v_ego):
@@ -85,20 +92,83 @@ def payload(intent, nav):
 class TurnSignalCoordinator:
   def __init__(self):
     self.core = NavTurnSignalCoordinator()
+    self._synth_key = None
+    self._synth_id = 0
+    self._synth_last_distance = None
+    self._yield_until_ns = 0
+    self._lamp_seen_key = None
+    self._lamp_off_since_ns = 0
+    self._lamp_drops = 0
 
   def reset(self):
     self.core = NavTurnSignalCoordinator()
+    self._yield_until_ns = 0
+    self._lamp_seen_key = None
+    self._lamp_off_since_ns = 0
+    self._lamp_drops = 0
 
-  def update(self, nav, *, speed_mps, now_ns, lookahead_time_s=8., turn_geometry_active=False):
+  def update(self, nav, *, speed_mps, now_ns, lookahead_time_s=8., lookahead_distance_m=None,
+             turn_geometry_active=False, left_blinker=False, right_blinker=False):
     n = navigation(nav)
     # Route-active but not yet position-matched still carries guidance: arm the lamp early, while lane
     # change readiness remains gated by the fully valid/matched nav state.
     armed = bool((nav.get('linked', nav.get('valid', False)) or nav.get('routeActive', False))
                  and not nav.get('stale', False))
-    plan = NavTurnPlan(armed, n.sessionId, n.routeRevision, n.maneuverEventId, n.maneuver, n.maneuverDistanceM)
-    return payload(self.core.update(plan, speed_mps=speed_mps, now_ns=now_ns,
-                                   lookahead_time_s=lookahead_time_s,
-                                   turn_geometry_active=turn_geometry_active), nav)
+    event_id = int(n.maneuverEventId)
+    if event_id == 0 and armed and n.maneuver not in ("", "none", "destination", "unknown") and n.maneuverDistanceM > 0:
+      key = (n.sessionId, n.routeRevision, n.maneuver)
+      passed = (self._synth_last_distance is not None and self._synth_last_distance < 30.0
+                and n.maneuverDistanceM > 100.0)
+      if key != self._synth_key or passed:
+        self._synth_key = key
+        self._synth_id += 1
+      event_id = self._synth_id
+    if event_id:
+      self._synth_last_distance = n.maneuverDistanceM
+    plan = NavTurnPlan(armed, n.sessionId, n.routeRevision, event_id, n.maneuver, n.maneuverDistanceM)
+    out = payload(self.core.update(plan, speed_mps=speed_mps, now_ns=now_ns,
+                                  lookahead_time_s=lookahead_time_s,
+                                  lookahead_distance_m=lookahead_distance_m,
+                                  turn_geometry_active=turn_geometry_active), nav)
+    key = (n.sessionId, n.routeRevision, n.maneuverEventId)
+    ours = 'right' if out.get('direction') == 'RIGHT' else 'left' if out.get('direction') == 'LEFT' else ''
+    opposing = bool(ours and ((ours == 'right' and left_blinker) or (ours == 'left' and right_blinker)))
+    if opposing:
+      # The driver used the stalk against navigation: hand the lamp over, then take the route back.
+      self.core.reset()
+      self._lamp_seen_key = None
+      self._lamp_off_since_ns = 0
+      self._lamp_drops = 0
+      self._yield_until_ns = now_ns + 1_500_000_000
+      return dict(out, signalRequested=False, direction='none', reason='driverYielding')
+    if now_ns < self._yield_until_ns and (left_blinker or right_blinker):
+      return dict(out, signalRequested=False, direction='none', reason='driverYielding')
+    if not out['signalRequested']:
+      self._lamp_seen_key = None
+      self._lamp_off_since_ns = 0
+      self._lamp_drops = 0
+      return out
+    lamp_on = (right_blinker if ours == 'right' else left_blinker) if ours else False
+    if lamp_on:
+      if self._lamp_seen_key == key and self._lamp_off_since_ns:
+        self._lamp_drops += 1  # the car handed the lamp back while we still asked for it
+      self._lamp_seen_key = key
+      self._lamp_off_since_ns = 0
+      if self._lamp_drops >= 2:
+        self.core.reset()
+        self._lamp_seen_key = None
+        self._lamp_off_since_ns = 0
+        self._lamp_drops = 0
+        return dict(out, signalRequested=False, direction='none', reason='lampRejected')
+    elif self._lamp_seen_key == key and not left_blinker and not right_blinker:
+      if self._lamp_off_since_ns == 0:
+        self._lamp_off_since_ns = now_ns
+      elif now_ns - self._lamp_off_since_ns > 400_000_000:
+        self.core.reset()
+        self._lamp_seen_key = None
+        self._lamp_off_since_ns = 0
+        return dict(out, signalRequested=False, direction='none', reason='driverCancelled')
+    return out
 
 
 class LaneIntentCoordinator:
@@ -107,11 +177,13 @@ class LaneIntentCoordinator:
     self.core = NavLaneIntentCoordinator(max_changes=max_changes)
     self._completed_relative_event = None
     self._owned_lane_event = None
+    self._hold = None
 
   def reset(self):
     self.core = NavLaneIntentCoordinator(max_changes=self.max_changes)
     self._completed_relative_event = None
     self._owned_lane_event = None
+    self._hold = None
 
   def update(self, nav, plan, *, now_ns, topology_valid, left_blocked, right_blocked,
              blindspot_left, blindspot_right, lateral_active, left_blinker=False, right_blinker=False,
@@ -143,8 +215,19 @@ class LaneIntentCoordinator:
       self._completed_relative_event = event
     if result.signal_requested:
       self._owned_lane_event = event
-    return dict(payload(result, nav), relativeStepComplete=self._completed_relative_event == event,
-                laneRequestOwned=self._owned_lane_event == event)
+    out = dict(payload(result, nav), relativeStepComplete=self._completed_relative_event == event,
+               laneRequestOwned=self._owned_lane_event == event)
+    # A started change must not be dropped by a one-frame plan gap: that makes the host re-press the
+    # stalk and the lamp blinks. Hold the same request briefly instead.
+    prepared = str(model_state) in ('preLaneChange', 'laneChangeStarting', 'laneChangeFinishing')
+    if out['signalRequested'] and int(out.get('targetLaneIndex', -1)) >= 0:
+      self._hold = (event, out, now_ns + 4_000_000_000)
+    elif self._hold is not None:
+      held_event, held_out, until_ns = self._hold
+      if held_event == event and now_ns <= until_ns and prepared:
+        return dict(held_out, reason='laneHold')
+      self._hold = None
+    return out
 
 
 def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
@@ -152,7 +235,9 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
                  left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
                  steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False):
   turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns, lookahead_time_s=settings.signal_lead_time_s,
-                      turn_geometry_active=turn_geometry_active)
+                      lookahead_distance_m=settings.turn_lane_lookahead_m,
+                      turn_geometry_active=turn_geometry_active,
+                      left_blinker=left_blinker, right_blinker=right_blinker)
   n = navigation(nav)
   intersection = n.maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'turnRight', 'sharpRight', 'uTurnRight')
   approaching = bool(intersection and turn['signalRequested'])
@@ -182,4 +267,16 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
     return turn
   if out['reason'] in ('routeChanged', 'neighborObservationPaused', 'crossingWaitTimeout') or out['reason'].startswith('lanePosition'):
     return out
+  # 已经在要并过去那一侧的路沿：为「并道」点灯已经没有意义，直接不发（路口转弯灯不受影响）
+  _LANE_CHANGE_LAMPS = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight",
+                                  "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight"))
+  if turn.get('signalRequested') and str(n.maneuver) in _LANE_CHANGE_LAMPS:
+    _count = int(topology.get('visibleLaneCount', 0) or 0)
+    _ego = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
+    _dir = str(turn.get('direction', 'none')).lower()
+    if _count > 1 and 0 <= _ego < _count:
+      _at_edge = (_dir == 'left' and _ego == 0) or (_dir == 'right' and _ego == _count - 1)
+      if _at_edge:
+        turn = dict(turn, signalRequested=False, direction='none', reason='atRoadEdge')
   return turn if settings.turn_signal_enabled else out
+

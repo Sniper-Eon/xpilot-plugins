@@ -15,6 +15,14 @@ LEFT_EXIT_LANE_MANEUVERS = frozenset(("exitLeft", "rampLeft", "mergeLeft"))
 
 
 RIGHT_EXIT_LANE_MANEUVERS = frozenset(("exitRight", "rampRight", "mergeRight"))
+# Freeways aim at the exit-side edge well before the exit itself.
+FREEWAY_RECOMMENDED_FROM_M = 800.0
+ROAD_KIND_LOOKAHEAD_SCALE = {"expressway": 1.0, "urban_expressway": 0.8, "ramp": 0.0}
+# No recommendation at all: drift to the maneuver's side only this close, and only once.
+EDGE_FALLBACK_FROM_M = 250.0
+DIRECTIONAL_MANEUVERS = (LEFT_TURN_LANE_MANEUVERS | RIGHT_TURN_LANE_MANEUVERS
+                         | LEFT_EXIT_LANE_MANEUVERS | RIGHT_EXIT_LANE_MANEUVERS
+                         | frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight")))
 
 
 MERGE_MANEUVERS = frozenset(("mergeLeft", "mergeRight"))
@@ -32,6 +40,10 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
   maneuver = str(nav.maneuver)
   distance_m = float(nav.maneuverDistanceM)
   lane_count = int(topology.visibleLaneCount)
+  road_kind = str(getattr(nav, 'roadKind', 'unknown'))
+  scale = ROAD_KIND_LOOKAHEAD_SCALE.get(road_kind, 1.0)
+  if road_kind == 'ramp':
+    nav_valid = False  # no new lane changes while on a ramp
   fallback_side = None
   lookahead_m = 0.0
   if maneuver in LEFT_TURN_LANE_MANEUVERS:
@@ -39,9 +51,9 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
   elif maneuver in RIGHT_TURN_LANE_MANEUVERS:
     fallback_side, lookahead_m = "right", settings.turn_lane_lookahead_m
   elif maneuver in LEFT_EXIT_LANE_MANEUVERS:
-    fallback_side, lookahead_m = "left", settings.exit_lane_lookahead_m
+    fallback_side, lookahead_m = "left", settings.exit_lane_lookahead_m * scale
   elif maneuver in RIGHT_EXIT_LANE_MANEUVERS:
-    fallback_side, lookahead_m = "right", settings.exit_lane_lookahead_m
+    fallback_side, lookahead_m = "right", settings.exit_lane_lookahead_m * scale
   fork_now = bool(
     maneuver in LEFT_EXIT_LANE_MANEUVERS | RIGHT_EXIT_LANE_MANEUVERS
     and math.isfinite(distance_m) and 0.0 < distance_m <= FORK_NOW_DISTANCE_M
@@ -60,7 +72,7 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
       return NavLanePlan(ready, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
                          lane_count, (target,), heuristic=True,
                          edge_direction=LaneIntentDirection.left if fallback_side == 'left' else LaneIntentDirection.right,
-                         relative_change_limit=1, allow_unknown_crossing=True)
+                         relative_change_limit=1)
     if not (nav_valid and lanes and recommended and 0 <= amap_ego_index < len(lanes)
             and 0 <= int(topology.egoLaneIndexFromLeft) < lane_count):
       return NavLanePlan(False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
@@ -109,6 +121,45 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
         edge_direction=LaneIntentDirection.left if fallback_side == "left" else LaneIntentDirection.right,
         force_fork=fork_now, allow_unknown_crossing=True, ignore_solid_boundary=fork_now,
       )
+    # Last resort: nothing recommends a lane and the maneuver is close. Head for the edge on the
+    # maneuver's own side, one step at a time, and stop asking once that edge lane is reached.
+    visual_ego = int(topology.egoLaneIndexFromLeft)
+    if (nav_valid and not recommended and maneuver in DIRECTIONAL_MANEUVERS
+        and math.isfinite(distance_m) and 0.0 < distance_m <= EDGE_FALLBACK_FROM_M
+        and 0 <= visual_ego < lane_count):
+      side = "left" if "left" in maneuver.lower() else "right"
+      edge_index = 0 if side == "left" else lane_count - 1
+      if visual_ego != edge_index:
+        return NavLanePlan(
+          True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
+          lane_count, (visual_ego - 1 if side == "left" else visual_ego + 1,), heuristic=True,
+          edge_direction=LaneIntentDirection.left if side == "left" else LaneIntentDirection.right,
+          allow_unknown_crossing=True, relative_change_limit=1,
+        )
+      return NavLanePlan(
+        False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId), lane_count, (),
+        observation_interrupted=True,
+      )
+    # No trustworthy absolute lane number: follow the recommendation's own geometry. Recommended
+    # lanes left of the road centre mean one step left, otherwise one step right, once per event.
+    visual_ego = int(topology.egoLaneIndexFromLeft)
+    if nav_valid and recommended and lane_count > 1 and 0 <= visual_ego < lane_count:
+      if len(lanes) == lane_count and visual_ego in recommended:
+        return NavLanePlan(
+          False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId), lane_count, (),
+          observation_interrupted=True,
+        )
+      centre = (len(lanes) - 1) / 2.0
+      rec_centre = sum(recommended) / len(recommended)
+      side = "left" if rec_centre < centre else "right"
+      target = max(0, visual_ego - 1) if side == "left" else min(lane_count - 1, visual_ego + 1)
+      if target != visual_ego:
+        return NavLanePlan(
+          True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
+          lane_count, (target,), heuristic=True,
+          edge_direction=LaneIntentDirection.left if side == "left" else LaneIntentDirection.right,
+          allow_unknown_crossing=True, relative_change_limit=1,
+        )
     # AMap lane indices describe the complete road while modelV2 exposes only a
     # local visible window. Without an edge-qualified directional target there
     # is no common absolute index, so retain the observation but do not control.

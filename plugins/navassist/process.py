@@ -18,6 +18,21 @@ from .lane_tracker import LaneIndexTracker
 from .network import NavigationTransports
 from .phone import PhoneBlindspotAssist
 from .phone_lane import read_observation as read_phone_lane
+
+
+def read_phone_lane_estimate():
+  """The phone's MNN lane estimate with an age, so a stale file is ignored."""
+  try:
+    import json, os
+    path = "/dev/shm/phone_lane_estimate.json"
+    with open(path, 'rb') as f:
+      data = json.loads(f.read(2048).decode('utf-8'))
+    if not isinstance(data, dict):
+      return None
+    data['ageNs'] = max(0, int((time.time() - os.stat(path).st_mtime) * 1e9))
+    return data
+  except Exception:
+    return None
 from .plugin import NavAssist
 from .position import publish as publish_position
 from .feedback import MODEL_POSITION_PATH
@@ -71,20 +86,26 @@ def main():
           params.put_bool('ExtNavAssistPairingReset', False)
       model_good = healthy(sm, ['modelV2'], now, 150_000_000)
       model = sm['modelV2'] if model_good else None
-      phone_lane_record = read_phone_lane() if settings.enabled and settings.phone_lane_enabled else None
-      phone_lane_capture = phone_lane_record.get('capture_mono_ns') if isinstance(phone_lane_record, dict) else None
-      phone_lane_usable = bool(isinstance(phone_lane_record, dict) and phone_lane_record.get('valid') is True
-                               and type(phone_lane_capture) is int and 0 <= now - phone_lane_capture <= 800_000_000)
-      if settings.phone_lane_enabled and phone_lane_usable:
+      if settings.phone_lane_enabled:
         lane_tracker.reset()
-        lane_geometry = dict(status='PhoneLane', widthM=None)
+        lane_geometry = dict(status='DisabledByPhone', widthM=None)
         lane_state = dict(index=None,count=None,valid=False,changing=False,ageMs=0.)
       else:
         lateral_state = str(model.meta.laneChangeState) if model_good else None
         lane_geometry = measure_lane_geometry(model, lateral_state)
         lane_state = lane_tracker.update(int(model.frameId) if model_good else None,
           lane_geometry['provisionalIndex'], lane_geometry['laneCount'], lane_geometry['status'], now)
-      phone_sides = phone.read(now) if phone.enabled else None
+      _snap = store.current(now)
+      _kind = "unknown"
+      if _snap is not None:
+        _inner = _snap.snapshot
+        from .navstate import road_kind as _road_kind
+        _kind = _road_kind(getattr(_inner, "road_class", None), getattr(_inner, "road_type", None),
+                           road_name=getattr(_inner, "current_road", "") or "",
+                           speed_kph=float(getattr(_inner, "speed_kph", 0.0) or 0.0),
+                           parallel_status=str(getattr(_inner, "parallel_road_status", "unknown")),
+                           elevated_status=str(getattr(_inner, "elevated_road_status", "unknown")))
+      phone_sides = phone.read(now, _kind) if phone.enabled else None
       vehicle_fresh = healthy(sm, ['carState', 'carControl', 'controlsState'], now)
       pose_ok = healthy(sm, ['deviceMotion'], now, 500_000_000) and sm['deviceMotion'].inputsOK
       cs, cc = sm['carState'], sm['carControl']
@@ -94,7 +115,32 @@ def main():
         left_phone=bool(phone_sides and phone_sides[0].blocked), right_phone=bool(phone_sides and phone_sides[1].blocked),
         turn_geometry_active=cs.vEgo**2*abs(curvature) >= 1.1,
         localization_valid=bool(pose_ok), map_snapshot=map_messages.fresh('nav.map').get('navassist'),
-        phone_lane_observation=phone_lane_record)
+        phone_lane_observation=read_phone_lane() if settings.enabled and settings.phone_lane_enabled else None)
+      try:
+        _i = result['intent']
+        _n = result['nav']
+        _lanes = _n.get('lanes') or ()
+        _topo = result.get('topology') or {}
+        _ego = int(_topo.get('egoLaneIndexFromLeft', -1) or -1)
+        _cnt = int(_topo.get('visibleLaneCount', 0) or 0)
+        _key = (bool(_n.get('valid')), bool(_n.get('linked')), bool(_n.get('routeActive')),
+                str(_n.get('maneuver')), int(_n.get('maneuverEventId') or 0),
+                float(_n.get('distanceM') or 0.0), float(getattr(cs, 'vEgo', 0.0)),
+                len(_lanes), sum(1 for _l in _lanes if _l.get('recommended') is True), _ego, _cnt,
+                bool(_i.get('signalRequested')), str(_i.get('direction')),
+                str(_i.get('reason')), int(_i.get('targetLaneIndex', -1)),
+                bool(cs.leftBlinker), bool(cs.rightBlinker), bool(cc.latActive),
+                str(getattr(model.meta, 'laneChangeState', 'na')) if model_good else 'na')
+        if _key != globals().get('_last_key'):
+          globals()['_last_key'] = _key
+          import time as _t
+          with open('/tmp/lane_exec.log', 'a') as _f:
+            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d ego=%d/%d | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s\n' % (
+              _t.monotonic(), _key[0], _key[1], _key[2], _key[3], _key[4], _key[5], _key[6],
+              _key[7], _key[8], _key[9], _key[10],
+              _key[11], _key[12], _key[13], _key[14], _key[15], _key[16], _key[17], _key[18]))
+      except Exception:
+        pass
       for payload in (result['topology'], result['intent']):
         payload.update(modelLaneStatus=lane_geometry['status'], modelLaneWidthM=lane_geometry['widthM'],
           modelLaneIndex=lane_state['index'], modelLaneCount=lane_state['count'], modelLaneValid=lane_state['valid'],
