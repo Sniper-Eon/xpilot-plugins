@@ -228,8 +228,8 @@ class NavLaneIntentCoordinator(LanePreparation):
 
     neighbor_exists = topology.left_neighbor_exists if direction == LaneIntentDirection.left else topology.right_neighbor_exists
     if neighbor_exists is None and not plan.force_fork:
-      self._reset()
-      return self._idle("neighborUnknown")
+      # 邻道未知不再阻断：先把灯打出来，让车端有机会执行；已在路沿的情况规划层不会给出目标。
+      neighbor_exists = True
     if not neighbor_exists and not plan.force_fork:
       return self._abort(event_key, "noNeighbor")
 

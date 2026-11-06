@@ -3,6 +3,9 @@ from __future__ import annotations
 from .intent_types import (LaneIntentDirection, ObservedLaneChangeState, NavLanePlan, LaneTopologyInput, LaneVehicleInput, NavTurnPlan, NavLaneIntent)
 
 
+TURN_HOLD_SPEED_MPS = 8.0
+
+
 class NavTurnSignalCoordinator:
   """Requests a physical lamp for a route turn without authorizing a lane change."""
 
@@ -70,7 +73,9 @@ class NavTurnSignalCoordinator:
         route_continuous = (plan.session_id, plan.route_revision) == self._active_key[:2]
         if not route_continuous:
           return self._reset("turnChanged")
-        if turn_geometry_active:
+        # 模型不一定给出 turnGeometryActive；低车速（正在转弯）同样按完成态处理，
+        # 否则每换一个导航 step 就会把灯掐灭再点亮。
+        if turn_geometry_active or speed_mps <= TURN_HOLD_SPEED_MPS:
           self._completion_hold = True
           self._turn_clear_since_ns = 0
         elif self._completion_hold:
