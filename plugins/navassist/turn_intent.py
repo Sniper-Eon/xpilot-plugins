@@ -9,6 +9,16 @@ class NavTurnSignalCoordinator:
   SIGNAL_TIMEOUT_NS = 60_000_000_000
   PLAN_GAP_GRACE_NS = 1_500_000_000
   LOOKAHEAD_TIME_S = 8.0
+  # Forks, exits and merges should warn as soon as they are announced, but only from a sane distance.
+  IMMEDIATE_ARM_MANEUVERS = frozenset((
+    "slightLeft", "slightRight", "keepLeft", "keepRight",
+    "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight",
+  ))
+  IMMEDIATE_ARM_MAX_M = {
+    "slightLeft": 600.0, "slightRight": 600.0, "keepLeft": 600.0, "keepRight": 600.0,
+    "exitLeft": 800.0, "exitRight": 800.0, "rampLeft": 800.0, "rampRight": 800.0,
+    "mergeLeft": 800.0, "mergeRight": 800.0,
+  }
   MIN_LOOKAHEAD_M = 40.0
   MAX_LOOKAHEAD_M = 250.0
   LOOKAHEAD_MARGIN_M = 20.0
@@ -112,6 +122,8 @@ class NavTurnSignalCoordinator:
       # Turn-lane lookahead (UI setting) extends the lamp window so an announced turn arms the lamp
       # hundreds of metres out; 300 m keeps it from blinking through an entire road.
       lookahead_m = min(300.0, max(lookahead_m, float(lookahead_distance_m)))
+    if plan.maneuver in self.IMMEDIATE_ARM_MANEUVERS and plan.distance_m <= self.IMMEDIATE_ARM_MAX_M.get(plan.maneuver, 600.0):
+      lookahead_m = max(lookahead_m, plan.distance_m)
     if not 0.0 < plan.distance_m <= lookahead_m:
       return self._reset("turnOutsideWindow")
 

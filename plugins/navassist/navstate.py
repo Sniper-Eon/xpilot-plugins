@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 MAX_PHONE_LOCATION_AGE_MS = 1_000
-MAX_PHONE_LANE_GUIDANCE_AGE_MS = 2_000
+MAX_PHONE_LANE_GUIDANCE_AGE_MS = 10_000  # AMap re-emits lane items irregularly; 2 s dropped most of them
 MAX_PHONE_LOCATION_ACCURACY_M = 25.0
 
 MANEUVERS = frozenset((
@@ -29,6 +29,27 @@ def _phone_observations_valid(snapshot) -> bool:
   )
 
 
+AUTO_ROAD_KIND = {0: "expressway", 1: "national", 6: "urban_expressway"}
+SDK_ROAD_KIND = {1: "expressway", 2: "national", 3: "provincial", 4: "county", 5: "town",
+                 6: "ramp", 8: "ramp", 9: "ramp", 10: "ramp", 56: "ramp", 58: "ramp"}
+HIGHWAY_NAME_HINTS = ("高速", "高架", "快速", "环路", "环线")
+FREEWAY_KINDS = frozenset(("expressway", "urban_expressway"))
+VALID_HOLD_NS = 1_500_000_000
+_valid_hold = 0
+
+
+def road_kind(road_class, road_type, *, road_name="", speed_kph=0.0,
+              parallel_status="unknown", elevated_status="unknown") -> str:
+  name = road_name or ""
+  on_side_layer = parallel_status == "side" or elevated_status == "side"
+  if any(h in name for h in HIGHWAY_NAME_HINTS) and not on_side_layer and speed_kph >= 45.0:
+    return "urban_expressway" if any(h in name for h in ("高架", "快速", "环路", "环线")) else "expressway"
+  kind = SDK_ROAD_KIND.get(road_type) or AUTO_ROAD_KIND.get(road_class) or "unknown"
+  if kind in FREEWAY_KINDS and speed_kph < 55.0:
+    return "unknown"
+  return kind
+
+
 def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   """Control-valid only for a fresh, matched realtime Android/iOS route with guidance."""
   if current is None:
@@ -48,7 +69,7 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   # baseline, a fresh matched snapshot keeps turn-only guidance available.
   # Lane/slowdown validity below still requires recent guidance and positioning.
   guidance_known = snapshot.guidance_present and guidance_age >= 0
-  linked = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched and guidance_known)
+  linked = bool(not stale and control_source_valid and guidance_known and snapshot.location_present)
   valid = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched
                and snapshot.location_present and guidance_valid and not snapshot.gps_weak and phone_observations_valid)
   if stale:
@@ -67,6 +88,15 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
     reason = "phoneLocalization"
   else:
     reason = "none"
+  global _valid_hold
+  if valid:
+    _valid_hold = now_ns
+  elif not stale and _valid_hold and 0 <= now_ns - _valid_hold <= VALID_HOLD_NS:
+    valid = True
+    if reason != "stale":
+      reason = "none"
+  elif not stale:
+    _valid_hold = 0
   lanes = []
   if lane_valid:
     for lane in snapshot.lanes:

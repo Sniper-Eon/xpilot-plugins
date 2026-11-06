@@ -57,7 +57,10 @@ class PhoneBlindspotAssist:
     self.states = (PhoneSide(reason=reason), PhoneSide(reason=reason))
     return self.states
 
-  def read(self, now_ns):
+  # 每类道路的"算作有车"的置信度门限。越高越宽松（不容易拦），越低越保守。
+  BLOCK_THRESHOLD_BY_KIND = {"expressway": 0.6, "urban_expressway": 0.6, "ramp": 0.45}
+
+  def read(self, now_ns, road_kind="unknown"):
     try:
       data = bounded_json(self.path)
       stamp, stream = data.get("updated_mono_ns"), data.get("stream_id")
@@ -100,8 +103,9 @@ class PhoneBlindspotAssist:
         self.empty[i] = 0
         confidence = value.get("confidence") if isinstance(value, dict) else None
         hits = value.get("hits") if isinstance(value, dict) else None
+        threshold = self.BLOCK_THRESHOLD_BY_KIND.get(str(road_kind), .30)
         if (type(confidence) in (int, float) and math.isfinite(confidence) and
-            .30 <= confidence <= 1 and type(hits) is int and 3 <= hits <= 100000):
+            threshold <= confidence <= 1 and type(hits) is int and 3 <= hits <= 100000):
           states.append(PhoneSide(True, True, "confirmed_phone_target"))
         else:
           states.append(PhoneSide(reason="unconfirmed_or_malformed_target"))

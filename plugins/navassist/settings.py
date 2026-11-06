@@ -13,7 +13,7 @@ class NavSettings:
   turn_lane_lookahead_m: int = 1000
   exit_lane_lookahead_m: int = 2000
   signal_lead_time_s: int = 8
-  turn_speed_kph: int = 18
+  turn_speed_kph: int = 30
   max_lane_changes: int = 5
   phone_assist_enabled: bool = False
   phone_lane_enabled: bool = False
@@ -44,7 +44,7 @@ def read(params) -> NavSettings:
     turn_lane_lookahead_m=_int(params, "ExtNavAssistLookahead", 1000, 100, 1500),
     exit_lane_lookahead_m=_int(params, "ExtNavAssistExitLookahead", 2000, 300, 3000),
     signal_lead_time_s=_int(params, "ExtNavAssistSignalLead", 8, 3, 12),
-    turn_speed_kph=_int(params, "ExtNavAssistTurnSpeed", 18, 10, 30),
+    turn_speed_kph=_int(params, "ExtNavAssistTurnSpeed", 30, 10, 45),
     max_lane_changes=_int(params, "ExtNavAssistMaxChanges", 5, 1, 5),
     phone_assist_enabled=_bool(params, "ExtNavAssistPhoneBlindspot", False),
     phone_lane_enabled=_bool(params, "ExtNavAssistPhoneLane", False),

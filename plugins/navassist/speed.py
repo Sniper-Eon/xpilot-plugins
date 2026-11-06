@@ -19,12 +19,12 @@ RELEASE_ACCEL_MPS2 = 1.0
 DT = 0.05
 
 TARGET_SPEEDS = {
-  "slight_left": 8.0, "slight_right": 8.0,
+  "slight_left": 12.5, "slight_right": 12.5,   # 45 km/h：往左/右前方行驶不该压到 29
   "turn_left": 5.0, "turn_right": 5.0,
-  "sharp_left": 3.5, "sharp_right": 3.5,
+  "sharp_left": 6.5, "sharp_right": 6.5,   # 23 km/h
   "u_turn_left": 2.5, "u_turn_right": 2.5,
-  "exit_left": 10.0, "exit_right": 10.0,
-  "ramp_left": 10.0, "ramp_right": 10.0,
+  "exit_left": 12.5, "exit_right": 12.5,   # 45 km/h
+  "ramp_left": 12.5, "ramp_right": 12.5,   # 45 km/h
   "roundabout": 6.0,
 }
 
