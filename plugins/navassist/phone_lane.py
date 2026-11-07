@@ -1,8 +1,6 @@
 """Frame-bound CP phone lane candidates. Single-frame estimates; no model-only absolute lane promotion."""
 from .phone import bounded_json, OBSERVATION_PATH
 
-MIN_PLANNING_SAMPLES = 3
-
 
 def read_observation():
   try:
@@ -71,14 +69,7 @@ def planning_index(candidate, nav, *, enabled=False):
   if not enabled or not nav.get('valid') or not candidate.get('valid'):
     return None
   count, index = candidate.get('laneCount'), candidate.get('laneNumber')
-  if type(count) is not int or type(index) is not int or not 1 <= index <= count <= 5:
-    return None
-  # 单帧估计不足以驱动变道：要求连续多帧一致，避免模型偶发误判把车并到错误车道。
-  samples = candidate.get('samples')
-  if type(samples) is not int or samples < MIN_PLANNING_SAMPLES:
-    return None
-  # 高德多数时候不给 laneTotalCount；缺省时信任手机的车道总数，只有两边都给出且矛盾才拒绝。
-  total = nav.get('laneTotalCount')
-  if type(total) is int and total > 0 and count != total:
+  if (type(count) is not int or type(index) is not int or not 1 <= index <= count <= 5
+      or type(nav.get('laneTotalCount')) is not int or count != nav['laneTotalCount']):
     return None
   return index-1
