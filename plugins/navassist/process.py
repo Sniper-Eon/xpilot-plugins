@@ -152,14 +152,25 @@ def main():
             pass
           with open(_LOG_PATH, 'a') as _f:
             _ovt = ((result.get('nav') or {}).get('overtake') or {})
-            _lamp = result.get('lamp') or {}
+            # 日志在灯诊断写入之前，直接读 card 进程落盘的文件，否则永远是 -/-
+            _lamp = {}
+            try:
+              import json as _jl
+              with open('/tmp/navassist_lamp.json') as _lf:
+                _lamp = _jl.load(_lf)
+            except Exception:
+              _lamp = {}
             _flags = ('B' if getattr(cs, 'brakePressed', False) else '-') + \
                      ('G' if getattr(cs, 'gasPressed', False) else '-') + \
                      ('S' if getattr(cs, 'steeringPressed', False) else '-')
-            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d ego=%d/%d | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | %s lamp=%s/%s\n' % (
+            _topo = result.get('topology') or {}
+            _abs = _topo.get('absoluteEgoIndex')
+            _abs_src = _topo.get('absoluteSource') or ('phone' if _topo.get('phoneLaneCount') else '-')
+            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d ego=%d/%d abs=%s/%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | %s lamp=%s/%s\n' % (
               _t.monotonic(), _key[0], _key[1], _key[2], _key[3], _key[4], _key[5], _key[6],
               _key[7], _key[8], _key[9], _key[10],
               _key[11], _key[12], _key[13], _key[14], _key[15], _key[16], _key[17], _key[18],
+              '-' if _abs is None else _abs, _abs_src,
               '%s/%s' % (_ovt.get('state', '-'), _ovt.get('reason', '-')),
               _flags, _lamp.get('reason', '-'), _lamp.get('framesBuilt', '-')))
       except Exception:

@@ -11,9 +11,9 @@ BUS = 1
 TEMPLATE_MAX_AGE_NS = 1_500_000_000
 SEND_INTERVAL_NS = 100_000_000
 FEEDBACK_TIMEOUT_NS = 2_500_000_000
-CANCEL_TOTAL_TIMEOUT_NS = 5_000_000_000
+CANCEL_TOTAL_TIMEOUT_NS = 9_000_000_000
 SESSION_TIMEOUT_NS = 60_000_000_000
-MAX_CANCEL_ATTEMPTS = 3
+MAX_CANCEL_ATTEMPTS = 20
 TURN_REQUESTS = {"left": 1, "right": 2, "cancel": 3}
 ACTIVE_REASON = 8
 CANCEL_REASON = 4
@@ -139,12 +139,8 @@ class TurnSignalController:
       elif int(getattr(cs, "brakePressed", False)):
         return self._cancel(now_ns)
       elif not requested:
-        # Keep the lamp for the current maneuver while a blind-spot/road-edge gate blocks the change, so the
-        # driver can still complete the turn after the obstruction clears. Cancel only when the maneuver
-        # changes, the driver brakes, the session times out, or the lamp is already off.
-        if physical_on and enabled and intent.get("valid") and bool(getattr(cc, "latActive", False)):
-          self.active["held"] = True
-          return []
+        # 不再无限期保持：以前这里在「灯已亮 + 导航有效」时直接 return []，
+        # 结果是意图停止请求后灯还一直亮着（实测 17 秒以上），并且挡住新的反向机动。
         return self._cancel(now_ns)
       else:
         self.active["held"] = physical_on

@@ -293,10 +293,20 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
   if turn.get('signalRequested') and str(n.maneuver) in _LANE_CHANGE_LAMPS:
     _count = int(topology.get('visibleLaneCount', 0) or 0)
     _ego = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
+    _abs_ego = topology.get('absoluteEgoIndex')
+    if not (0 <= _ego < _count) and isinstance(_abs_ego, int) and _abs_ego >= 0:
+      # 视觉没给出相对车道号时，用绝对车道号判断是否贴着路沿。
+      _ego, _count = _abs_ego, max(_count, _abs_ego + 1)
     _dir = str(turn.get('direction', 'none')).lower()
+    _left_solid = int(topology.get('laneMarkingLeft', -1) or -1) == 1
+    _right_solid = int(topology.get('laneMarkingRight', -1) or -1) == 1
+    _at_edge = False
     if _count > 1 and 0 <= _ego < _count:
       _at_edge = (_dir == 'left' and _ego == 0) or (_dir == 'right' and _ego == _count - 1)
-      if _at_edge:
-        turn = dict(turn, signalRequested=False, direction='none', reason='atRoadEdge')
+    if not _at_edge and not (0 <= _ego < _count):
+      # 车道号未知时，手机判定的实线侧也视为路沿：禁止再往那一侧并道。
+      _at_edge = (_dir == 'left' and _left_solid) or (_dir == 'right' and _right_solid)
+    if _at_edge:
+      turn = dict(turn, signalRequested=False, direction='none', reason='atRoadEdge')
   return turn if settings.turn_signal_enabled else out
 

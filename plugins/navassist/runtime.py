@@ -96,6 +96,11 @@ class NavigationRuntime:
       _line = _lls(now_ns=now_ns)
     except Exception:
       _line = {}
+    try:
+      topology['laneMarkingLeft'] = int(_line.get('left') or -1)
+      topology['laneMarkingRight'] = int(_line.get('right') or -1)
+    except Exception:
+      pass
     # 手机虚实线补充锚定：模型看不到路沿、但手机判定该侧是实线且本车在最外侧车道时，
     # 把这一侧视为车道计数基准（用于绝对车位和推荐车道换算）。
     try:

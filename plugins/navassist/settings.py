@@ -63,7 +63,7 @@ def read(params) -> NavSettings:
     overtake_style=_int(params, "ExtNavAssistOvertakeStyle", 1, 0, 2),
     overtake_min_kph=_int(params, "ExtNavAssistOvertakeMinKph", 70, 50, 120),
     overtake_diff_kph=_int(params, "ExtNavAssistOvertakeDiffKph", 10, 5, 30),
-    overtake_lead_max_m=_int(params, "ExtNavAssistOvertakeLeadMaxM", 80, 40, 150),
+    overtake_lead_max_m=_int(params, "ExtNavAssistOvertakeLeadMaxM", 120, 40, 150),
     overtake_turn_m=_int(params, "ExtNavAssistOvertakeTurnM", 2000, 500, 3000),
     overtake_delay_ms=_int(params, "ExtNavAssistOvertakeDelayMs", 2500, 1000, 5000),
     overtake_cooldown_s=_int(params, "ExtNavAssistOvertakeCooldownS", 20, 10, 60),

@@ -7,6 +7,7 @@ from __future__ import annotations
 import math
 
 CONTROLLED_ACCESS = frozenset(("expressway", "urban_expressway"))
+LEAD_PROB_MIN = 0.4   # 模型前车置信度门槛
 MIN_LEAD_SPEED_MS = 13.9            # 50 km/h
 MAX_CURVATURE_RATE = 0.02
 MAX_STEERING_DEG = 15.0
@@ -149,7 +150,7 @@ class OvertakeController:
     if lead is None:
       return '前车缺失'
     prob, lead_x, lead_v = lead
-    if prob < 0.5 or not 0.0 < lead_x < float(settings.overtake_lead_max_m):
+    if prob < LEAD_PROB_MIN or not 0.0 < lead_x < float(settings.overtake_lead_max_m):
       return '前车过远或置信度低'
     if lead_v < MIN_LEAD_SPEED_MS:
       return '前车过慢'
