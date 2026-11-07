@@ -2,6 +2,7 @@ package com.garan.tesnav.ui
 
 import com.garan.tesnav.model.LaneAction
 import com.garan.tesnav.model.LaneState
+import com.garan.tesnav.model.NavigationManeuver
 import com.garan.tesnav.model.NavigationMode
 import com.garan.tesnav.model.NavigationState
 import com.garan.tesnav.model.OemLanePosition
@@ -88,6 +89,9 @@ object LaneGuidancePresenter {
         }
         val lanes = state.lanes.sortedBy(LaneState::index).take(MAX_VISIBLE_LANES)
         if (lanes.isEmpty()) {
+            earlySideHint(state)?.let { hint ->
+                return LaneGuidancePresentation(hint, emptyList(), earlySide(state.maneuver) ?: LaneRecommendationSide.NONE)
+            }
             if (oem.receivedAtMs == 0L && state.laneCallbackCount == 0) return null
             val laneDiagnostic = when (state.laneLastEvent) {
                 "hidden" -> "高德车道引导已隐藏（已驶过提示区）"
@@ -322,4 +326,25 @@ object LaneGuidancePresenter {
     }
 
     private const val MAX_VISIBLE_LANES = 16
+
+    /** v38: hint the side to pre-select once the next maneuver is within 1.5 km. */
+    private const val EARLY_SIDE_HINT_M = 1500
+
+    private fun earlySide(maneuver: NavigationManeuver?): LaneRecommendationSide? = when (maneuver) {
+        NavigationManeuver.SLIGHT_LEFT, NavigationManeuver.TURN_LEFT, NavigationManeuver.SHARP_LEFT,
+        NavigationManeuver.U_TURN_LEFT, NavigationManeuver.KEEP_LEFT, NavigationManeuver.MERGE_LEFT,
+        NavigationManeuver.EXIT_LEFT -> LaneRecommendationSide.LEFT
+        NavigationManeuver.SLIGHT_RIGHT, NavigationManeuver.TURN_RIGHT, NavigationManeuver.SHARP_RIGHT,
+        NavigationManeuver.U_TURN_RIGHT, NavigationManeuver.KEEP_RIGHT, NavigationManeuver.MERGE_RIGHT,
+        NavigationManeuver.EXIT_RIGHT -> LaneRecommendationSide.RIGHT
+        else -> null
+    }
+
+    private fun earlySideHint(state: NavigationState): String? {
+        if (!state.routePlanned || state.navigationMode != NavigationMode.REALTIME) return null
+        val distance = state.nextTurnDistanceMeters?.takeIf { it in 1 until EARLY_SIDE_HINT_M + 1 } ?: return null
+        val side = earlySide(state.maneuver) ?: return null
+        val distanceText = if (distance >= 1000) "约%.1f km".format(distance / 1000.0) else "约$distance m"
+        return "提前选道：靠${if (side == LaneRecommendationSide.LEFT) "左" else "右"} · $distanceText"
+    }
 }

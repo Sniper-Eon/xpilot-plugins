@@ -75,7 +75,7 @@ internal class CpLaneNativeEngine(private val context: Context) : AutoCloseable 
             if (rc == 0 && roadSize > 0) road = CpRoadMaskCore.fromScores(shape,roadScores)
             val result = if (rc == 0) CpLaneCore.decode(scores, model) else null
             status = if (rc != 0) "车道模型推理返回错误 $rc" else result?.let { "视觉估计：第 ${it.laneNumber}/${it.laneCount} 可见车道（估计）" }
-                ?: "车道模型本帧未确认"
+                ?: ("车道模型本帧未确认 s=" + scores.joinToString(",") { "%.3f".format(it) })
             result
         } catch (e: Exception) { status = "车道模型本帧失败"; null }
           catch (e: LinkageError) { status = "车道模型运行库失败"; null }

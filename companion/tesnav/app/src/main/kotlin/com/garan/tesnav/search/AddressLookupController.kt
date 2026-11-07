@@ -73,6 +73,7 @@ class AddressLookupController(
     private var suggestionGeneration = 0L
     private var reverseGeneration = 0L
     private var reverseInFlight = false
+    private var reverseStartedAtMs: Long? = null
     private var lastReverseAttemptAtMs: Long? = null
     private var lastResolvedPoint: AddressPoint? = null
 
@@ -140,19 +141,31 @@ class AddressLookupController(
             view.onCurrentAddressFailed(CURRENT_LOCATION_INVALID)
             return
         }
-        if (reverseInFlight) return
-
         val nowMs = elapsedRealtimeMs()
+        if (reverseInFlight) {
+            // 高德回调可能永远不来（无网络/SDK 异常），超时后放行重试，避免界面卡在「正在解析」。
+            val startedAt = reverseStartedAtMs
+            if (startedAt != null && nowMs - startedAt >= REVERSE_TIMEOUT_MS) {
+                reverseInFlight = false
+                reverseGeneration++
+                lastResolvedPoint = null
+                view.onCurrentAddressFailed(CURRENT_ADDRESS_TIMEOUT)
+            } else {
+                return
+            }
+        }
         if (lastResolvedPoint?.let { distanceMeters(it, point) < MIN_REVERSE_DISTANCE_METERS } == true) return
         if (lastReverseAttemptAtMs?.let { nowMs - it < MIN_REVERSE_INTERVAL_MS } == true) return
 
         lastReverseAttemptAtMs = nowMs
         reverseInFlight = true
+        reverseStartedAtMs = nowMs
         val generation = ++reverseGeneration
         view.onCurrentAddressLoading()
         gateway.reverseGeocode(point) { result ->
             if (!active || generation != reverseGeneration) return@reverseGeocode
             reverseInFlight = false
+            reverseStartedAtMs = null
             when (result) {
                 is LookupResult.Success -> {
                     val address = result.value.trim()
@@ -223,6 +236,8 @@ class AddressLookupController(
 
     private companion object {
         const val MIN_REVERSE_INTERVAL_MS = 15_000L
+        const val REVERSE_TIMEOUT_MS = 8_000L
+        const val CURRENT_ADDRESS_TIMEOUT = "地址解析超时，稍后自动重试"
         const val MIN_REVERSE_DISTANCE_METERS = 50.0
         const val EARTH_RADIUS_METERS = 6_371_000.0
         const val MIN_SUGGESTION_QUERY_LENGTH = 2

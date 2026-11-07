@@ -806,7 +806,9 @@ class NavigationRepository(
             recommended = recommended,
         )
         val count = lanes.size
-        Log.i(TAG, "AMap legacy lane callback count=$count background=${raw.toUnsignedList()} foreground=${front.toUnsignedList()}")
+        val laneState = stateStore.state.value
+        Log.i(TAG, "AMap legacy lane callback count=$count maneuver=${laneState.maneuver} " +
+            "distanceM=${laneState.nextTurnDistanceMeters} background=${raw.toUnsignedList()} foreground=${front.toUnsignedList()}")
         update {
             copy(
                 lanes = lanes,

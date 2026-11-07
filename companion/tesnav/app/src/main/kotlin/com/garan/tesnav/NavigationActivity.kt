@@ -114,6 +114,8 @@ class NavigationActivity : Activity() {
     private var stateJob: Job? = null
     private var oemLaneJob: Job? = null
     private var currentState = NavigationState()
+    /** v38 behaviour: hand the screen to AMap Auto once a route goes live, instead of embedding it. */
+    private var autoJumpedForRoute = false
     private var currentSource = NavigationDataSource.AMAP_API
     private var currentOemLaneState = OemVehicleLaneState()
     // One configured send interval plus the next ACK receive window; display only.
@@ -167,12 +169,12 @@ class NavigationActivity : Activity() {
         configureMap()
         configureActions()
         activityScope.launch {
-            com.garan.tesnav.vision.CpPaintPreview.state.collectLatest { value ->
-                val frame=com.garan.tesnav.vision.CpPaintPreview.fresh(value,SystemClock.elapsedRealtime())
-                laneGuidanceView.setPhonePaint(frame?.let { com.garan.tesnav.vision.CpPaintPreview.text(it.estimate) })
-                if(frame!=null) {
-                    delay((frame.expiresMs-SystemClock.elapsedRealtime()).coerceAtLeast(0))
-                    laneGuidanceView.setPhonePaint(null)
+            com.garan.tesnav.vision.LaneLineState.state.collectLatest { frame ->
+                val fresh = com.garan.tesnav.vision.LaneLineState.fresh(frame, SystemClock.elapsedRealtime())
+                laneGuidanceView.setPhoneLaneLine(fresh?.let { com.garan.tesnav.vision.LaneLineState.text(it.result) })
+                if (fresh != null) {
+                    delay((fresh.issuedMs + com.garan.tesnav.vision.LaneLineState.maxAgeMs - SystemClock.elapsedRealtime()).coerceAtLeast(0))
+                    laneGuidanceView.setPhoneLaneLine(null)
                 }
             }
         }
@@ -307,18 +309,11 @@ class NavigationActivity : Activity() {
         })
     }
 
-    /** Both orientations keep the SDK fallback until the real car-map surface is ready. */
+    /** Embedded car-map is disabled on this build: the virtual display made AMap Auto exit, so we
+     *  hand the route over and jump to the installed app instead (see openNavigationPage). */
     private fun createMapPane(): FrameLayout = FrameLayout(this).apply {
         setBackgroundColor(Color.rgb(233, 240, 245))
         addView(naviView, FrameLayout.LayoutParams(-1, -1))
-        embeddedAmapView = EmbeddedAmapView(this@NavigationActivity).apply {
-            visibility = View.GONE
-            onAvailabilityChanged = { ready ->
-                naviView.visibility = if (ready) View.INVISIBLE else View.VISIBLE
-                if (!splitLayout) navigationTopPanel.visibility = if (ready) View.GONE else View.VISIBLE
-            }
-        }
-        addView(embeddedAmapView, FrameLayout.LayoutParams(-1, -1))
     }
 
     /** Reuse the live map and guidance; only the landscape presentation changes. */
@@ -670,7 +665,16 @@ class NavigationActivity : Activity() {
                     }
                     currentSource = source
                     sourceButton.text = NavigationSourcePolicy.buttonText(source, BuildConfig.EXTENDED_NAV_SOURCES)
-                    renderNavigationState(if (source == NavigationDataSource.AMAP_AUTO) autoState ?: NavigationState() else apiState)
+                    val rendered = if (source == NavigationDataSource.AMAP_AUTO) autoState ?: NavigationState() else apiState
+                    renderNavigationState(rendered)
+                    if (source == NavigationDataSource.AMAP_AUTO) {
+                        val live = rendered.navigationMode == NavigationMode.REALTIME
+                        if (live && !autoJumpedForRoute) {
+                            autoJumpedForRoute = AmapAutoActions.open(this@NavigationActivity) || autoJumpedForRoute
+                        } else if (!live) {
+                            autoJumpedForRoute = false
+                        }
+                    }
                 }
         }
         dashboardJob = activityScope.launch {
@@ -699,9 +703,16 @@ class NavigationActivity : Activity() {
         }
     }
 
+    private var lastRoadLogKey: String? = null
+
     private fun renderNavigationState(state: NavigationState) {
         val oldMode = previousMode
         currentState = state
+        val roadKey = "${state.navigationProvider}:${state.currentRoadType}:${state.currentRoadClass}"
+        if (roadKey != lastRoadLogKey) {
+            lastRoadLogKey = roadKey
+            android.util.Log.i("TesNavRoad", "provider=${state.navigationProvider} roadType=${state.currentRoadType} roadClass=${state.currentRoadClass}")
+        }
         laneGuidanceView.render(state, currentOemLaneState)
         renderNavigationSummary(state)
         autoExpiryJob?.cancel()

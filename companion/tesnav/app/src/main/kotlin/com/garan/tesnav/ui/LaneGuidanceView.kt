@@ -38,6 +38,9 @@ class LaneGuidanceView(context: Context, private val feedbackDisplayBudgetMs: Lo
     private val phonePaint=TextView(context).apply {
         gravity=Gravity.CENTER;textSize=11f;setTextColor(Color.LTGRAY);visibility=View.GONE
     }
+    private val phoneLaneLine=TextView(context).apply {
+        gravity=Gravity.CENTER;textSize=11f;setTextColor(Color.rgb(140,200,255));visibility=View.GONE
+    }
     private var hasPresentation=false
 
     init {
@@ -56,11 +59,12 @@ class LaneGuidanceView(context: Context, private val feedbackDisplayBudgetMs: Lo
         })
         addView(telemetry, LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         addView(phonePaint,LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT))
+        addView(phoneLaneLine,LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
     /** Keep multiline status readable in the narrow landscape instrument panel. */
     fun fitToPanel() {
-        listOf(title, currentLaneStatus, telemetry,phonePaint).forEach {
+        listOf(title, currentLaneStatus, telemetry,phonePaint,phoneLaneLine).forEach {
             it.layoutParams = LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         }
         val rowIndex = indexOfChild(laneRow)
@@ -92,7 +96,7 @@ class LaneGuidanceView(context: Context, private val feedbackDisplayBudgetMs: Lo
             else -> Color.LTGRAY
         })
         if (presentation == null) {
-            visibility = if (telemetry.text.isEmpty() && phonePaint.text.isEmpty()) View.GONE else View.VISIBLE
+            visibility = if (telemetry.text.isEmpty() && phonePaint.text.isEmpty() && phoneLaneLine.text.isEmpty()) View.GONE else View.VISIBLE
             laneRow.removeAllViews()
             return
         }
@@ -131,11 +135,12 @@ class LaneGuidanceView(context: Context, private val feedbackDisplayBudgetMs: Lo
         }
     }
 
-    fun setPhonePaint(text:String?) {
-        phonePaint.text=text.orEmpty()
-        phonePaint.visibility=if(text.isNullOrEmpty())View.GONE else View.VISIBLE
+    /** Lane-boundary classification from the phone vision model (solid/dashed). */
+    fun setPhoneLaneLine(text:String?) {
+        phoneLaneLine.text=text.orEmpty()
+        phoneLaneLine.visibility=if(text.isNullOrEmpty())View.GONE else View.VISIBLE
         if(!text.isNullOrEmpty())visibility=View.VISIBLE
-        else if(!hasPresentation && telemetry.text.isEmpty())visibility=View.GONE
+        else if(!hasPresentation && telemetry.text.isEmpty() && phonePaint.text.isEmpty())visibility=View.GONE
     }
 
     private fun rounded(fill: Int, stroke: Int) = GradientDrawable().apply {

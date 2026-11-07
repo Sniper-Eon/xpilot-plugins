@@ -155,6 +155,7 @@ class MainActivity : Activity(), AddressLookupView {
             return
         }
 
+        autoStartVision()
         MapsInitializer.updatePrivacyShow(applicationContext, true, true)
         MapsInitializer.updatePrivacyAgree(applicationContext, true)
         AMapLocationClient.updatePrivacyShow(applicationContext, true, true)
@@ -657,11 +658,13 @@ class MainActivity : Activity(), AddressLookupView {
     }
 
     private fun openNavigationPage(target: LatLng? = null) {
+        // Only the car-map source hands the route over. The SDK source keeps navigating in this app.
         if (BuildConfig.EXTENDED_NAV_SOURCES &&
             runtimeService?.navigationDataSource?.value == NavigationDataSource.AMAP_AUTO && target != null
         ) {
             if (runtimeService?.navigateAmapAutoDestination(destinationInput.text.toString(), target.latitude, target.longitude) == true) {
-                toast("目的地已发送，请在高德车机确认导航")
+                AmapAutoActions.open(this)
+                toast("已转跳高德车机版")
             } else {
                 toast("未能打开高德车机，请确认已安装车机版")
             }
@@ -960,4 +963,17 @@ class MainActivity : Activity(), AddressLookupView {
     }
 
     private enum class MapState { FOLLOW, BROWSE }
+
+    /** 打开 App 即启动手机视觉（车道模型 + 盲区），不再每次手动开始。 */
+    private fun autoStartVision() {
+        val prefs = getSharedPreferences("phone_vision", MODE_PRIVATE)
+        if (!prefs.getBoolean("cp_lane_enabled", true)) return
+        val host = prefs.getString("host", null)
+        val token = prefs.getString("token", null)
+        if (host.isNullOrBlank() || token.isNullOrBlank() || token.length < 32) return
+        try {
+            startForegroundService(Intent(this, com.garan.tesnav.vision.PhoneVisionService::class.java))
+        } catch (_: Exception) {
+        }
+    }
 }

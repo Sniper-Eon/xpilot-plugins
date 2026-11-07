@@ -1,0 +1,7 @@
+{
+  "source": "v36-assets",
+  "sha256": {
+    "assets/models/vlaneDay.mnn": "888f6512517d395687a709ea3fe4edef15c1d7f436deec9555beb84b4e2847ae",
+    "assets/models/vlaneNight.mnn": "8a2b24eb750fa378e8a2ad225f497be507385644e2384f8874079a1d16342e2d"
+  }
+}

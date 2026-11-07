@@ -15,6 +15,8 @@ internal class CpLaneDetector(private val context: Context) : AutoCloseable {
         private set
     @Volatile private var serial = 0
     @Volatile private var busy = 0
+    @Volatile var lastLine: LaneLineResult? = null
+        private set
     @Volatile var status = "未启用车道模型"
         private set
     private val replies = Messenger(Handler(Looper.getMainLooper()) { reply ->
@@ -28,6 +30,10 @@ internal class CpLaneDetector(private val context: Context) : AutoCloseable {
                 && model in setOf("vlaneDay.mnn", "vlaneNight.mnn"))
                 CpLaneResult(model = model, leftClass = left, rightClass = right, laneNumber = left, laneCount = left + right - 1) else null
             pending = null
+            if (d.containsKey("lineLeft")) {
+                lastLine = LaneLineResult(d.getInt("lineLeft"), d.getInt("lineRight"),
+                    d.getFloat("lineLeftConf"), d.getFloat("lineRightConf"), d.getInt("lineCandidates"))
+            }
             val road = CpRoadMaskCore.fromPacket(d.getInt("roadH"),d.getInt("roadW"),
                 d.getByteArray("roadIds"),d.getByteArray("roadConfidence"))
             waiting?.complete(CpLaneInference(result,road))
@@ -64,7 +70,8 @@ internal class CpLaneDetector(private val context: Context) : AutoCloseable {
             worker.send(Message.obtain(null, 1).apply {
                 arg1 = serial; replyTo = replies
                 data = Bundle().apply { putByteArray("y", CpLaneCore.luma(pixels)); putInt("width", bitmap.width)
-                    putInt("height", bitmap.height); putString("model", model); putBoolean("road",roadEnabled) }
+                    putInt("height", bitmap.height); putString("model", model); putBoolean("road",roadEnabled)
+                    putBoolean("laneLine", true) }
             })
             val observation = withTimeoutOrNull(500) { result.await() }
             if (!result.isCompleted) status = "车道模型超时，本帧未知"
