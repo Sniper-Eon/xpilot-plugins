@@ -115,6 +115,16 @@ class TurnSignalCoordinator:
     armed = bool((nav.get('linked', nav.get('valid', False)) or nav.get('routeActive', False))
                  and not nav.get('stale', False))
     event_id = int(n.maneuverEventId)
+    # 路口换段时手机常把当前机动报成 none（ev=0），此时用下一步机动兜底，
+    # 否则转弯那一刻灯反而不亮。
+    if armed and n.maneuver in ("", "none", "unknown"):
+      _next = str(nav.get('nextManeuver', 'none'))
+      try:
+        _next_d = float(nav.get('nextDistanceM') or 0.0)
+      except (TypeError, ValueError):
+        _next_d = 0.0
+      if _next not in ("", "none", "destination", "unknown") and 0.0 < _next_d <= 200.0:
+        n = type(n)(**{**n.__dict__, 'maneuver': _next, 'maneuverDistanceM': _next_d})
     if event_id == 0 and armed and n.maneuver not in ("", "none", "destination", "unknown") and n.maneuverDistanceM > 0:
       key = (n.sessionId, n.routeRevision, n.maneuver)
       passed = (self._synth_last_distance is not None and self._synth_last_distance < 30.0

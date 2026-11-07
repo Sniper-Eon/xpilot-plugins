@@ -16,6 +16,10 @@ class NavTurnSignalCoordinator:
   PLAN_GAP_GRACE_NS = 1_500_000_000
   LOOKAHEAD_TIME_S = 8.0
   # Forks, exits and merges should warn as soon as they are announced, but only from a sane distance.
+  # 真正的路口转弯（不含并道/匝道）；市区低速时只提前 60 m 打灯。
+  TURN_MANEUVERS = frozenset((
+    "turnLeft", "turnRight", "sharpLeft", "sharpRight", "uTurnLeft", "uTurnRight",
+  ))
   IMMEDIATE_ARM_MANEUVERS = frozenset((
     "slightLeft", "slightRight", "keepLeft", "keepRight",
     "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight",
@@ -26,6 +30,11 @@ class NavTurnSignalCoordinator:
     "mergeLeft": 800.0, "mergeRight": 800.0,
   }
   MIN_LOOKAHEAD_M = 40.0
+  # 市区转弯：低速时不要提前上百米就打灯，按「够用就好」的窗口。
+  URBAN_TURN_SPEED_MPS = 16.0
+  URBAN_TURN_LOOKAHEAD_M = 2.5   # 市区低速转弯：到路口前 2.5 m 才点亮
+  URBAN_TURN_HOLD_NS = 6_000_000_000  # 转弯过程中保持，之后交车端取消
+  SLOW_IMMEDIATE_MAX_M = 150.0    # 低速时并道/匝道窗口上限，避免提前几百米亮灯
   MAX_LOOKAHEAD_M = 250.0
   LOOKAHEAD_MARGIN_M = 20.0
   TURN_CLEAR_STABLE_NS = 500_000_000
@@ -76,7 +85,9 @@ class NavTurnSignalCoordinator:
     if plan.valid and 0.0 <= plan.distance_m <= ARRIVE_DISTANCE_M:
       if self._arrive_since_ns == 0:
         self._arrive_since_ns = now_ns
-      elif self._active_key is not None and now_ns - self._arrive_since_ns > ARRIVE_HOLD_NS:
+      elif self._active_key is not None and now_ns - self._arrive_since_ns > (
+          URBAN_TURN_HOLD_NS if (plan.maneuver in self.TURN_MANEUVERS
+                                 and speed_mps < URBAN_TURN_SPEED_MPS) else ARRIVE_HOLD_NS):
         self._arrive_since_ns = 0
         self._suppress_until_ns = now_ns + POST_TURN_SUPPRESS_NS
         return self._reset("turnCompleted")
@@ -151,6 +162,13 @@ class NavTurnSignalCoordinator:
       # Turn-lane lookahead (UI setting) extends the lamp window so an announced turn arms the lamp
       # hundreds of metres out; 300 m keeps it from blinking through an entire road.
       lookahead_m = min(300.0, max(lookahead_m, float(lookahead_distance_m)))
+    # 市区低速转弯：压缩打灯窗口，避免普通道路提前 100 m 就亮灯。
+    if (plan.maneuver in self.TURN_MANEUVERS
+        and speed_mps < self.URBAN_TURN_SPEED_MPS):
+      lookahead_m = min(lookahead_m, self.URBAN_TURN_LOOKAHEAD_M)
+    if (plan.maneuver in self.IMMEDIATE_ARM_MANEUVERS
+        and speed_mps < self.URBAN_TURN_SPEED_MPS):
+      lookahead_m = min(lookahead_m, self.SLOW_IMMEDIATE_MAX_M)
     if plan.maneuver in self.IMMEDIATE_ARM_MANEUVERS and plan.distance_m <= self.IMMEDIATE_ARM_MAX_M.get(plan.maneuver, 600.0):
       lookahead_m = max(lookahead_m, plan.distance_m)
     if not 0.0 < plan.distance_m <= lookahead_m:
