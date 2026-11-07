@@ -24,7 +24,9 @@ class LaneChangeBlocker:
     self._last_evidence = None
 
   def update(self, oem: dict | None, topology: dict | None, *,
-             phone_left: bool = False, phone_right: bool = False) -> tuple[bool, bool, tuple[str, str]]:
+             phone_left: bool = False, phone_right: bool = False,
+             car_left: bool = False, car_right: bool = False,
+             paint_left: bool = False, paint_right: bool = False) -> tuple[bool, bool, tuple[str, str]]:
     oem = oem or {}
     topology_valid = bool((topology or {}).get("valid"))
     evidence = (oem.get('alcStampNs'), oem.get('mapStampNs')) if 'alcStampNs' in oem else None
@@ -33,15 +35,18 @@ class LaneChangeBlocker:
     # Explicit OEM/map reject always vetoes. The "availability" verdict may be speed/map gated, so it only
     # vetoes when local topology cannot confirm a crossing.
     immediate = [
-      bool(oem.get("leftExplicitBlock")) or (bool(oem.get("leftAvailabilityBlock")) and not topology_valid) or phone_left,
-      bool(oem.get("rightExplicitBlock")) or (bool(oem.get("rightAvailabilityBlock")) and not topology_valid) or phone_right,
+      bool(oem.get("leftExplicitBlock")) or (bool(oem.get("leftAvailabilityBlock")) and not topology_valid)
+      or phone_left or car_left or paint_left,
+      bool(oem.get("rightExplicitBlock")) or (bool(oem.get("rightAvailabilityBlock")) and not topology_valid)
+      or phone_right or car_right or paint_right,
     ]
     reasons = []
     for side, detected in enumerate(immediate):
       if not detected:
         self._streak[side] = 0
-      elif phone_left if side == 0 else phone_right:
-        self._streak[side] = self.confirm_frames  # PhoneSide already requires a confirmed multi-frame track.
+      elif ((phone_left if side == 0 else phone_right) or (car_left if side == 0 else car_right)
+            or (paint_left if side == 0 else paint_right)):
+        self._streak[side] = self.confirm_frames  # 手机多帧确认或车辆 CAN 盲区，均视为已确认
       elif new_evidence:
         self._streak[side] += 1
       confirmed = self._streak[side] >= self.confirm_frames

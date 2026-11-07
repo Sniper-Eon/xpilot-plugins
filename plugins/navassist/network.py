@@ -17,9 +17,11 @@ class NavigationTransports:
     self.threads = []
     try:
       udp = NavAssistUDPServer(('0.0.0.0', 4213), store)
+      self.udp = udp
       self.geometry = udp.geometry
       self.servers.append(udp)
-      self.servers.append(NavAssistHTTPServer(('0.0.0.0', LISTEN_PORT), store, identity, self.pairing))
+      self.http = NavAssistHTTPServer(('0.0.0.0', LISTEN_PORT), store, identity, self.pairing)
+      self.servers.append(self.http)
       self.servers.append(NavAssistDiscoveryServer(('0.0.0.0', DISCOVERY_PORT), identity, self.pairing,
                                                  is_offroad=is_offroad))
       for server in self.servers:
@@ -29,6 +31,12 @@ class NavigationTransports:
     except Exception:
       self.close()
       raise
+
+  def set_status_provider(self, provider):
+    # 只给 HTTP 用：手机上行的 UDP ACK 有严格字段白名单，多一个字段整包会被丢弃。
+    target = getattr(self, 'http', None)
+    if target is not None:
+      target.status_provider = provider
 
   def close(self):
     for index, server in enumerate(self.servers):

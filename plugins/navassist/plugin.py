@@ -64,8 +64,16 @@ class NavAssist(Plugin):
     if now_ns >= self._next_lamp:
       from openpilot.tesla import plugins
       self._next_lamp=now_ns+1_000_000_000
-      plugins.send_msg(type(self),'nav.lamp',self.turns.diagnostics(intent,CS,CC,now_ns,
-        enabled=enabled,frames=frames),1500)
+      diag=self.turns.diagnostics(intent,CS,CC,now_ns,enabled=enabled,frames=frames)
+      plugins.send_msg(type(self),'nav.lamp',diag,1500)
+      # 插件自身的消息会被 msgq 过滤掉，这里落盘一份，供 navassist 进程记录日志。
+      try:
+        import json as _json, os as _os
+        diag=dict(diag); diag['framesBuilt']=len(frames)
+        with open('/tmp/navassist_lamp.json.tmp','w') as _f: _json.dump(diag,_f)
+        _os.replace('/tmp/navassist_lamp.json.tmp','/tmp/navassist_lamp.json')
+      except Exception:
+        pass
     return frames
 
   @classmethod

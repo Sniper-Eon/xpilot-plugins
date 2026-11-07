@@ -9,6 +9,7 @@ from .navstate import build as build_nav_state
 from .oem import OemLaneSignals
 from .phone_lane import PhoneLaneEvidence, planning_index
 from .position import AbsolutePosition
+from .overtake import OvertakeController
 from .topology import from_model
 
 
@@ -22,6 +23,21 @@ class NavigationRuntime:
     self.phone_lane = PhoneLaneEvidence()
     self.turns = TurnSignalCoordinator()
     self.lanes = LaneIntentCoordinator(max_changes=settings.max_lane_changes)
+    self.overtake = OvertakeController()
+    self.last_overtake = {}
+
+  def status_snapshot(self) -> dict:
+    """只读状态：给手机 App 展示当前超车/视觉判定。"""
+    ovt = dict(getattr(self, 'last_overtake', {}) or {})
+    return {
+      'overtake': {k: ovt.get(k) for k in ('state', 'reason', 'direction', 'count') if k in ovt},
+      'settings': {
+        'mode': int(getattr(self.settings, 'overtake_mode', 0)),
+        'style': int(getattr(self.settings, 'overtake_style', 0)),
+        'minKph': int(getattr(self.settings, 'overtake_min_kph', 0)),
+        'diffKph': int(getattr(self.settings, 'overtake_diff_kph', 0)),
+      },
+    }
 
   def tick(self, current, model, model_ns, car, cc, now_ns, *, can_list=(), vehicle_fresh=False,
            left_phone=False, right_phone=False, turn_geometry_active=False,
@@ -75,8 +91,51 @@ class NavigationRuntime:
         topology['egoLaneIndexFromLeft'] = _phone_abs
     else:
       topology['absoluteEgoIndex'] = position['lane_index']-1 if position['valid'] else None
+    try:
+      from .phone import lane_line_state as _lls
+      _line = _lls(now_ns=now_ns)
+    except Exception:
+      _line = {}
+    # 手机虚实线补充锚定：模型看不到路沿、但手机判定该侧是实线且本车在最外侧车道时，
+    # 把这一侧视为车道计数基准（用于绝对车位和推荐车道换算）。
+    try:
+      _ego_now = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
+      _cnt_now = int(topology.get('visibleLaneCount', 0) or 0)
+      if _ego_now == 0 and int(_line.get('left') or 0) == 1:
+        topology['leftCarriagewayAnchored'] = True
+        topology['phoneLineAnchor'] = 'left'
+      if _cnt_now >= 2 and _ego_now == _cnt_now - 1 and int(_line.get('right') or 0) == 1:
+        topology['rightCarriagewayAnchored'] = True
+        topology['phoneLineAnchor'] = 'right'
+    except Exception:
+      pass
+    # 边缘推断：高德给整条路的车道数，手机只看得到可见范围。当两边数量不一致时，
+    # 用实线边界判断本车是否贴在某侧路沿：贴左侧路沿且在最左可见车道 → 绝对第 1 条；
+    # 贴右侧路沿且在最右可见车道 → 绝对最后一条。仅在缺少绝对号时使用。
+    if topology.get('absoluteEgoIndex') is None:
+      try:
+        _amap = len(nav.get('lanes') or ())
+        _ev = candidate or {}
+        _number, _count = int(_ev.get('laneNumber') or 0), int(_ev.get('laneCount') or 0)
+        if _amap >= 1 and _ev.get('valid') and _number >= 1 and 1 <= _count <= _amap:
+          _visual = _number - 1
+          _abs = None
+          if int(_line.get('left') or 0) == 1 and _visual == 0:
+            _abs = 0
+          elif int(_line.get('right') or 0) == 1 and _count >= 2 and _visual == _count - 1:
+            _abs = _amap - 1
+          if _abs is not None:
+            topology['absoluteEgoIndex'] = _abs
+            topology['estimatedEgoIndex'] = _abs
+            topology['absoluteSource'] = 'edgeInference'
+      except Exception:
+        pass
     left_blocked, right_blocked, reasons = self.blocker.update(oem, topology,
-      phone_left=left_phone, phone_right=right_phone)
+      phone_left=left_phone, phone_right=right_phone,
+      car_left=bool(getattr(car, 'leftBlindspot', False)),
+      car_right=bool(getattr(car, 'rightBlindspot', False)),
+      paint_left=_line.get('left') == 1 if _line else False,
+      paint_right=_line.get('right') == 1 if _line else False)
     oem.update(leftBlocked=left_blocked, rightBlocked=right_blocked, blockReasons=list(reasons))
     for side in ('left', 'right'):
       topology[side+'CrossingAllowed'] = oem[side+'CrossingAllowed'] and not oem[side+'Blocked']
@@ -88,6 +147,29 @@ class NavigationRuntime:
       self.turns.reset()
       self.lanes.reset()
     meta = getattr(model, 'meta', None)
+    _snap = current
+    _road_kind = 'unknown'
+    if _snap is not None:
+      try:
+        from .navstate import road_kind as _rk
+        _inner = _snap.snapshot
+        _road_kind = _rk(getattr(_inner, 'road_class', None), getattr(_inner, 'road_type', None),
+                         road_name=getattr(_inner, 'current_road', '') or '',
+                         speed_kph=float(getattr(_inner, 'speed_kph', 0.0) or 0.0),
+                         parallel_status=str(getattr(_inner, 'parallel_road_status', 'unknown')),
+                         elevated_status=str(getattr(_inner, 'elevated_road_status', 'unknown')))
+      except Exception:
+        _road_kind = 'unknown'
+    overtake = self.overtake.update(car=car, model=model, topology=topology, nav=usable_nav,
+      now_ns=now_ns, settings=self.settings, road_kind=_road_kind,
+      left_blocked=left_blocked, right_blocked=right_blocked,
+      blindspot_left=bool(getattr(car, 'leftBlindspot', False)),
+      blindspot_right=bool(getattr(car, 'rightBlindspot', False)),
+      lateral_active=bool(vehicle_fresh and getattr(cc, 'latActive', False)),
+      lane_change_state=str(getattr(meta, 'laneChangeState', 'off')))
+    usable_nav['overtake'] = overtake
+    self.last_overtake = overtake
+    nav['overtake'] = overtake
     intent = build_intent(usable_nav, topology, settings=self.settings,
       v_ego=float(getattr(car, 'vEgo', 0.)), now_ns=now_ns, left_blocked=left_blocked, right_blocked=right_blocked,
       blindspot_left=bool(getattr(car, 'leftBlindspot', False)),
@@ -98,5 +180,5 @@ class NavigationRuntime:
       steering_pressed=bool(getattr(car, 'steeringPressed', False)),
       model_state=str(getattr(meta, 'laneChangeState', 'off')),
       model_direction=str(getattr(meta, 'laneChangeDirection', 'none')), turn_geometry_active=turn_geometry_active,
-      turns=self.turns, lanes=self.lanes)
+      turns=self.turns, lanes=self.lanes, overtake=overtake)
     return dict(nav=nav, topology=topology, intent=intent, oem=oem, position=position)

@@ -63,6 +63,7 @@ def main():
   can_socket = messaging.sub_sock('can', conflate=False)
   state = {'offroad': False}
   transports = NavigationTransports(store, params, lambda: state['offroad'])
+  transports.set_status_provider(lambda: runtime.status_snapshot())
   phone = PhoneBlindspotAssist(mode='assist' if settings.phone_assist_enabled else 'shadow')
   recorder = Recorder()
   lane_tracker = LaneIndexTracker()
@@ -134,11 +135,39 @@ def main():
         if _key != globals().get('_last_key'):
           globals()['_last_key'] = _key
           import time as _t
-          with open('/tmp/lane_exec.log', 'a') as _f:
-            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d ego=%d/%d | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s\n' % (
+          _LOG_PATH = '/data/log/navassist-lane.log'
+          try:
+            import os as _os, time as _time
+            _now = _time.monotonic()
+            if _now - globals().get('_last_disk_check', 0.0) > 60.0:
+              globals()['_last_disk_check'] = _now
+              _st = _os.statvfs('/data')
+              _free = _st.f_bavail * _st.f_frsize
+              _total = _st.f_blocks * _st.f_frsize
+              # 剩余空间低于 10% 时覆盖旧日志，避免把磁盘写满。
+              if _total > 0 and _free / _total < 0.10 and _os.path.exists(_LOG_PATH):
+                with open(_LOG_PATH, 'w'):
+                  pass
+          except Exception:
+            pass
+          with open(_LOG_PATH, 'a') as _f:
+            _ovt = ((result.get('nav') or {}).get('overtake') or {})
+            _lamp = result.get('lamp') or {}
+            _flags = ('B' if getattr(cs, 'brakePressed', False) else '-') + \
+                     ('G' if getattr(cs, 'gasPressed', False) else '-') + \
+                     ('S' if getattr(cs, 'steeringPressed', False) else '-')
+            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d ego=%d/%d | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | %s lamp=%s/%s\n' % (
               _t.monotonic(), _key[0], _key[1], _key[2], _key[3], _key[4], _key[5], _key[6],
               _key[7], _key[8], _key[9], _key[10],
-              _key[11], _key[12], _key[13], _key[14], _key[15], _key[16], _key[17], _key[18]))
+              _key[11], _key[12], _key[13], _key[14], _key[15], _key[16], _key[17], _key[18],
+              '%s/%s' % (_ovt.get('state', '-'), _ovt.get('reason', '-')),
+              _flags, _lamp.get('reason', '-'), _lamp.get('framesBuilt', '-')))
+      except Exception:
+        pass
+      try:
+        _ovt = (result.get('nav') or {}).get('overtake') or {}
+        if _ovt:
+          result['intent'] = dict(result['intent'], overtake=_ovt)
       except Exception:
         pass
       for payload in (result['topology'], result['intent']):
@@ -148,7 +177,13 @@ def main():
       publish_position(dict(result['nav']['phoneLaneEvidence'],version=1,enabled=settings.enabled and settings.phone_lane_enabled,navSessionId=result['nav'].get('sessionId'),
         routeRevision=result['nav'].get('routeRevision')),path=MODEL_POSITION_PATH)
       publish_position(result['position'])
-      result['lamp'] = map_messages.fresh('nav.lamp').get('navassist',{})
+      _lamp={}
+      try:
+        import json as _json
+        with open('/tmp/navassist_lamp.json') as _f: _lamp=_json.load(_f)
+      except Exception:
+        _lamp=map_messages.fresh('nav.lamp').get('navassist',{})
+      result['lamp'] = _lamp
       lines = observe_lines(cs,int(sm.logMonoTime['carState']),now,
         enabled=settings.enabled,vehicle_fresh=vehicle_fresh)
       publish_position(dict(enabled=settings.enabled,captureMonoNs=int(sm.logMonoTime['carState']),

@@ -18,6 +18,16 @@ class NavSettings:
   phone_assist_enabled: bool = False
   phone_lane_enabled: bool = False
   beep_enabled: bool = True
+  # 超车（对照 navipilot AutoOvertakeManager）
+  overtake_mode: int = 0
+  overtake_style: int = 1
+  overtake_min_kph: int = 70
+  overtake_diff_kph: int = 10
+  overtake_lead_max_m: int = 80
+  overtake_turn_m: int = 2000
+  overtake_delay_ms: int = 2500
+  overtake_cooldown_s: int = 20
+  overtake_early: int = 1
 
 
 def _int(params, key: str, default: int, low: int, high: int) -> int:
@@ -49,4 +59,13 @@ def read(params) -> NavSettings:
     phone_assist_enabled=_bool(params, "ExtNavAssistPhoneBlindspot", False),
     phone_lane_enabled=_bool(params, "ExtNavAssistPhoneLane", False),
     beep_enabled=_bool(params, "ExtNavAssistBeep", True),
+    overtake_mode=_int(params, "ExtNavAssistOvertake", 0, 0, 2),
+    overtake_style=_int(params, "ExtNavAssistOvertakeStyle", 1, 0, 2),
+    overtake_min_kph=_int(params, "ExtNavAssistOvertakeMinKph", 70, 50, 120),
+    overtake_diff_kph=_int(params, "ExtNavAssistOvertakeDiffKph", 10, 5, 30),
+    overtake_lead_max_m=_int(params, "ExtNavAssistOvertakeLeadMaxM", 80, 40, 150),
+    overtake_turn_m=_int(params, "ExtNavAssistOvertakeTurnM", 2000, 500, 3000),
+    overtake_delay_ms=_int(params, "ExtNavAssistOvertakeDelayMs", 2500, 1000, 5000),
+    overtake_cooldown_s=_int(params, "ExtNavAssistOvertakeCooldownS", 20, 10, 60),
+    overtake_early=_int(params, "ExtNavAssistOvertakeEarly", 1, 0, 1),
   )

@@ -51,7 +51,9 @@ class AbsolutePosition:
     ys, ego = topology.get('boundaryYs', []), topology.get('egoLaneIndexFromLeft', -1)
     if type(count) is not int or not 1 <= count <= 12:
       return reject('laneTotalUnavailable')
-    if not topology.get('rightCarriagewayAnchored') or not 0 <= ego < len(ys)-1:
+    right_anchored = bool(topology.get('rightCarriagewayAnchored'))
+    left_anchored = bool(topology.get('leftCarriagewayAnchored'))
+    if not (right_anchored or left_anchored) or not 0 <= ego < len(ys)-1:
       return reject('physicalAnchorUnavailable')
     if not all(type(y) in (int, float) and math.isfinite(y) for y in ys):
       return reject('malformedGeometry')
@@ -59,8 +61,13 @@ class AbsolutePosition:
     # resolve unobserved dividers next to the ego or between visible boundaries.
     if not 0 < ys[ego+1] <= 2.2 or any(not 2.2 <= b-a < 4.4 for a, b in zip(ys, ys[1:])):
       return reject('ambiguousSpan')
-    right = len(ys)-2-ego
-    index = count-right
+    # 优先从右侧计数（原本的行为）：右侧路沿可见时最可靠。
+    # 右侧不可见但左侧路沿可见时，从左数：ego+1 就是绝对车道号。
+    if right_anchored:
+      right = len(ys)-2-ego
+      index = count-right
+    else:
+      index = ego+1
     if not 1 <= index <= count or len(ys)-1 > count:
       return reject('mapTotalInconsistent')
     key = (index, count)

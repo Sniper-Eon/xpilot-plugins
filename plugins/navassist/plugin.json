@@ -109,6 +109,112 @@
     {
       "key": "ExtNavAssistPhoneLane",
       "label": "Phone lane model observation"
+    },
+    {
+      "key": "ExtNavAssistOvertake",
+      "label": "自动超车",
+      "choices": [
+        [
+          "关闭",
+          0
+        ],
+        [
+          "观察",
+          1
+        ],
+        [
+          "自动",
+          2
+        ]
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeStyle",
+      "label": "超车风格",
+      "choices": [
+        [
+          "保守",
+          0
+        ],
+        [
+          "标准",
+          1
+        ],
+        [
+          "激进",
+          2
+        ]
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeMinKph",
+      "label": "超车最低车速",
+      "range": [
+        50,
+        120,
+        5,
+        "km/h",
+        1
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeDiffKph",
+      "label": "超车速度差",
+      "range": [
+        5,
+        30,
+        1,
+        "km/h",
+        1
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeLeadMaxM",
+      "label": "前车最大距离",
+      "range": [
+        40,
+        150,
+        10,
+        "m",
+        1
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeTurnM",
+      "label": "转弯禁超距离",
+      "range": [
+        500,
+        3000,
+        100,
+        "m",
+        1
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeDelayMs",
+      "label": "打灯到变道延迟",
+      "range": [
+        1000,
+        5000,
+        250,
+        "ms",
+        1
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeCooldownS",
+      "label": "超车冷却",
+      "range": [
+        10,
+        60,
+        5,
+        "s",
+        1
+      ]
+    },
+    {
+      "key": "ExtNavAssistOvertakeEarly",
+      "label": "远距离超车"
     }
   ],
   "params": {
@@ -182,6 +288,44 @@
     "ExtNavAssistPhoneLane": {
       "type": "BOOL",
       "default": "0"
+    },
+    "ExtNavAssistOvertake": {
+      "type": "INT",
+      "default": "0",
+      "note": "0 off / 1 observe / 2 auto"
+    },
+    "ExtNavAssistOvertakeStyle": {
+      "type": "INT",
+      "default": "1",
+      "note": "0 conservative / 1 standard / 2 aggressive"
+    },
+    "ExtNavAssistOvertakeMinKph": {
+      "type": "INT",
+      "default": "70"
+    },
+    "ExtNavAssistOvertakeDiffKph": {
+      "type": "INT",
+      "default": "10"
+    },
+    "ExtNavAssistOvertakeLeadMaxM": {
+      "type": "INT",
+      "default": "80"
+    },
+    "ExtNavAssistOvertakeTurnM": {
+      "type": "INT",
+      "default": "2000"
+    },
+    "ExtNavAssistOvertakeDelayMs": {
+      "type": "INT",
+      "default": "2500"
+    },
+    "ExtNavAssistOvertakeCooldownS": {
+      "type": "INT",
+      "default": "20"
+    },
+    "ExtNavAssistOvertakeEarly": {
+      "type": "INT",
+      "default": "1"
     }
   },
   "rules": [

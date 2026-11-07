@@ -34,6 +34,7 @@ class NavAssistUDPServer:
     self.geometry_limiter = ClientRateLimiter(max_requests=10)
     self.ingress_limiter = ClientRateLimiter(max_requests=40)
     self._accepted_source = None
+    self.status_provider = None
     self.store = store
     self.rate_limiter = rate_limiter or ClientRateLimiter()
     self._stopping = threading.Event()
@@ -110,6 +111,7 @@ class NavAssistUDPServer:
           ack = {"messageType": UDP_ACK_TYPE, "schemaVersion": 3,
                  "sessionId": current.snapshot.session_id, "sequence": int(query["sequence"]),
                  "lanePosition": lane_position_feedback(current.snapshot)}
+
           if query.get("laneEstimateVersion") == 1:
             estimate = lane_model_feedback(current.snapshot)
             if estimate is not None:ack["laneEstimate"] = estimate

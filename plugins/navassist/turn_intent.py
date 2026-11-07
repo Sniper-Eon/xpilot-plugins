@@ -4,6 +4,9 @@ from .intent_types import (LaneIntentDirection, ObservedLaneChangeState, NavLane
 
 
 TURN_HOLD_SPEED_MPS = 8.0
+ARRIVE_DISTANCE_M = 5.0        # 到达路口判定（米）
+ARRIVE_HOLD_NS = 800_000_000   # 到达路口后很快放手，交给车辆自己的自动取消
+POST_TURN_SUPPRESS_NS = 6_000_000_000  # 通过路口后暂不再打灯
 
 
 class NavTurnSignalCoordinator:
@@ -49,6 +52,8 @@ class NavTurnSignalCoordinator:
     self._active_since_ns = 0
     self._plan_gap_since_ns: int | None = None
     self._completion_hold = False
+    self._arrive_since_ns = 0
+    self._suppress_until_ns = 0
     self._turn_clear_since_ns = 0
 
   def _reset(self, reason: str = "idle") -> NavLaneIntent:
@@ -66,6 +71,22 @@ class NavTurnSignalCoordinator:
     direction = self.MANEUVER_DIRECTIONS.get(plan.maneuver, LaneIntentDirection.none)
     event_key = (plan.session_id, plan.route_revision, plan.maneuver_event_id)
 
+    # 已到达路口并在转弯：保持灯，但超过 ARRIVE_HOLD_NS 仍未推进就释放，
+    # 避免转完弯灯一直亮着。
+    if plan.valid and 0.0 <= plan.distance_m <= ARRIVE_DISTANCE_M:
+      if self._arrive_since_ns == 0:
+        self._arrive_since_ns = now_ns
+      elif self._active_key is not None and now_ns - self._arrive_since_ns > ARRIVE_HOLD_NS:
+        self._arrive_since_ns = 0
+        self._suppress_until_ns = now_ns + POST_TURN_SUPPRESS_NS
+        return self._reset("turnCompleted")
+    else:
+      self._arrive_since_ns = 0
+
+    # 刚通过路口的一小段时间内不再为下一个机动点灯。
+    if self._suppress_until_ns and now_ns < self._suppress_until_ns and self._active_key is None:
+      return NavLaneIntent(reason="postTurnSuppress")
+
     if self._active_key is not None:
       if now_ns - self._active_since_ns > self.SIGNAL_TIMEOUT_NS:
         return self._reset("turnSignalTimeout")
@@ -75,7 +96,10 @@ class NavTurnSignalCoordinator:
           return self._reset("turnChanged")
         # 模型不一定给出 turnGeometryActive；低车速（正在转弯）同样按完成态处理，
         # 否则每换一个导航 step 就会把灯掐灭再点亮。
-        if turn_geometry_active or speed_mps <= TURN_HOLD_SPEED_MPS:
+        # 只有方向一致才沿用旧方向；方向变了必须切到新方向，否则会出现
+        # 「左转却亮右灯」的情况。
+        same_direction = direction == self._active_direction
+        if same_direction and (turn_geometry_active or speed_mps <= TURN_HOLD_SPEED_MPS):
           self._completion_hold = True
           self._turn_clear_since_ns = 0
         elif self._completion_hold:

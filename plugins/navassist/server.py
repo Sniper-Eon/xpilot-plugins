@@ -55,6 +55,8 @@ class NavAssistHTTPServer(ThreadingHTTPServer):
     self.store = store
     self.identity = identity
     self.pairing = pairing
+    # 只读状态回传：由 process 注入，按需返回超车/视觉状态，缺省为空。
+    self.status_provider = None
     self.rate_limiter = rate_limiter or ClientRateLimiter()
     self._request_slots = threading.BoundedSemaphore(max_concurrent_requests)
     super().__init__(address, NavAssistRequestHandler)
@@ -134,12 +136,20 @@ class NavAssistRequestHandler(BaseHTTPRequestHandler):
       status = 401 if error.reason == "authentication" else 409 if error.reason == "replay" else 400
       self._respond(status, {"accepted": False, "reason": error.reason})
       return
-    self._respond(202, {
+    payload = {
       "accepted": True,
       "sessionId": accepted.snapshot.session_id,
       "sequence": accepted.snapshot.sequence,
       "routeRevision": accepted.snapshot.route_revision,
-    })
+    }
+    try:
+      if callable(self.server.status_provider):
+        extra = self.server.status_provider()
+        if isinstance(extra, dict):
+          payload["status"] = extra
+    except Exception:
+      pass
+    self._respond(202, payload)
 
   def do_GET(self) -> None:
     self._respond(405, {"accepted": False, "reason": "method_not_allowed"})

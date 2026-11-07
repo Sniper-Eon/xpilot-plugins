@@ -10,6 +10,7 @@ from openpilot.tesla.plugin import PluginAlert
 from .settings import read as read_settings
 
 DIRECTIONS = {1: 'left', 2: 'right'}
+START_FALLBACK_NS = 1_200_000_000   # 打灯后多久仍未见模型确认就用自判补提示音
 
 
 class NavigationChime:
@@ -46,7 +47,9 @@ class NavigationChime:
     except Exception:
       return []
     if lane_state != 'laneChangeStarting':
-      return []
+      # 模型没报「开始变道」时，退回到我们自己的请求：灯已亮、横向已激活、
+      # 请求已发出 1.2 秒仍无模型确认，就补一声，避免大部分变道没有提示音。
+      return self._start_fallback(intent, sm, now_ns)
     model_direction = 'left' if 'left' in direction_text else 'right' if 'right' in direction_text else None
     cs = sm['carState']
     physical = 'left' if cs.leftBlinker and not cs.rightBlinker else 'right' if cs.rightBlinker and not cs.leftBlinker else None
@@ -67,6 +70,31 @@ class NavigationChime:
     self._last_fired = key
     self._armed = None
     return [PluginAlert('warning', 'Navigation turn signal', model_direction.capitalize())]
+
+
+  def _start_fallback(self, intent, sm, now_ns):
+    if self._armed is None or not self.settings.beep_enabled:
+      return []
+    armed_key, armed_direction, armed_session, armed_revision, armed_ns = self._armed
+    if armed_direction not in ('left', 'right'):
+      return []
+    if now_ns - armed_ns < START_FALLBACK_NS:
+      return []
+    if intent.get('sessionId') != armed_session or intent.get('routeRevision') != armed_revision:
+      return []
+    cs = sm['carState']
+    physical = 'left' if cs.leftBlinker and not cs.rightBlinker else 'right' if cs.rightBlinker and not cs.leftBlinker else None
+    if physical != armed_direction:
+      return []
+    if not sm['carControl'].latActive:
+      return []
+    if getattr(cs, armed_direction + 'Blindspot'):
+      return []
+    if armed_key == self._last_fired:
+      return []
+    self._last_fired = armed_key
+    self._armed = None
+    return [PluginAlert('warning', 'Navigation lane change', armed_direction.capitalize())]
 
 
 class NavigationBuzzerPolicy:

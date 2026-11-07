@@ -233,7 +233,8 @@ class LaneIntentCoordinator:
 def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
                  blindspot_left, blindspot_right, lateral_active, turns, lanes,
                  left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
-                 steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False):
+                 steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False,
+                 overtake=None):
   turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns, lookahead_time_s=settings.signal_lead_time_s,
                       lookahead_distance_m=settings.turn_lane_lookahead_m,
                       turn_geometry_active=turn_geometry_active,
@@ -242,6 +243,15 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
   intersection = n.maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'turnRight', 'sharpRight', 'uTurnRight')
   approaching = bool(intersection and turn['signalRequested'])
   plan = lane_plan(nav, topology, settings, v_ego=v_ego)
+  if overtake and overtake.get('request') and str(overtake.get('direction')) in ('left', 'right'):
+    _count = int(topology.get('visibleLaneCount', 0) or 0)
+    _ego = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
+    if _count > 1 and 0 <= _ego < _count:
+      _target = max(0, _ego - 1) if overtake['direction'] == 'left' else min(_count - 1, _ego + 1)
+      if _target != _ego:
+        plan = NavLanePlan(True, str(nav.get('sessionId', '')), int(nav.get('routeRevision', 0)),
+                           int(nav.get('maneuverEventId', 0) or 0), _count, (_target,), heuristic=True,
+                           allow_unknown_crossing=False, relative_change_limit=1)
   out = lanes.update(nav, plan, now_ns=now_ns, topology_valid=bool(topology.get('valid')),
     left_blocked=left_blocked, right_blocked=right_blocked,
     blindspot_left=blindspot_left, blindspot_right=blindspot_right, lateral_active=lateral_active,

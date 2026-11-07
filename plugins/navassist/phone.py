@@ -11,6 +11,8 @@ from pathlib import Path
 CONFIG_PATH = "/data/phone-vision/blindspot-assist.json"
 OBSERVATION_PATH = "/dev/shm/phone_side_vehicles.json"
 MAX_AGE_NS = 800_000_000
+SOLID = 1
+DASHED = 0
 
 
 def bounded_json(path):
@@ -37,6 +39,32 @@ class PhoneSide:
   available: bool = False
   blocked: bool = False
   reason: str = "unavailable"
+
+
+def lane_line_state(path=OBSERVATION_PATH, now_ns=None):
+  """Solid/dashed verdict per side from the phone's lane-boundary classifier.
+
+  Returns {} when the packet is missing, stale or malformed; a side with an unknown
+  type is reported as None."""
+  import time
+  try:
+    data = bounded_json(path)
+  except (OSError, ValueError, TypeError, RecursionError, OverflowError):
+    return {}
+  if not isinstance(data, dict) or not data.get('valid'):
+    return {}
+  stamp = data.get('updated_mono_ns')
+  now = time.monotonic_ns() if now_ns is None else now_ns
+  if type(stamp) is not int or not 0 <= now - stamp <= MAX_AGE_NS:
+    return {}
+  line = data.get('lane_line')
+  if not isinstance(line, dict):
+    return {}
+  out = {}
+  for side in ('left', 'right'):
+    value = line.get(side)
+    out[side] = value if type(value) is int and value in (DASHED, SOLID) else None
+  return out
 
 
 class PhoneBlindspotAssist:
