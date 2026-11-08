@@ -23,6 +23,7 @@ class NavigationRuntime:
     self.phone_lane = PhoneLaneEvidence()
     self.turns = TurnSignalCoordinator()
     self.lanes = LaneIntentCoordinator(max_changes=settings.max_lane_changes)
+    self._topo_hold = None      # 模型拓扑短时抖动时的保持缓存
     self.overtake = OvertakeController()
     self.last_overtake = {}
 
@@ -46,6 +47,17 @@ class NavigationRuntime:
     self.oem.update(can_list, now_ns)
     oem = self.oem.payload(now_ns)
     topology = from_model(model, now_ns, model_ns)
+    # 模型偶尔一帧看不到车道线时，不要立刻把本车位置清零：
+    # 1.5 秒内沿用上一次有效拓扑，避免推荐车道/并道跟着抖。
+    if not topology.get('valid'):
+      held = getattr(self, '_topo_hold', None)
+      if held is not None and now_ns - held[0] <= 1_500_000_000:
+        topology = dict(held[1])
+        topology['stale'] = True
+      else:
+        self._topo_hold = None
+    else:
+      self._topo_hold = (now_ns, dict(topology))
     nav = build_nav_state(current, now_ns, oem_nav_route_active=oem['navRouteActive'])
     # The C3 lane model often cannot see lanes on ordinary roads; the phone's MNN estimate is the
     # driver-visible truth there, so use it as the lane geometry when it is fresh.

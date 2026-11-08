@@ -3,6 +3,7 @@ import time,json,math,threading,secrets,hashlib,base64
 from pathlib import Path
 from .limits import MAX_AGE_NS
 from .lane import validate as validate_lane
+from .lane_line import validate as validate_lane_line
 from collections import OrderedDict
 import os
 
@@ -135,6 +136,7 @@ class FrameStore:
       if data.get('frame_id') != frame_id:
         raise ValueError('wrong_frame')
       lane = validate_lane(data.get("lane_cp"))
+      lane_line = validate_lane_line(data.get("lane_line"))
       sides = {}
       for side in ('left', 'right'):
         value = data.get(side)
@@ -155,7 +157,7 @@ class FrameStore:
           sides[side] = None
       result = dict(version=1, source='tesnav-phone', valid=True,
                     updated_mono_ns=capture, received_mono_ns=self.clock(), frame_id=frame_id, stream_id=self.stream_id,
-                    experimental=True, control_eligible=False, lane_cp=lane, **sides)
+                    experimental=True, control_eligible=False, lane_cp=lane, lane_line=lane_line, **sides)
       self._persist(result)
       self.last_accepted_capture = capture
       self.last_result = result

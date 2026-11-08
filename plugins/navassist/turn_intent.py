@@ -116,8 +116,8 @@ class NavTurnSignalCoordinator:
       if self._arrive_since_ns == 0:
         self._arrive_since_ns = now_ns
       elif self._active_key is not None and now_ns - self._arrive_since_ns > (
-          URBAN_TURN_HOLD_NS if (plan.maneuver in self.TURN_MANEUVERS
-                                 and speed_mps < URBAN_TURN_SPEED_MPS) else ARRIVE_HOLD_NS):
+          self.URBAN_TURN_HOLD_NS if (plan.maneuver in self.TURN_MANEUVERS
+                                      and speed_mps < self.URBAN_TURN_SPEED_MPS) else ARRIVE_HOLD_NS):
         self._arrive_since_ns = 0
         self._suppress_until_ns = now_ns + POST_TURN_SUPPRESS_NS
         return self._reset("turnCompleted")
