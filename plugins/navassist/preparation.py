@@ -27,6 +27,7 @@ class LanePreparation:
 
 
   OBSERVATION_RECOVERY_NS = 3_000_000_000
+  OBSERVE_MAX_PAUSE_NS = 6_000_000_000   # 邻道观测一直未知时，最多暂停 6 秒后重试
 
 
   SIGNAL_WAIT_TIMEOUT_NS = 60_000_000_000
@@ -164,6 +165,12 @@ class LanePreparation:
       self._observation_lamp_released = True
       self._observation_recovery_ns = now_ns if recovering else None
     _event, _ego, direction, target, _relative = self._candidate
+    # 邻道观测长时间未知（模型看不到邻道、手机视觉又没数据）时，
+    # 不能一直暂停到本机动结束：清掉候选，过几秒允许重新尝试。
+    if (self._observation_lamp_released and self._observation_missing_since_ns is not None
+        and now_ns - self._observation_missing_since_ns > self.OBSERVE_MAX_PAUSE_NS):
+      self._reset()
+      return self._idle("neighborObservationTimeout")
     return NavLaneIntent(
       signal_requested=not self._observation_lamp_released, direction=direction,
       request_id=self._request_id, target_lane_index=target,

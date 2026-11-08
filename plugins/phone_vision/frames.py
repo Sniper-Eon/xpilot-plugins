@@ -136,7 +136,11 @@ class FrameStore:
       if data.get('frame_id') != frame_id:
         raise ValueError('wrong_frame')
       lane = validate_lane(data.get("lane_cp"))
-      lane_line = validate_lane_line(data.get("lane_line"))
+      # 标线只是附加观测：任何不合法都置空继续，别丢整帧（车道/盲区照常接收）。
+      try:
+        lane_line = validate_lane_line(data.get("lane_line"))
+      except ValueError:
+        lane_line = None
       sides = {}
       for side in ('left', 'right'):
         value = data.get(side)

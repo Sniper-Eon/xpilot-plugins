@@ -2,6 +2,43 @@
 from .phone import bounded_json, OBSERVATION_PATH
 
 MIN_PLANNING_SAMPLES = 3
+MIN_PLANNING_SAMPLES_NIGHT = 2   # 夜间模型车道数更抖，放宽到 2 帧
+
+# C 方案：连续帧凑不齐时，用最近 2 秒的样本投票兜底。
+WINDOW_NS = 2_000_000_000
+WINDOW_MIN_COUNT = 2
+WINDOW_MIN_SHARE = 0.6
+_window = {"identity": None, "last_stamp": 0, "items": []}
+
+
+def _window_vote(candidate, nav):
+  """Return the voted absolute lane index, or None when the window is inconclusive."""
+  identity = (str(nav.get("sessionId", "")), int(nav.get("routeRevision", 0)))
+  if _window["identity"] != identity:
+    _window["identity"] = identity
+    _window["last_stamp"] = 0
+    _window["items"] = []
+  stamp = candidate.get("captureMonoNs")
+  number, count = candidate.get("laneNumber"), candidate.get("laneCount")
+  if candidate.get("valid") and type(stamp) is int and type(number) is int and type(count) is int:
+    if stamp != _window["last_stamp"]:
+      _window["last_stamp"] = stamp
+      _window["items"].append((stamp, number, count))
+    cutoff = stamp - WINDOW_NS
+    _window["items"] = [item for item in _window["items"] if item[0] >= cutoff]
+  items = _window["items"]
+  if len(items) < WINDOW_MIN_COUNT:
+    return None
+  tally = {}
+  for _stamp, number, count in items:
+    tally[(number, count)] = tally.get((number, count), 0) + 1
+  (number, count), hits = max(tally.items(), key=lambda kv: (kv[1], kv[0][0]))
+  if hits < WINDOW_MIN_COUNT or hits / len(items) < WINDOW_MIN_SHARE:
+    return None
+  total = nav.get("laneTotalCount")
+  if type(total) is int and total > 0 and count != total:
+    return None
+  return number - 1
 
 
 def read_observation():
@@ -75,8 +112,10 @@ def planning_index(candidate, nav, *, enabled=False):
     return None
   # 单帧估计不足以驱动变道：要求连续多帧一致，避免模型偶发误判把车并到错误车道。
   samples = candidate.get('samples')
-  if type(samples) is not int or samples < MIN_PLANNING_SAMPLES:
-    return None
+  need = MIN_PLANNING_SAMPLES_NIGHT if candidate.get('model') == 'vlaneNight.mnn' else MIN_PLANNING_SAMPLES
+  if type(samples) is not int or samples < need:
+    # 连续帧不够（夜间车道数抖动）：用最近 2 秒的样本投票兜底。
+    return _window_vote(candidate, nav)
   # 高德多数时候不给 laneTotalCount；缺省时信任手机的车道总数，只有两边都给出且矛盾才拒绝。
   total = nav.get('laneTotalCount')
   if type(total) is int and total > 0 and count != total:

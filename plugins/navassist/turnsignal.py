@@ -14,6 +14,8 @@ FEEDBACK_TIMEOUT_NS = 2_500_000_000
 CANCEL_TOTAL_TIMEOUT_NS = 9_000_000_000
 SESSION_TIMEOUT_NS = 60_000_000_000
 MAX_CANCEL_ATTEMPTS = 20
+RESEND_NS = 1_000_000_000        # 灯没亮时每秒重发一次请求
+MAX_ACTION_ATTEMPTS = 10          # 最多重发 10 次（约 10 秒）
 TURN_REQUESTS = {"left": 1, "right": 2, "cancel": 3}
 ACTIVE_REASON = 8
 CANCEL_REASON = 4
@@ -146,14 +148,15 @@ class TurnSignalController:
         self.active["held"] = physical_on
         if physical_on:
           return []
-        if age > FEEDBACK_TIMEOUT_NS:
-          self._failed_key = self._key(intent)
-          return self._cancel(now_ns)
+        # 灯没亮就周期性重发，而不是 2.5 秒后放弃：
+        # 车端变道需要灯持续亮着，提前放弃会让它永远不满足条件。
         if not self._can_send(now_ns):
           return []
-        # One retry if the first frame produced no feedback.
-        if self.active.get("action_attempts", 0) >= 2:
-          return []  # Await feedback until the original bounded deadline; do not cut the lamp early.
+        if now_ns - int(self.active.get("action_sent_ns", 0)) < RESEND_NS:
+          return []
+        if self.active.get("action_attempts", 0) >= MAX_ACTION_ATTEMPTS:
+          self._failed_key = self._key(intent)
+          return self._cancel(now_ns)
         if self.template is None or now_ns - self.template_ns > TEMPLATE_MAX_AGE_NS:
           return []
         counter = (decode(self.template)["counter"] + 1) % 16

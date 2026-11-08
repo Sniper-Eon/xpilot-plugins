@@ -10,6 +10,10 @@ from .oem import OemLaneSignals
 from .phone_lane import PhoneLaneEvidence, planning_index
 from .position import AbsolutePosition
 from .overtake import OvertakeController
+
+# 绕过车端 ALC「可用性」判断：只用自己的传感器（车道线/盲区/实线/路沿）。
+# 车端雷达盲区与 DesireHelper 的盲区检查仍然生效。
+BYPASS_OEM_CROSSING = True
 from .topology import from_model
 
 
@@ -91,6 +95,18 @@ class NavigationRuntime:
     candidate = self.phone_lane.update(phone_lane_observation, nav, now_ns,
       enabled=self.settings.enabled and self.settings.phone_lane_enabled)
     nav['phoneLaneEvidence'] = candidate
+    # 用手机车道号推断邻道是否存在：模型看不到邻道时，避免协调器一直卡在
+    # 「邻道观测未知 → 暂停」。只填补 None，不覆盖模型给出的判断。
+    try:
+      _ev = candidate or {}
+      _n, _c = _ev.get('laneNumber'), _ev.get('laneCount')
+      if _ev.get('valid') and type(_n) is int and type(_c) is int and 1 <= _n <= _c:
+        if topology.get('leftNeighborExists') is None:
+          topology['leftNeighborExists'] = _n > 1          # neighbor_from_phone
+        if topology.get('rightNeighborExists') is None:
+          topology['rightNeighborExists'] = _n < _c        # neighbor_from_phone
+    except Exception:
+      pass
     topology['estimatedEgoIndex'] = planning_index(candidate, nav,
       enabled=self.settings.enabled and self.settings.phone_lane_enabled)
     topology['phoneLanePlanningEnabled'] = self.settings.enabled and self.settings.phone_lane_enabled
@@ -155,7 +171,11 @@ class NavigationRuntime:
       paint_right=_line.get('right') == 1 if _line else False)
     oem.update(leftBlocked=left_blocked, rightBlocked=right_blocked, blockReasons=list(reasons))
     for side in ('left', 'right'):
-      topology[side+'CrossingAllowed'] = oem[side+'CrossingAllowed'] and not oem[side+'Blocked']
+      if BYPASS_OEM_CROSSING:
+        # 只信自己的观测：车端 ALC 不可用/过期不再否决，但自己的阻塞仍然生效。
+        topology[side+'CrossingAllowed'] = not oem[side+'Blocked']
+      else:
+        topology[side+'CrossingAllowed'] = oem[side+'CrossingAllowed'] and not oem[side+'Blocked']
     usable_nav = dict(nav, valid=bool(nav['valid'] and vehicle_fresh),
                       linked=bool(nav.get('linked', nav['valid']) and vehicle_fresh),
                       routeActive=bool(nav.get('routeActive') and vehicle_fresh and self.settings.enabled))

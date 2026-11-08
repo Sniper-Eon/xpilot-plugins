@@ -166,13 +166,30 @@ def main():
             _topo = result.get('topology') or {}
             _abs = _topo.get('absoluteEgoIndex')
             _abs_src = _topo.get('absoluteSource') or ('phone' if _topo.get('phoneLaneCount') else '-')
-            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d ego=%d/%d abs=%s/%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | %s lamp=%s/%s\n' % (
+            _recset = '{' + ','.join(str(_l.get('index')) for _l in (_n.get('lanes') or [])
+                                     if _l.get('recommended') is True) + '}'
+            # 左右阻塞原因（来自 blocker.update 的第三个返回值）
+            _ev_vis = ((result.get('nav') or {}).get('phoneLaneEvidence') or {})
+            if _ev_vis.get('valid'):
+              _vis = '%s/%s@%s' % (_ev_vis.get('laneNumber'), _ev_vis.get('laneCount'), _ev_vis.get('samples'))
+            else:
+              _vis = '-'
+            _blk = '-'
+            try:
+              _rs = (result.get('oem') or {}).get('blockReasons') or ()
+              if len(_rs) == 2:
+                _blk = '%s|%s' % ((_rs[0] or '-'), (_rs[1] or '-'))
+            except Exception:
+              _blk = '-'
+            if _recset == '{}':
+              _recset = '-'
+            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d%s ego=%d/%d abs=%s/%s vis=%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | %s blk=%s lamp=%s/%s\n' % (
               _t.monotonic(), _key[0], _key[1], _key[2], _key[3], _key[4], _key[5], _key[6],
-              _key[7], _key[8], _key[9], _key[10],
-              '-' if _abs is None else _abs, _abs_src,
+              _key[7], _key[8], _recset, _key[9], _key[10],
+              '-' if _abs is None else _abs, _abs_src, _vis,
               _key[11], _key[12], _key[13], _key[14], _key[15], _key[16], _key[17], _key[18],
               '%s/%s' % (_ovt.get('state', '-'), _ovt.get('reason', '-')),
-              _flags, _lamp.get('reason', '-'), _lamp.get('framesBuilt', '-')))
+              _flags, _blk, _lamp.get('reason', '-'), _lamp.get('framesBuilt', '-')))
       except Exception:
         pass
       try:

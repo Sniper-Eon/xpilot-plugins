@@ -11,10 +11,19 @@ def validate(value):
     return None
   if not isinstance(value, dict):
     raise ValueError('invalid_lane_line_observation')
-  left, right = value.get('left'), value.get('right')
-  if type(left) is not int or type(right) is not int or not 0 <= left <= 1 or not 0 <= right <= 1:
-    raise ValueError('invalid_lane_line_types')
-  out = {'left': left, 'right': right}
+  def _norm(v):
+    # 手机用 -1 表示「这一侧没识别出来」：按未知处理，不因此拒绝整帧。
+    if type(v) is not int:
+      raise ValueError('invalid_lane_line_types')
+    return v if v in (0, 1) else None
+  left, right = _norm(value.get('left')), _norm(value.get('right'))
+  if left is None and right is None:
+    return None
+  out = {}
+  if left is not None:
+    out['left'] = left
+  if right is not None:
+    out['right'] = right
   for key in ('left_conf', 'right_conf'):
     conf = value.get(key)
     if type(conf) in (int, float) and math.isfinite(conf) and 0 <= conf <= 1:
