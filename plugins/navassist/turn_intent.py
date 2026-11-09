@@ -32,14 +32,14 @@ class NavTurnSignalCoordinator:
   MIN_LOOKAHEAD_M = 40.0
   # 市区转弯：低速时不要提前上百米就打灯，按「够用就好」的窗口。
   URBAN_TURN_SPEED_MPS = 16.0
-  TURN_LOOKAHEAD_S = 4.0        # 转弯灯按 4 秒提前量计算（低速准，高速也够）
-  TURN_LOOKAHEAD_MIN_M = 25.0
-  TURN_LOOKAHEAD_MAX_M = 100.0
+  TURN_LOOKAHEAD_S = 6.0        # 转弯灯按 6 秒提前量计算（30km/h≈50m，50km/h≈83m）
+  TURN_LOOKAHEAD_MIN_M = 40.0
+  TURN_LOOKAHEAD_MAX_M = 120.0
   RESTART_PULSE_NS = 2_000_000_000       # 转弯中停车后起步，补亮 2 秒
   RESTART_PULSE_DISTANCE_M = 25.0        # 只在这个距离内补灯
   RESTART_STOP_SPEED_MPS = 0.3
   RESTART_GO_SPEED_MPS = 1.5
-  TURN_LAMP_MAX_NS = 20_000_000_000  # 转弯灯硬上限：超过 20 秒强制熄灭
+  TURN_LAMP_MAX_NS = 10_000_000_000  # 转弯灯硬上限：超过 10 秒强制熄灭，避免卡住挡住下一个指示
   URBAN_TURN_HOLD_NS = 0             # 不再额外保持，转弯由车端自己维持
   SLOW_IMMEDIATE_MAX_M = 150.0    # 低速时并道/匝道窗口上限，避免提前几百米亮灯
   MAX_LOOKAHEAD_M = 250.0
@@ -72,6 +72,7 @@ class NavTurnSignalCoordinator:
     self._pulse_until_ns = 0
     self._arrive_since_ns = 0
     self._suppress_until_ns = 0
+    self._suppress_event_id = 0
     self._turn_clear_since_ns = 0
 
   def _reset(self, reason: str = "idle") -> NavLaneIntent:
@@ -120,13 +121,17 @@ class NavTurnSignalCoordinator:
                                       and speed_mps < self.URBAN_TURN_SPEED_MPS) else ARRIVE_HOLD_NS):
         self._arrive_since_ns = 0
         self._suppress_until_ns = now_ns + POST_TURN_SUPPRESS_NS
+        self._suppress_event_id = int(plan.maneuver_event_id or 0)
         return self._reset("turnCompleted")
     else:
       self._arrive_since_ns = 0
 
-    # 刚通过路口的一小段时间内不再为下一个机动点灯。
+    # 刚通过路口的一小段时间内不再为同一个机动点灯；但如果导航已经给出「下一个」机动
+    # （事件号变化），必须让新机动接管，否则连着的第二个路口会被这 3 秒压制挡掉。
     if self._suppress_until_ns and now_ns < self._suppress_until_ns and self._active_key is None:
-      return NavLaneIntent(reason="postTurnSuppress")
+      _new_event = bool(plan.valid and plan.maneuver_event_id and plan.maneuver_event_id != self._suppress_event_id)
+      if not _new_event:
+        return NavLaneIntent(reason="postTurnSuppress")  # allowNewEvent
 
     if self._active_key is not None:
       # 路口转弯灯的硬上限：导航距离卡住不动时也要能自动熄灭。
