@@ -8,8 +8,13 @@ from .intent import LaneIntentCoordinator, TurnSignalCoordinator, build_intent
 from .navstate import build as build_nav_state
 from .oem import OemLaneSignals
 from .phone_lane import PhoneLaneEvidence, planning_index
+from .lane_estimate import estimate as lane_estimate
 from .position import AbsolutePosition
 from .overtake import OvertakeController
+
+# 绝对车道号防抖：新值必须持续这么久才切换，避免在最右车道两个来源来回跳。
+ABS_DEBOUNCE_NS = 500_000_000
+ABS_STALE_NS = 1_500_000_000
 
 # 绕过车端 ALC「可用性」判断：只用自己的传感器（车道线/盲区/实线/路沿）。
 # 车端雷达盲区与 DesireHelper 的盲区检查仍然生效。
@@ -28,6 +33,11 @@ class NavigationRuntime:
     self.turns = TurnSignalCoordinator()
     self.lanes = LaneIntentCoordinator(max_changes=settings.max_lane_changes)
     self._topo_hold = None      # 模型拓扑短时抖动时的保持缓存
+    self._abs_hold = None       # 绝对车道号的防抖状态
+    self._lane_history = None   # 统一估计器用的历史值
+    self._road_total = None     # 道路实际车道总数（远离路口时稳定值）
+    self._road_total_cand = None
+    self._road_total_since = 0
     self.overtake = OvertakeController()
     self.last_overtake = {}
 
@@ -110,15 +120,22 @@ class NavigationRuntime:
     topology['estimatedEgoIndex'] = planning_index(candidate, nav,
       enabled=self.settings.enabled and self.settings.phone_lane_enabled)
     topology['phoneLanePlanningEnabled'] = self.settings.enabled and self.settings.phone_lane_enabled
-    # 手机 MNN 是车道编号的第一决策源：它报出车道号时直接采信，模型只做补充。
+    # PREFER_POSITION_OVER_PHONE：相机+地图锚定的绝对号（position.py）比手机 MNN 可靠。
+    # 实测（4 车道、两者都可用 651 行）：手机比 position 小 1 的占 26%（171 行），
+    # 也就是 MNN 常漏掉左侧一条车道。所以 position 有效时优先用它，手机退居兜底。
     _phone_abs = topology.get('absoluteEgoIndex')
     _phone_ok = isinstance(_phone_abs, int) and _phone_abs >= 0
-    if _phone_ok:
+    _pos_abs = (int(position['lane_index']) - 1) if position.get('valid') and position.get('lane_index') else None
+    if _pos_abs is not None and _pos_abs >= 0:
+      topology['absoluteEgoIndex'] = _pos_abs
+      if _phone_ok and int(topology.get('visibleLaneCount', 0) or 0) == int(topology.get('phoneLaneCount', 0) or -1):
+        topology['egoLaneIndexFromLeft'] = _phone_abs
+    elif _phone_ok:
       topology['absoluteEgoIndex'] = _phone_abs
       if int(topology.get('visibleLaneCount', 0) or 0) == int(topology.get('phoneLaneCount', 0) or -1):
         topology['egoLaneIndexFromLeft'] = _phone_abs
     else:
-      topology['absoluteEgoIndex'] = position['lane_index']-1 if position['valid'] else None
+      topology['absoluteEgoIndex'] = None
     try:
       from .phone import lane_line_state as _lls
       _line = _lls(now_ns=now_ns)
@@ -129,46 +146,176 @@ class NavigationRuntime:
       topology['laneMarkingRight'] = int(_line.get('right') or -1)
     except Exception:
       pass
-    # 手机虚实线补充锚定：模型看不到路沿、但手机判定该侧是实线且本车在最外侧车道时，
-    # 把这一侧视为车道计数基准（用于绝对车位和推荐车道换算）。
+    # SOLID_LINE_LANE_NUMBER: 实线不再用来推断路沿/车道号（实线可能只是车道分隔线）。
+    # 边缘推断：高德给整条路的车道数，手机只看得到可见范围。只认「真实路沿」
+    # （模型拓扑里的 left/rightCarriagewayAnchored），不再用手机实线代替路沿。
+    # EDGE_PLUS_SOLID：模型看到该侧路沿 + 手机判定该侧实线 → 本车就在最外侧车道。
+    # 这比单看实线可靠（实线也可能只是车道分隔线），用来纠正「最左车道被数成第 2 条」。
+    # SHADOW_OLD：把旧算法在同一份输入上再算一遍，只用于日志对比，不参与控制。
+    _old_abs, _old_src = None, '-'
     try:
-      _ego_now = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
-      _cnt_now = int(topology.get('visibleLaneCount', 0) or 0)
-      if _ego_now == 0 and int(_line.get('left') or 0) == 1:
-        topology['leftCarriagewayAnchored'] = True
-        topology['phoneLineAnchor'] = 'left'
-      if _cnt_now >= 2 and _ego_now == _cnt_now - 1 and int(_line.get('right') or 0) == 1:
-        topology['rightCarriagewayAnchored'] = True
-        topology['phoneLineAnchor'] = 'right'
+      _amap_o = len(nav.get('lanes') or ())
+      _ev_o = candidate or {}
+      _num_o, _cnt_o = int(_ev_o.get('laneNumber') or 0), int(_ev_o.get('laneCount') or 0)
+      _vis_o = bool(_ev_o.get('valid')) and 1 <= _num_o <= max(_cnt_o, 1)
+      _left_solid_o = int(_line.get('left') or 0) == 1
+      _right_solid_o = int(_line.get('right') or 0) == 1
+      if _vis_o and _amap_o >= 1 and _cnt_o == _amap_o:
+        _old_abs, _old_src = _num_o - 1, 'phoneMatch'
+      elif position.get('valid') and isinstance(position.get('lane_index'), int):
+        _old_abs, _old_src = int(position['lane_index']) - 1, 'position'
+      elif _vis_o and _amap_o >= 1:
+        if _left_solid_o and _num_o == 1:
+          _old_abs, _old_src = 0, 'oldEdge'
+        elif _right_solid_o and _cnt_o >= 2 and _num_o == _cnt_o:
+          _old_abs, _old_src = _amap_o - 1, 'oldEdge'
     except Exception:
-      pass
-    # 边缘推断：高德给整条路的车道数，手机只看得到可见范围。当两边数量不一致时，
-    # 用实线边界判断本车是否贴在某侧路沿：贴左侧路沿且在最左可见车道 → 绝对第 1 条；
-    # 贴右侧路沿且在最右可见车道 → 绝对最后一条。仅在缺少绝对号时使用。
+      _old_abs, _old_src = None, '-'
+    # LANE_PRIORITY_V2
+    #   ① 左侧路沿（紧贴，或 路沿+实线）        → 第 1 条
+    #   ② 右侧路沿紧贴可见最右 + 高德总数        → 高德总数 - 可见数 + (手机号 - 1)
+    #   ③ 否则手机左侧计数                       → 手机号 - 1
+    #   ④ 都没有                                  → 不猜
     if topology.get('absoluteEgoIndex') is None:
       try:
         _amap = len(nav.get('lanes') or ())
-        _ev = candidate or {}
-        _number, _count = int(_ev.get('laneNumber') or 0), int(_ev.get('laneCount') or 0)
-        if _amap >= 1 and _ev.get('valid') and _number >= 1 and 1 <= _count <= _amap:
-          _visual = _number - 1
-          _abs = None
-          if int(_line.get('left') or 0) == 1 and _visual == 0:
+        _left_solid = int(_line.get('left') or 0) == 1
+        _ev2 = candidate or {}
+        _vis_number, _vis_count = int(_ev2.get('laneNumber') or 0), int(_ev2.get('laneCount') or 0)
+        _has_vis = bool(_ev2.get('valid')) and 1 <= _vis_number <= max(_vis_count, 1)
+        EDGE_GAP_LIMIT_M = 3.0
+        E_DGE_GAP = EDGE_GAP_LIMIT_M
+        _lg_raw = topology.get('leftEdgeGapM')
+        _rg_raw = topology.get('rightEdgeGapM')
+        _lgap = 99.0 if _lg_raw is None else float(_lg_raw)   # 0 米是合法紧贴，不能用 or
+        _rgap = 99.0 if _rg_raw is None else float(_rg_raw)
+        # EDGE_GAP_LIMIT_M：路沿必须在 3 米内才算「紧贴」，否则中间车道会被远处路沿带偏。
+        _left_anchor = bool(topology.get('leftRoadEdge') or topology.get('leftCarriagewayAnchored')
+                            or (topology.get('leftEdgeDetected') and _left_solid and _lgap <= E_DGE_GAP))
+        # RIGHT_SOLID_ANCHOR：右侧路沿紧贴，或「检测到右路沿 + 右侧实线」都算右侧锚定。
+        # 单独实线不采信（可能只是车道分隔线），必须有路沿配合。
+        _right_solid = int(_line.get('right') or 0) == 1
+        _right_anchor = bool(topology.get('rightCarriagewayAnchored')
+                             or (topology.get('rightEdgeDetected') and _right_solid and _rgap <= E_DGE_GAP))
+        if _left_anchor:
+          # LEFT_ANCHOR_EGO：左侧路沿锚住窗口最左端 → 窗口第 1 条 = 高德第 1 条，
+          # 所以绝对号 = 模型在窗口里的序号（中间车道不能一律写 0）。
+          # 注意：ego=0（最左）会被 `or -1` 变成 -1，必须显式判断类型。
+          _ego_raw = topology.get('egoLaneIndexFromLeft')
+          _ego_i = int(_ego_raw) if isinstance(_ego_raw, int) and not isinstance(_ego_raw, bool) else -1
+          if 0 <= _ego_i:
+            _abs = _ego_i
+          elif _has_vis:
+            _abs = _vis_number - 1
+          else:
             _abs = 0
-          elif int(_line.get('right') or 0) == 1 and _count >= 2 and _visual == _count - 1:
+          if _amap >= 1:
+            _abs = max(0, min(_amap - 1, _abs))
+          topology['absoluteEgoIndex'] = _abs
+          topology['estimatedEgoIndex'] = _abs
+          topology['absoluteSource'] = 'leftEdge'
+        elif _right_anchor and _amap >= 1 and (not _has_vis or (_amap - _vis_count) <= 1):
+          # ② 右侧路沿紧贴可见最右车道：可见最右 = 高德最后一条。
+          # RIGHT_EDGE_TOTAL_GAP：只有「高德总数 - 可见数 ≤ 1」时才成立；
+          # 差 2 条以上说明可见窗口没到路右端，反推会偏好几条（19:56 就是这种）。
+          if _has_vis and _vis_count >= 1:
+            _abs = _amap - _vis_count + (_vis_number - 1)
+          else:
             _abs = _amap - 1
-          if _abs is not None:
-            topology['absoluteEgoIndex'] = _abs
-            topology['estimatedEgoIndex'] = _abs
-            topology['absoluteSource'] = 'edgeInference'
+          topology['absoluteEgoIndex'] = max(0, min(_amap - 1, _abs))
+          topology['estimatedEgoIndex'] = topology['absoluteEgoIndex']
+          topology['absoluteSource'] = 'rightEdgeAmapTotal'
+        elif _has_vis and _amap >= 1:
+          # PHONE_ABS_NEEDS_AMAP：高德没给车道数时，手机窗口序号不是整条路的序号，
+          # 直接当绝对号会系统性少算（最右车道被报成第 2 条）。宁可不报。
+          _abs = min(_vis_number - 1, _amap - 1)
+          topology['absoluteEgoIndex'] = max(0, _abs)
+          topology['estimatedEgoIndex'] = topology['absoluteEgoIndex']
+          topology['absoluteSource'] = 'phoneLeftCount'
       except Exception:
         pass
+    # ABS_DEBUG/防抖：最右车道会在「右路沿反推」和「手机左侧计数」之间来回跳，
+    # 要求新值连续稳定 500 毫秒才采纳，旧的继续用；超过 1.5 秒没有候选则清空。
+    try:
+      _cand = topology.get('absoluteEgoIndex')
+      _h = self._abs_hold
+      if not isinstance(_cand, int) or _cand < 0:
+        if _h is not None and now_ns - _h['last'] > ABS_STALE_NS:
+          self._abs_hold = None
+          topology['absoluteEgoIndex'] = None
+      else:
+        if _h is None:
+          self._abs_hold = dict(value=_cand, pending=None, since=now_ns, last=now_ns)
+        elif _cand == _h['value']:
+          _h['pending'] = None
+          _h['last'] = now_ns
+        else:
+          if _h['pending'] != _cand:
+            _h['pending'] = _cand
+            _h['since'] = now_ns
+          elif now_ns - _h['since'] >= ABS_DEBOUNCE_NS:
+            _h['value'] = _cand
+            _h['pending'] = None
+            _h['last'] = now_ns
+          _h['last'] = now_ns
+        if _h is not None:
+          topology['absoluteEgoIndex'] = _h['value']
+          topology['estimatedEgoIndex'] = _h['value']
+    except Exception:
+      pass
+
+    # LANE_ESTIMATE_OBSERVE：统一估计器先只做观察，日志里和现有 abs 并排输出，
+    # 跑够数据确认置信度表后再切换为正式输出。
+    # ROAD_TOTAL_TRACKER：路口的高德 lanes 会多出左转/待转车道，
+    # 只在远离路口（>300 米或无机动）时观察总数，稳定 1 秒才采纳。
+    try:
+      _amap_n = len(nav.get('lanes') or ())
+      _dist = float(nav.get('maneuverDistanceM') or 0.0)
+      _far = _dist <= 0.0 or _dist > 300.0
+      if _amap_n >= 2 and _far:
+        if self._road_total_cand != _amap_n:
+          self._road_total_cand = _amap_n
+          self._road_total_since = now_ns
+        elif now_ns - self._road_total_since >= 1_000_000_000:
+          self._road_total = _amap_n
+    except Exception:
+      pass
+    try:
+      _est = lane_estimate(nav, topology, position, candidate, _line, self._lane_history, now_ns,
+                           road_total=self._road_total)
+      topology['estimateValue'] = _est.get('value')
+      topology['estimateSource'] = _est.get('source')
+      topology['estimateConfidence'] = _est.get('confidence')
+      topology['estimateNote'] = _est.get('note')
+      # LANE_ESTIMATE_ACTIVE：估计器成为正式来源（旧 if 链只作为它没有结论时的兜底）。
+      if isinstance(_est.get('value'), int):
+        topology['absoluteEgoIndex'] = int(_est['value'])
+        topology['estimatedEgoIndex'] = int(_est['value'])
+        topology['absoluteSource'] = 'est:' + str(_est.get('source'))
+        if _est.get('confidence', 0.0) >= 0.6:
+          self._lane_history = dict(value=int(_est['value']), ns=now_ns)
+    except Exception:
+      pass
+
+    # NEIGHBOR_FROM_ABS：模型只看得见 2-3 条车道，窗口外的邻道会被判成「不存在」，
+    # 导致协调器一直 lanePositionRecoveryWaiting。绝对号 + 高德总数能确定邻道是否存在。
+    try:
+      _abs_n = topology.get('absoluteEgoIndex')
+      _amap_n = len(nav.get('lanes') or ())
+      if isinstance(_abs_n, int) and 0 <= _abs_n and _amap_n >= 1:
+        topology['leftNeighborExists'] = bool(_abs_n > 0)
+        topology['rightNeighborExists'] = bool(_abs_n < _amap_n - 1)
+    except Exception:
+      pass
     left_blocked, right_blocked, reasons = self.blocker.update(oem, topology,
       phone_left=left_phone, phone_right=right_phone,
       car_left=bool(getattr(car, 'leftBlindspot', False)),
       car_right=bool(getattr(car, 'rightBlindspot', False)),
       paint_left=_line.get('left') == 1 if _line else False,
-      paint_right=_line.get('right') == 1 if _line else False)
+      paint_right=_line.get('right') == 1 if _line else False,
+      # 路口前的转弯/靠边：跨过实线是正常操作，实线不再拦截
+      ignore_paint=bool(str(nav.get('maneuver', '')).startswith(('turn_', 'slight_', 'keep_'))
+                        and 0.0 <= float(nav.get('maneuverDistanceM') or 0.0) <= 150.0))
     oem.update(leftBlocked=left_blocked, rightBlocked=right_blocked, blockReasons=list(reasons))
     for side in ('left', 'right'):
       if BYPASS_OEM_CROSSING:
@@ -186,6 +333,7 @@ class NavigationRuntime:
     meta = getattr(model, 'meta', None)
     _snap = current
     _road_kind = 'unknown'
+    _road_name = ''
     if _snap is not None:
       try:
         from .navstate import road_kind as _rk
@@ -195,6 +343,7 @@ class NavigationRuntime:
                          speed_kph=float(getattr(_inner, 'speed_kph', 0.0) or 0.0),
                          parallel_status=str(getattr(_inner, 'parallel_road_status', 'unknown')),
                          elevated_status=str(getattr(_inner, 'elevated_road_status', 'unknown')))
+        _road_name = str(getattr(_inner, 'current_road', '') or '')
       except Exception:
         _road_kind = 'unknown'
     overtake = self.overtake.update(car=car, model=model, topology=topology, nav=usable_nav,
@@ -218,4 +367,6 @@ class NavigationRuntime:
       model_state=str(getattr(meta, 'laneChangeState', 'off')),
       model_direction=str(getattr(meta, 'laneChangeDirection', 'none')), turn_geometry_active=turn_geometry_active,
       turns=self.turns, lanes=self.lanes, overtake=overtake)
-    return dict(nav=nav, topology=topology, intent=intent, oem=oem, position=position)
+    return dict(nav=nav, topology=topology, intent=intent, oem=oem, position=position,
+                road_kind=_road_kind, road_name=_road_name,
+                old_abs=_old_abs, old_src=_old_src)

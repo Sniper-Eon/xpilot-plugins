@@ -27,6 +27,10 @@ DIRECTIONAL_MANEUVERS = (LEFT_TURN_LANE_MANEUVERS | RIGHT_TURN_LANE_MANEUVERS
 
 MERGE_MANEUVERS = frozenset(("mergeLeft", "mergeRight"))
 RELATIVE_ROUTE_MANEUVERS = LEFT_EXIT_LANE_MANEUVERS | RIGHT_EXIT_LANE_MANEUVERS
+# 转弯/掉头：并道准备窗口（打灯窗口另由 turn_intent 控制）
+TURN_PREPARE_MANEUVERS = (frozenset(("turn_left", "turn_right", "u_turn_left", "u_turn_right"))
+                          | LEFT_TURN_LANE_MANEUVERS | RIGHT_TURN_LANE_MANEUVERS)
+TURN_PREPARE_M = 400.0
 
 FORK_NOW_DISTANCE_M = 50.0
 
@@ -46,6 +50,13 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     nav_valid = False  # no new lane changes while on a ramp
   fallback_side = None
   lookahead_m = 0.0
+  # RECOMMENDATION_GATE：高德的 lanes 是「路口那一段」的车道，不是当前位置的。
+  # 提前几百米就按它并道会套错车道；只有进入合理窗口才跟随推荐。
+  _rec_gate_m = (800.0 * scale if road_kind in ("expressway", "urban_expressway") else 250.0)
+  # PREPARE_WINDOW_TURN：转弯/掉头要提前几百米就靠到推荐车道，
+  # 但转弯「灯」仍按速度×6 秒（约 50 米）在 turn_intent 里控制，两者不再共用一个窗口。
+  if maneuver in (TURN_PREPARE_MANEUVERS):
+    _rec_gate_m = max(_rec_gate_m, TURN_PREPARE_M)
   if maneuver in LEFT_TURN_LANE_MANEUVERS:
     fallback_side, lookahead_m = "left", settings.turn_lane_lookahead_m
   elif maneuver in RIGHT_TURN_LANE_MANEUVERS:
@@ -84,7 +95,8 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # Translate AMap full-road recommendations into the local visible window.
     # Passing AMap indices raw makes the coordinator compare them with a
     # different egoLaneIndexFromLeft and steer to the wrong edge.
-    if nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count:
+    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+        and (not math.isfinite(distance_m) or distance_m <= 0.0 or distance_m <= _rec_gate_m)):
       visual_ego = int(topology.egoLaneIndexFromLeft)
       if 0 <= visual_ego < lane_count:
         offset = amap_ego_index - visual_ego
@@ -97,7 +109,8 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # A confirmed absolute lane also permits one adjacent step toward a
     # recommendation outside the local window. Do not equate the local index
     # with an absolute lane or require the final destination to be visible.
-    if nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count:
+    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+        and (not math.isfinite(distance_m) or distance_m <= 0.0 or distance_m <= _rec_gate_m)):
       visual_ego = int(topology.egoLaneIndexFromLeft)
       absolute_recommended = tuple(index for index in recommended if 0 <= index < amap_lane_count)
       if 0 <= visual_ego < lane_count and absolute_recommended:

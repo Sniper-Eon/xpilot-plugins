@@ -22,10 +22,14 @@ def empty_state(reason: str = "noData") -> dict:
 
 def _phone_observations_valid(snapshot) -> bool:
   location_age_ms = snapshot.source_wall_time_ms - snapshot.location_observed_at_ms
+  # PARKED_LOCATION_RELAX：停车时高德不重复回调位置，年龄会一直增长；
+  # 车速接近 0 时放宽到 5 秒，行驶中仍要求 1 秒内。
+  parked = float(getattr(snapshot, 'speed_kph', 0.0) or 0.0) < 5.0
+  budget_ms = 5_000 if parked else MAX_PHONE_LOCATION_AGE_MS
   return bool(
     snapshot.coordinate_system != "unknown"
     and snapshot.accuracy_m <= MAX_PHONE_LOCATION_ACCURACY_M
-    and 0 <= location_age_ms <= MAX_PHONE_LOCATION_AGE_MS
+    and 0 <= location_age_ms <= budget_ms
   )
 
 
@@ -33,6 +37,8 @@ AUTO_ROAD_KIND = {0: "expressway", 1: "national", 6: "urban_expressway"}
 SDK_ROAD_KIND = {1: "expressway", 2: "national", 3: "provincial", 4: "county", 5: "town",
                  6: "ramp", 8: "ramp", 9: "ramp", 10: "ramp", 56: "ramp", 58: "ramp"}
 HIGHWAY_NAME_HINTS = ("高速", "高架", "快速", "环路", "环线")
+# 车主指定的快速化城市道路：路名匹配时按快速路处理，允许导航超车。
+USER_ROAD_WHITELIST = ("桂丹路", "禅西大道")
 FREEWAY_KINDS = frozenset(("expressway", "urban_expressway"))
 VALID_HOLD_NS = 1_500_000_000
 _valid_hold = 0
@@ -44,6 +50,9 @@ def road_kind(road_class, road_type, *, road_name="", speed_kph=0.0,
   on_side_layer = parallel_status == "side" or elevated_status == "side"
   if any(h in name for h in HIGHWAY_NAME_HINTS) and not on_side_layer and speed_kph >= 45.0:
     return "urban_expressway" if any(h in name for h in ("高架", "快速", "环路", "环线")) else "expressway"
+  # 白名单道路：桂丹路、禅西大道等快速化主干道，允许超车（仍需车速达标）。
+  if any(h in name for h in USER_ROAD_WHITELIST) and not on_side_layer and speed_kph >= 45.0:
+    return "urban_expressway"
   kind = SDK_ROAD_KIND.get(road_type) or AUTO_ROAD_KIND.get(road_class) or "unknown"
   if kind in FREEWAY_KINDS and speed_kph < 55.0:
     return "unknown"
@@ -64,7 +73,12 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   control_source_valid = snapshot.source_platform in ("android", "ios") and snapshot.navigation_mode == "realtime"
   phone_observations_valid = _phone_observations_valid(snapshot)
   guidance_age = snapshot.source_wall_time_ms-snapshot.guidance_observed_at_ms
-  guidance_valid = snapshot.guidance_present and 0 <= guidance_age <= 1500
+  # GUIDANCE_STALE_PARKED：高德只在距离变化时回调引导，停着不动引导时间戳会一直变老。
+  # 车速接近 0 时放宽到 60 秒（机动信息本身没变），行驶中仍要求 1.5 秒内。
+  _parked = float(getattr(snapshot, 'speed_kph', 0.0) or 0.0) < 5.0
+  # 停着不动时引导时间戳会无限变老（高德只在距离变化时回调），此时只看"有没有引导"。
+  guidance_valid = bool(snapshot.guidance_present
+                        and ((_parked and guidance_age >= 0) or (0 <= guidance_age <= 1500)))
   # AMap need not repeat unchanged maneuver callbacks. As on the 23-Oct
   # baseline, a fresh matched snapshot keeps turn-only guidance available.
   # Lane/slowdown validity below still requires recent guidance and positioning.

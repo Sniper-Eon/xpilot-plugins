@@ -240,6 +240,31 @@ class LaneIntentCoordinator:
     return out
 
 
+def _at_road_edge(direction, topology):
+  """True when the requested side is the carriageway edge (no lane to move into)."""
+  _dir = str(direction or 'none').lower()
+  if _dir not in ('left', 'right'):
+    return False
+  # 注意：不能用 `int(x or 0)`，最左车道的 ego=0 会被 `or` 当成假值变成 -1。
+  def _as_int(value, fallback):
+    return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) else fallback
+  _count = _as_int(topology.get('visibleLaneCount'), 0)
+  _ego = _as_int(topology.get('egoLaneIndexFromLeft'), -1)
+  _abs_ego = topology.get('absoluteEgoIndex')
+  _abs_known = isinstance(_abs_ego, int) and not isinstance(_abs_ego, bool) and _abs_ego >= 0
+  if _abs_known and not (0 <= _ego < _count):
+    _ego, _count = _abs_ego, max(_count, _abs_ego + 1)
+  if _count > 1 and 0 <= _ego < _count:
+    return (_dir == 'left' and _ego == 0) or (_dir == 'right' and _ego == _count - 1)
+  # 只知道绝对号、不知道总数时，绝对号 0 就是最左车道。
+  if _abs_known and _dir == 'left' and _abs_ego == 0:
+    return True
+  # 车道号未知时，手机判定的实线侧也视为路沿。
+  if _dir == 'left':
+    return int(topology.get('laneMarkingLeft', -1) or -1) == 1
+  return int(topology.get('laneMarkingRight', -1) or -1) == 1
+
+
 def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
                  blindspot_left, blindspot_right, lateral_active, turns, lanes,
                  left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
@@ -273,6 +298,11 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
     out.update(signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False, reason='heuristicChangeLimit')
     return out
   if out['signalRequested']:
+    # 并道灯也不能往路沿那一侧亮：已经在最左/最右车道时，再往那一侧并没有车道。
+    # 只拦并道请求，路口转弯灯（turn*/sharp*/uTurn*）不受影响。
+    if _at_road_edge(out.get('direction'), topology):
+      return dict(out, signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False,
+                  reason='atRoadEdge')
     return out
   if settings.turn_signal_enabled and turn['signalRequested']:
     relative_route_action = n.maneuver in ('mergeLeft', 'mergeRight', 'exitLeft', 'exitRight', 'rampLeft', 'rampRight')
@@ -290,23 +320,8 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
   # 已经在要并过去那一侧的路沿：为「并道」点灯已经没有意义，直接不发（路口转弯灯不受影响）
   _LANE_CHANGE_LAMPS = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight",
                                   "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight"))
-  if turn.get('signalRequested') and str(n.maneuver) in _LANE_CHANGE_LAMPS:
-    _count = int(topology.get('visibleLaneCount', 0) or 0)
-    _ego = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
-    _abs_ego = topology.get('absoluteEgoIndex')
-    if not (0 <= _ego < _count) and isinstance(_abs_ego, int) and _abs_ego >= 0:
-      # 视觉没给出相对车道号时，用绝对车道号判断是否贴着路沿。
-      _ego, _count = _abs_ego, max(_count, _abs_ego + 1)
-    _dir = str(turn.get('direction', 'none')).lower()
-    _left_solid = int(topology.get('laneMarkingLeft', -1) or -1) == 1
-    _right_solid = int(topology.get('laneMarkingRight', -1) or -1) == 1
-    _at_edge = False
-    if _count > 1 and 0 <= _ego < _count:
-      _at_edge = (_dir == 'left' and _ego == 0) or (_dir == 'right' and _ego == _count - 1)
-    if not _at_edge and not (0 <= _ego < _count):
-      # 车道号未知时，手机判定的实线侧也视为路沿：禁止再往那一侧并道。
-      _at_edge = (_dir == 'left' and _left_solid) or (_dir == 'right' and _right_solid)
-    if _at_edge:
-      turn = dict(turn, signalRequested=False, direction='none', reason='atRoadEdge')
+  if (turn.get('signalRequested') and str(n.maneuver) in _LANE_CHANGE_LAMPS
+      and _at_road_edge(turn.get('direction'), topology)):
+    turn = dict(turn, signalRequested=False, direction='none', reason='atRoadEdge')
   return turn if settings.turn_signal_enabled else out
 

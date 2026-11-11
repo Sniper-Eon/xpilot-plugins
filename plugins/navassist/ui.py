@@ -13,21 +13,82 @@ DIM=rl.Color(142,159,180,255)
 AMBER=rl.Color(255,191,87,255)
 
 
+ARROW_SCALE=.72   # 整体尺寸（配合下面的横纵比）
+ASPECT_X,ASPECT_Y=1.34,.86   # 横向拉长、纵向压扁
+
+
+def _sx(v):
+  return .5+(v-.5)*ASPECT_X
+
+
+def _sy(v):
+  return .5+(v-.5)*ASPECT_Y
+
+
+def _stroke(x,y,size,pts,color,thickness):
+  for a,b in zip(pts,pts[1:]):
+    rl.draw_line_ex(rl.Vector2(x+_sx(a[0])*size,y+_sy(a[1])*size),
+                    rl.Vector2(x+_sx(b[0])*size,y+_sy(b[1])*size),thickness,color)
+
+
+def _head(x,y,size,tip,travel,color,thickness,length=.2,spread=34):
+  import math
+  base=math.atan2(travel[1],travel[0])+math.pi
+  tip_x,tip_y=_sx(tip[0])*size,_sy(tip[1])*size
+  for sign in (-1,1):
+    ang=base+sign*math.radians(spread)
+    end=(tip[0]+math.cos(ang)*length,tip[1]+math.sin(ang)*length)
+    rl.draw_line_ex(rl.Vector2(x+tip_x,y+tip_y),
+                    rl.Vector2(x+_sx(end[0])*size,y+_sy(end[1])*size),thickness,color)
+
+
+def _circle_pts(cx,cy,r,steps=14):
+  import math
+  return [(cx+r*math.cos(2*math.pi*i/steps),cy+r*math.sin(2*math.pi*i/steps)) for i in range(steps+1)]
+
+
 def arrow(x,y,size,direction,color):
-  """Vector arrows avoid missing icon glyphs in C3 fonts."""
-  left='left' in str(direction)
-  right='right' in str(direction)
-  mid=x+size*.5
-  if left or right:
-    side=x+size*(.16 if left else .84)
-    pts=[(mid,y+size*.86),(mid,y+size*.35),(side,y+size*.35)]
-    head=[(side+size*(.2 if left else -.2),y+size*.16),(side,y+size*.35),
-          (side+size*(.2 if left else -.2),y+size*.54)]
+  """Vector glyphs per AMap maneuver: turn/slight/sharp/U-turn/roundabout/fork/arrive."""
+  name=str(direction or '').lower().replace('_','').replace(' ','')
+  size=size*ARROW_SCALE
+  thickness=max(3.0,size*.055)
+  flip='left' in name
+  # (折线点, 箭头尖端, 行进方向) —— 单位坐标，y 向下
+  glyph=None
+  if name in ('','none','straight','continue','newname'):
+    glyph=([(.5,.92),(.5,.2)],(.5,.2),(0,-1))
+  elif 'uturn' in name:
+    sx=.64 if flip else .36
+    ex=.36 if flip else .64
+    glyph=([(sx,.92),(sx,.44),(ex,.44),(ex,.72)],(ex,.72),(0,1))
+  elif 'sharp' in name:
+    sx=.5; ex=.28 if flip else .72
+    glyph=([(sx,.92),(sx,.5),(ex,.5)],(ex,.5),(-1 if flip else 1,0))
+  elif 'slight' in name or 'keep' in name:
+    ex=.3 if flip else .7
+    glyph=([(.5,.92),(.5,.56),(ex,.28)],(ex,.28),(-.7 if flip else .7,-1))
+  elif 'roundabout' in name or 'rotary' in name:
+    pts=_circle_pts(.5,.46,.22)+[(.5,.24),(.5,.12)]
+    glyph=(pts,(.5,.12),(0,-1))
+  elif any(k in name for k in ('exit','ramp','merge','fork')):
+    sx=.62 if flip else .38
+    main=[(sx,.92),(sx,.2)]
+    branch=[(sx,.55),(.38 if flip else .62,.32)]
+    _stroke(x,y,size,main,color,thickness)
+    _stroke(x,y,size,branch,color,thickness)
+    _head(x,y,size,branch[-1],(-.7 if flip else .7,-1),color,thickness)
+    return
+  elif 'destination' in name or 'arrive' in name:
+    _stroke(x,y,size,[(.45,.92),(.45,.2)],color,thickness)
+    _stroke(x,y,size,[(.45,.2),(.72,.28),(.45,.36)],color,thickness)
+    return
+  elif flip:
+    glyph=([(.5,.92),(.5,.42),(.3,.42)],(.3,.42),(-1,0))
   else:
-    pts=[(mid,y+size*.86),(mid,y+size*.16)]
-    head=[(x+size*.3,y+size*.36),(mid,y+size*.16),(x+size*.7,y+size*.36)]
-  for path in (pts,head):
-    for a,b in zip(path,path[1:]):rl.draw_line_ex(rl.Vector2(*a),rl.Vector2(*b),max(3,size*.065),color)
+    glyph=([(.5,.92),(.5,.42),(.7,.42)],(.7,.42),(1,0))
+  pts,tip,travel=glyph
+  _stroke(x,y,size,pts,color,thickness)
+  _head(x,y,size,tip,travel,color,thickness)
 
 
 class NavAssistOverlay(ScreenOverlay):
@@ -56,7 +117,8 @@ class NavAssistOverlay(ScreenOverlay):
   def _side_rect(zones):
     view=zones.get('view'); left=zones.get('left'); right=zones.get('right')
     if view is None or left is None or right is None:return None
-    zone=right if right.width>=left.width else left
+    # 画面居中时左右等宽：优先放在左侧（原来相等时固定选右）。
+    zone=left if left.width>=right.width else right
     if zone.width<160 or view.height<220:return None
     return rl.Rectangle(zone.x,view.y,zone.width,view.height)
 
@@ -71,11 +133,11 @@ class NavAssistOverlay(ScreenOverlay):
       ax=rect.x+(rect.width-size)/2
       ay=rect.y+pad
       arrow(ax,ay,size,state['maneuver'],tint)
-      font_size=max(40,min(110,int(rect.height*.17)))
+      font_size=max(36,min(88,int(rect.height*.14)))
       width=font_size*.62*len(value)
       text(FontWeight.BOLD,value,rect.x+(rect.width-width)/2,ay+size+18,font_size,WHITE)
     else:
-      font_size=max(40,min(110,int(rect.height*.20)))
+      font_size=max(36,min(88,int(rect.height*.16)))
       width=font_size*.62*len(value)
       text(FontWeight.BOLD,value,rect.x+(rect.width-width)/2,rect.y+(rect.height-font_size)/2,font_size,WHITE)
 
@@ -100,8 +162,8 @@ class NavAssistOverlay(ScreenOverlay):
       arrow(ax,ay,aw,state['maneuver'],tint)
     distance=state['distance']
     value='--' if distance is None else distance_text(distance)
-    text(FontWeight.BOLD,value,x+242,y+67,86,WHITE)
-    text(FontWeight.MEDIUM,maneuver_label(state['maneuver']),x+246,y+166,38,DIM)
+    text(FontWeight.BOLD,value,x+242,y+78,62,WHITE)
+    text(FontWeight.MEDIUM,maneuver_label(state['maneuver']),x+246,y+150,34,DIM)
     lx=x+w*.40
     text(FontWeight.MEDIUM,'Recommended lanes',lx,y+12,26,DIM)
     count=state['count']

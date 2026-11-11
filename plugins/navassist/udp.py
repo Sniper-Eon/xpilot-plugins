@@ -8,6 +8,7 @@ import socket
 import threading
 import time
 
+from . import gpsfeed
 from .feedback import REQUEST_TYPE, lane_position_feedback, lane_model_feedback
 from .rate import ClientRateLimiter
 from .wire import NavAssistProtocolError
@@ -111,6 +112,9 @@ class NavAssistUDPServer:
           ack = {"messageType": UDP_ACK_TYPE, "schemaVersion": 3,
                  "sessionId": current.snapshot.session_id, "sequence": int(query["sequence"]),
                  "lanePosition": lane_position_feedback(current.snapshot)}
+          _telemetry = gpsfeed.telemetry(time.monotonic_ns())
+          if _telemetry is not None:
+            ack["vehicleTelemetry"] = _telemetry
 
           if query.get("laneEstimateVersion") == 1:
             estimate = lane_model_feedback(current.snapshot)
@@ -129,12 +133,16 @@ class NavAssistUDPServer:
       self._accepted_source = source_host
       with self._stats_lock:
         self._stats["accepted"] += 1
-      acknowledgement = json.dumps({
+      _ack = {
         "messageType": UDP_ACK_TYPE,
         "schemaVersion": 3,
         "sessionId": accepted.snapshot.session_id,
         "sequence": accepted.snapshot.sequence,
-      }, separators=(",", ":")).encode()
+      }
+      _telemetry = gpsfeed.telemetry(time.monotonic_ns())
+      if _telemetry is not None:
+        _ack["vehicleTelemetry"] = _telemetry
+      acknowledgement = json.dumps(_ack, separators=(",", ":")).encode()
       try:
         self._socket.sendto(acknowledgement, address)
       except OSError:

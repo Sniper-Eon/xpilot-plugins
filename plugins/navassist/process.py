@@ -12,6 +12,7 @@ from openpilot.common.realtime import Ratekeeper
 from openpilot.common.swaglog import cloudlog
 from openpilot.tesla import plugins
 
+from . import gpsfeed
 from .can_input import can_batches
 from .lane_geometry import measure as measure_lane_geometry
 from .lane_tracker import LaneIndexTracker
@@ -59,7 +60,8 @@ def main():
   publisher = CyclePublisher(lambda kind, payload, ttl: plugins.send_msg(NavAssist, kind, payload, ttl))
   map_messages = plugins.PluginMsgs()
   store = NavAssistStore(checkpoint_path=REPLAY_CHECKPOINT_PATH)
-  sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState', 'deviceMotion'])
+  sm = messaging.SubMaster(['modelV2', 'carState', 'carControl', 'controlsState', 'deviceState',
+                            'deviceMotion', 'gpsLocationExternal'])
   can_socket = messaging.sub_sock('can', conflate=False)
   state = {'offroad': False}
   transports = NavigationTransports(store, params, lambda: state['offroad'])
@@ -75,6 +77,9 @@ def main():
     while True:
       sm.update(0)
       now = time.monotonic_ns()
+      # 把车端 GPS 转成 App 要求的 GCJ-02 遥测，随 UDP 回执下发（手机无星时兜底）。
+      if sm.updated['gpsLocationExternal']:
+        gpsfeed.update(sm['gpsLocationExternal'], now)
       state['offroad'] = bool(sm.alive['deviceState'] and sm.valid['deviceState']
                               and not sm['deviceState'].started and params.get_bool('IsOffroad'))
       if now >= next_settings:
@@ -174,6 +179,36 @@ def main():
               _vis = '%s/%s@%s' % (_ev_vis.get('laneNumber'), _ev_vis.get('laneCount'), _ev_vis.get('samples'))
             else:
               _vis = '-'
+            _road = '%s/%s' % ((result.get('road_kind') or '-'), (result.get('road_name') or '-'))
+            _old = '%s/%s' % ('-' if result.get('old_abs') is None else result.get('old_abs'),
+                              result.get('old_src') or '-')
+            _spd = '-'
+            try:
+              import json as _json
+              with open('/tmp/navassist_speed.json') as _f2:
+                _sp = _json.load(_f2)
+              _out = _sp.get('output')
+              _spd = '%s/%s@%s' % ('-' if _out is None else round(float(_out) * 3.6),
+                                   round(float(_sp.get('target') or 0) * 3.6), _sp.get('maneuver', '-'))
+            except Exception:
+              _spd = '-'
+            _tp = result.get('topology') or {}
+            try:
+              _v = _tp.get('estimateValue')
+              _est = '%s/%s/%.2f' % ('-' if _v is None else _v,
+                                     _tp.get('estimateSource') or '-',
+                                     float(_tp.get('estimateConfidence') or 0.0))
+            except Exception:
+              _est = '-'
+            try:
+              _edge = 'L%d%d/R%d%d' % (
+                1 if _tp.get('leftEdgeDetected') else 0,
+                1 if _tp.get('leftCarriagewayAnchored') else 0,
+                1 if _tp.get('rightEdgeDetected') else 0,
+                1 if _tp.get('rightCarriagewayAnchored') else 0)
+              _edge += '@%d/%d' % (int(_tp.get('leftEdgeGapM', 99) or 99), int(_tp.get('rightEdgeGapM', 99) or 99))
+            except Exception:
+              _edge = '-'
             _blk = '-'
             try:
               _rs = (result.get('oem') or {}).get('blockReasons') or ()
@@ -183,12 +218,13 @@ def main():
               _blk = '-'
             if _recset == '{}':
               _recset = '-'
-            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d%s ego=%d/%d abs=%s/%s vis=%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | %s blk=%s lamp=%s/%s\n' % (
+            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d%s ego=%d/%d abs=%s/%s old=%s vis=%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | road=%s spd=%s edge=%s est=%s | %s blk=%s lamp=%s/%s\n' % (
               _t.monotonic(), _key[0], _key[1], _key[2], _key[3], _key[4], _key[5], _key[6],
               _key[7], _key[8], _recset, _key[9], _key[10],
-              '-' if _abs is None else _abs, _abs_src, _vis,
+              '-' if _abs is None else _abs, _abs_src, _old, _vis,
               _key[11], _key[12], _key[13], _key[14], _key[15], _key[16], _key[17], _key[18],
               '%s/%s' % (_ovt.get('state', '-'), _ovt.get('reason', '-')),
+              _road, _spd, _edge, _est,
               _flags, _blk, _lamp.get('reason', '-'), _lamp.get('framesBuilt', '-')))
       except Exception:
         pass

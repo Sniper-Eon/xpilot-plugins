@@ -26,7 +26,8 @@ class LaneChangeBlocker:
   def update(self, oem: dict | None, topology: dict | None, *,
              phone_left: bool = False, phone_right: bool = False,
              car_left: bool = False, car_right: bool = False,
-             paint_left: bool = False, paint_right: bool = False) -> tuple[bool, bool, tuple[str, str]]:
+             paint_left: bool = False, paint_right: bool = False,
+             ignore_paint: bool = False) -> tuple[bool, bool, tuple[str, str]]:
     oem = oem or {}
     topology_valid = bool((topology or {}).get("valid"))
     evidence = (oem.get('alcStampNs'), oem.get('mapStampNs')) if 'alcStampNs' in oem else None
@@ -34,12 +35,18 @@ class LaneChangeBlocker:
     self._last_evidence = evidence
     # Explicit OEM/map reject always vetoes. The "availability" verdict may be speed/map gated, so it only
     # vetoes when local topology cannot confirm a crossing.
-    immediate = [
-      bool(oem.get("leftExplicitBlock")) or (bool(oem.get("leftAvailabilityBlock")) and not topology_valid)
-      or phone_left or car_left or paint_left,
-      bool(oem.get("rightExplicitBlock")) or (bool(oem.get("rightAvailabilityBlock")) and not topology_valid)
-      or phone_right or car_right or paint_right,
+    # IGNORE_PAINT_AT_JUNCTION：路口前转弯本来就要跨过左/右实线，实线不构成拦截理由。
+    paint_left = bool(paint_left) and not ignore_paint
+    paint_right = bool(paint_right) and not ignore_paint
+    sources = [
+      ('oemExplicit' if oem.get("leftExplicitBlock") else 'oemAvailability'
+       if (oem.get("leftAvailabilityBlock") and not topology_valid) else 'phoneBlindspot' if phone_left
+       else 'bsmObject' if car_left else 'paintSolid' if paint_left else ''),
+      ('oemExplicit' if oem.get("rightExplicitBlock") else 'oemAvailability'
+       if (oem.get("rightAvailabilityBlock") and not topology_valid) else 'phoneBlindspot' if phone_right
+       else 'bsmObject' if car_right else 'paintSolid' if paint_right else ''),
     ]
+    immediate = [bool(sources[0]), bool(sources[1])]
     reasons = []
     for side, detected in enumerate(immediate):
       if not detected:
@@ -52,12 +59,7 @@ class LaneChangeBlocker:
       confirmed = self._streak[side] >= self.confirm_frames
       if confirmed:
         self._remaining[side] = self.clear_frames
-        if oem.get("leftExplicitBlock" if side == 0 else "rightExplicitBlock"):
-          reasons.append("oemExplicit")
-        elif (phone_left if side == 0 else phone_right):
-          reasons.append("phoneBlindspot")
-        else:
-          reasons.append("oemAvailability")
+        reasons.append(sources[side] or "unknown")
       elif self._remaining[side] > 0:
         self._remaining[side] -= 1
         reasons.append(self._reason[side])

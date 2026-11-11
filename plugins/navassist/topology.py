@@ -40,6 +40,8 @@ def from_model(model, now_ns: int, model_mono_ns: int) -> dict:
              leftNeighborExists=False, rightNeighborExists=False,
              leftRoadEdge=False, rightRoadEdge=False,
              leftCrossingAllowed=False, rightCrossingAllowed=False,
+             leftEdgeDetected=False, rightEdgeDetected=False,
+             leftEdgeGapM=99.0, rightEdgeGapM=99.0,
              captureMonoNs=int(model_mono_ns), boundaryYs=[])
   if model is None or type(model_mono_ns) is not int or model_mono_ns <= 0:
     return out
@@ -72,12 +74,31 @@ def from_model(model, now_ns: int, model_mono_ns: int) -> dict:
       return out
     edges, stds = list(getattr(model, 'roadEdges', [])), list(getattr(model, 'roadEdgeStds', []))
     physical_left = physical_right = False
+    edge_left_ys, edge_right_ys = [], []
     for edge, std in zip(edges, stds):
       y = _y_at_x(edge, SAMPLE_X_M)
       if y is None or not math.isfinite(std) or not 0 <= std <= .8:
         continue
       physical_left |= y < 0 and 0 <= ys[0]-y <= 1.5
       physical_right |= y > 0 and 0 <= y-ys[-1] <= 1.5
+      (edge_left_ys if y < 0 else edge_right_ys).append(y)
+    out['leftEdgeDetected'] = bool(edge_left_ys)
+    out['rightEdgeDetected'] = bool(edge_right_ys)
+    # 路沿到最外侧车道线的距离：用来区分「紧贴」和「远在别处」。
+    out['leftEdgeGapM'] = (min(ys[0] - y for y in edge_left_ys if y < ys[0])
+                           if any(y < ys[0] for y in edge_left_ys) else 99.0)
+    out['rightEdgeGapM'] = (min(y - ys[-1] for y in edge_right_ys if y > ys[-1])
+                            if any(y > ys[-1] for y in edge_right_ys) else 99.0)
+    # SHOULDER_TRIM：模型的路沿落在最外侧那条「车道」里面时，那一段其实是路肩/应急带，
+    # 不是可行驶车道。丢掉这条假车道，否则会把本车多算一条（最左车道被数成第 2 条）。
+    if len(ys) >= 3:
+      if edge_left_ys and ys[0] < min(edge_left_ys, key=abs) < ys[1]:
+        ys = ys[1:]
+      if len(ys) >= 3 and edge_right_ys and ys[-2] < max(edge_right_ys, key=abs) < ys[-1]:
+        ys = ys[:-1]
+      ego = next((i for i, (left, right) in enumerate(zip(ys, ys[1:])) if left < 0 < right), -1)
+      if ego < 0:
+        return out
     count = len(ys)-1
     out.update(valid=True, stale=False, visibleLaneCount=count, egoLaneIndexFromLeft=ego,
                lanesLeftOfEgo=ego, lanesRightOfEgo=count-1-ego, boundaryCount=len(ys), boundaryYs=ys,

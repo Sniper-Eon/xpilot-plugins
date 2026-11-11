@@ -41,5 +41,25 @@ class NavSpeedTarget:
       planner_ready = bool(cc.enabled)
     except (KeyError, AttributeError):
       override, planner_ready = True, False
-    return self.ceiling.update(self._fresh(), v_ego=v_ego, v_cruise=v_cruise, enabled=self.settings.enabled,
-                               driver_override=override, planner_ready=planner_ready)
+    nav = self._fresh()
+    out = self.ceiling.update(nav, v_ego=v_ego, v_cruise=v_cruise, enabled=self.settings.enabled,
+                              driver_override=override, planner_ready=planner_ready)
+    # 诊断：把调速结果写给 navassist 进程，日志里能看到「有没有减速/为什么没减」。
+    try:
+      if now >= getattr(self, '_next_diag', 0.0):
+        self._next_diag = now + 0.5
+        import json as _json
+        with open('/tmp/navassist_speed.json', 'w') as f:
+          _json.dump({'enabled': bool(self.settings.enabled),
+                      'turnSlowdown': bool(self.settings.turn_slowdown_enabled),
+                      'plannerReady': bool(planner_ready), 'override': bool(override),
+                      'vEgo': round(float(v_ego), 2), 'vCruise': round(float(v_cruise), 2),
+                      'output': None if out is None else round(float(out), 2),
+                      'target': round(float(self.ceiling._target), 2),
+                      'active': bool(self.ceiling.is_active),
+                      'maneuver': str(nav.get('maneuver', 'none')),
+                      'distanceM': round(float(nav.get('distanceM', 0.0) or 0.0), 1),
+                      'navValid': bool(nav.get('valid')), 'navStale': bool(nav.get('stale'))}, f)
+    except Exception:
+      pass
+    return out

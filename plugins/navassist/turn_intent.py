@@ -25,11 +25,13 @@ class NavTurnSignalCoordinator:
     "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight",
   ))
   IMMEDIATE_ARM_MAX_M = {
-    "slightLeft": 600.0, "slightRight": 600.0, "keepLeft": 600.0, "keepRight": 600.0,
-    "exitLeft": 800.0, "exitRight": 800.0, "rampLeft": 800.0, "rampRight": 800.0,
-    "mergeLeft": 800.0, "mergeRight": 800.0,
+    "slightLeft": 80.0, "slightRight": 80.0, "keepLeft": 80.0, "keepRight": 80.0,
+    "exitLeft": 400.0, "exitRight": 400.0, "rampLeft": 400.0, "rampRight": 400.0,
+    "mergeLeft": 400.0, "mergeRight": 400.0,
   }
   MIN_LOOKAHEAD_M = 40.0
+  REARM_LOCK_NS = 20_000_000_000      # 同一机动事件亮过一次后，20 秒内不再重复亮
+  DRIVER_CANCEL_LOCK_NS = 30_000_000_000  # 驾驶员反向打灯后，本机动 30 秒内不再自动打灯
   # 市区转弯：低速时不要提前上百米就打灯，按「够用就好」的窗口。
   URBAN_TURN_SPEED_MPS = 16.0
   TURN_LOOKAHEAD_S = 6.0        # 转弯灯按 6 秒提前量计算（30km/h≈50m，50km/h≈83m）
@@ -73,6 +75,8 @@ class NavTurnSignalCoordinator:
     self._arrive_since_ns = 0
     self._suppress_until_ns = 0
     self._suppress_event_id = 0
+    self._lamp_shown = {}
+    self._driver_canceled = {}
     self._turn_clear_since_ns = 0
 
   def _reset(self, reason: str = "idle") -> NavLaneIntent:
@@ -86,9 +90,30 @@ class NavTurnSignalCoordinator:
 
   def update(self, plan: NavTurnPlan, *, speed_mps: float, now_ns: int,
              turn_geometry_active: bool = False, lookahead_time_s: float | None = None,
-             lookahead_distance_m: float | None = None) -> NavLaneIntent:
+             lookahead_distance_m: float | None = None,
+             left_blinker: bool = False, right_blinker: bool = False) -> NavLaneIntent:
     direction = self.MANEUVER_DIRECTIONS.get(plan.maneuver, LaneIntentDirection.none)
     event_key = (plan.session_id, plan.route_revision, plan.maneuver_event_id)
+    # 驾驶员手动打了反方向的灯 = 明确要求取消本机动的自动打灯：
+    # 记下来并连续锁定 30 秒，避免灯灭了以后我们再抢回来反复闪。
+    _driver_left, _driver_right = bool(left_blinker), bool(right_blinker)
+    _opposite = ((direction is LaneIntentDirection.left and _driver_right)
+                 or (direction is LaneIntentDirection.right and _driver_left))
+    if _opposite and int(plan.maneuver_event_id or 0):
+      self._driver_canceled[int(plan.maneuver_event_id)] = now_ns
+      if self._active_key is not None:
+        return self._reset("driverOppositeCancel")
+      return NavLaneIntent(reason="driverOppositeCancel")
+    _canceled_at = self._driver_canceled.get(int(plan.maneuver_event_id or 0))
+    if _canceled_at is not None and now_ns - _canceled_at <= self.DRIVER_CANCEL_LOCK_NS:
+      if self._active_key is not None:
+        return self._reset("driverCanceledEvent")
+      return NavLaneIntent(reason="driverCanceledEvent")
+    # 同一机动事件亮过一次后，短时间内不再重复亮灯。
+    _shown_at = self._lamp_shown.get(int(plan.maneuver_event_id or 0))
+    if (_shown_at is not None and self._active_key is None
+        and now_ns - _shown_at <= self.REARM_LOCK_NS):
+      return NavLaneIntent(reason="lampAlreadyShown")
 
     # 转弯中停过车（等行人/让行），再起步时补亮 2 秒，提醒后车本车正在转弯。
     if speed_mps <= self.RESTART_STOP_SPEED_MPS:
@@ -194,6 +219,7 @@ class NavTurnSignalCoordinator:
         return self._reset("turnUnavailable")
       else:
         self._plan_gap_since_ns = None
+        self._lamp_shown[int(plan.maneuver_event_id or 0)] = now_ns
         return NavLaneIntent(
           signal_requested=True,
           direction=self._active_direction,

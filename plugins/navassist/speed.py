@@ -11,8 +11,8 @@ from .settings import NavSettings
 COMFORT_BRAKE = 1.2
 ACTUATION_DELAY_S = 1.0
 ADMISSION_MARGIN_M = 5.0
-ACTIVATION_MARGIN_M = 25.0
-TURN_ACTIVATION_MARGIN_M = 60.0   # 转弯类提前 60 米开始减速
+ACTIVATION_MARGIN_M = 45.0
+TURN_ACTIVATION_MARGIN_M = 90.0   # 转弯类提前 90 米开始减速（方案 B）
 COMFORT_DECEL = 0.9              # 舒适减速度 m/s^2（刹车曲线）
 OUTPUT_DECEL_RATE = 1.2          # 允许速度每秒最多下降多少 m/s，避免跳变
 # 按高德机动类型区分弯道形态（不再一套逻辑套所有弯）

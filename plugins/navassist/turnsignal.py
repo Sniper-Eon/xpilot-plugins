@@ -107,9 +107,18 @@ class TurnSignalController:
   def update(self, intent: dict, cs, cc, now_ns: int, *, enabled: bool) -> list:
     """Return CAN frames to append; the host checks the can.tx claim and panda validates each frame."""
     direction = str(intent.get("direction", "none"))
+    # BRAKE_CANCEL_JUNCTION_EXEMPT：接近路口踩刹车是正常驾驶动作，
+    # 不能因此取消「导航转弯灯」；只有并道类才把刹车当成放弃信号。
+    _purpose = str(intent.get("signalPurpose", ""))
+    _brake = bool(getattr(cs, "brakePressed", False))
+    _brake_cancel = _brake and _purpose != "junction"
+    # LAMP_DECOUPLED_FROM_LATERAL：导航转弯灯是「告诉后车我要转弯」，
+    # 与横向控制是否激活无关；只有并道类灯才要求 latActive。
+    _need_lat = _purpose != "junction"
     requested = bool(enabled and intent.get("valid") and intent.get("signalRequested")
-                     and direction in ("left", "right") and bool(getattr(cc, "latActive", False))
-                     and not bool(getattr(cs, "brakePressed", False)))
+                     and direction in ("left", "right")
+                     and (bool(getattr(cc, "latActive", False)) or not _need_lat)
+                     and not _brake_cancel)
     physical_left = bool(getattr(cs, "leftBlinker", False))
     physical_right = bool(getattr(cs, "rightBlinker", False))
     physical_on = physical_left if direction == "left" else physical_right
@@ -138,7 +147,7 @@ class TurnSignalController:
         pass
       elif not same or age > SESSION_TIMEOUT_NS:
         return self._cancel(now_ns)
-      elif int(getattr(cs, "brakePressed", False)):
+      elif _brake_cancel:
         return self._cancel(now_ns)
       elif not requested:
         # 不再无限期保持：以前这里在「灯已亮 + 导航有效」时直接 return []，
