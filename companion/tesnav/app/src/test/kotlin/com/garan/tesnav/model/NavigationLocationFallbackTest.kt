@@ -3,30 +3,48 @@ package com.garan.tesnav.model
 import org.junit.Assert.*
 import org.junit.Test
 
-/** Failure contracts: qualified phone loses to vehicle; stale/bad phone wins; vehicle rollback;
- * duplicate reinjection; inactive/clock reversal; independent recovery blocked by stale SDK status. */
+/** Failure contracts: a qualified vehicle fix beats phone; phone is used only when the vehicle
+ * fix is stale or unavailable; bad inputs, rollback, duplicate reinjection and
+ * inactive/clock reversal fail closed. */
 class NavigationLocationFallbackTest {
     private fun fix(t: Long = 100) = NavigationLocationObservation("epoch", 10_000 + t, t, 0,
         32.0, 121.0, 5.0, 0.0, 90.0, NavigationCoordinateSystem.GCJ02, true)
     private fun NavigationLocationFallback.at(t: Long, phone: NavigationLocationObservation?,
         vehicle: NavigationLocationObservation?, active: Boolean = true) = select(phone, vehicle, active, t, 10_000 + t)
 
-    @Test fun `phone preferred and vehicle used only when phone expires`() {
+    @Test fun `vehicle preferred and phone used only when vehicle expires`() {
         val s = NavigationLocationFallback()
-        assertEquals(NavigationLocationSource.PHONE, s.at(100, fix(), fix()).source)
-        val fallback = s.at(3100, fix(), fix(3100))
-        assertEquals(NavigationLocationSource.VEHICLE, fallback.source)
-        assertNotNull(fallback.vehicleFixToInject)
-        assertNull(s.at(3200, null, fix(3100).copy(receivedElapsedMs = 3200)).vehicleFixToInject)
-        assertNotNull(s.at(4100, null, fix(4100)).vehicleFixToInject)
-        assertEquals(NavigationLocationSource.NONE, s.at(7100, null, fix(4100)).source)
+        val primary = s.at(100, fix(), fix())
+        assertEquals(NavigationLocationSource.VEHICLE, primary.source)
+        assertEquals("vehiclePrimary", primary.reason)
+        assertNotNull(primary.vehicleFixToInject)
+        assertNull(primary.phoneFixToInject)
+        val fallback = s.at(3100, fix(3100), fix())
+        assertEquals(NavigationLocationSource.PHONE, fallback.source)
+        assertEquals("phoneFallback", fallback.reason)
+        assertNull(fallback.phoneFixToInject)
+        assertNull(fallback.vehicleFixToInject)
+        val renewed = s.at(3200, null, fix(3200))
+        assertEquals(NavigationLocationSource.VEHICLE, renewed.source)
+        assertEquals("vehiclePrimary", renewed.reason)
+        assertNotNull(renewed.vehicleFixToInject)
+        val duplicate = s.at(3300, null, fix(3200).copy(receivedElapsedMs = 3300))
+        assertEquals(NavigationLocationSource.VEHICLE, duplicate.source)
+        assertEquals("awaitingNewVehicleFix", duplicate.reason)
+        assertNull(duplicate.vehicleFixToInject)
+        assertEquals(NavigationLocationSource.NONE, s.at(6200, null, fix(3200)).source)
     }
 
     @Test fun `phone is used immediately when vehicle is unavailable`() {
         val s = NavigationLocationFallback()
         s.at(100, null, fix())
-        assertEquals(NavigationLocationSource.PHONE, s.at(1100, fix(1100), fix(1100)).source)
-        assertEquals(NavigationLocationSource.PHONE, s.at(2100, fix(2100), null).source)
+        val both = s.at(1100, fix(1100), fix(1100))
+        assertEquals(NavigationLocationSource.VEHICLE, both.source)
+        assertEquals("vehiclePrimary", both.reason)
+        assertNotNull(both.vehicleFixToInject)
+        val absent = s.at(2100, fix(2100), null)
+        assertEquals(NavigationLocationSource.PHONE, absent.source)
+        assertEquals("phoneFallback", absent.reason)
         assertEquals(NavigationLocationSource.PHONE, s.at(3100, fix(1100), null).source)
         assertEquals(NavigationLocationSource.PHONE, s.at(3100, fix(3100), null).source)
     }
@@ -59,14 +77,22 @@ class NavigationLocationFallbackTest {
         assertEquals(NavigationLocationSource.PHONE, s.at(301, fix(301), null).source)
     }
 
-    @Test fun `fresh phone remains primary without injecting vehicle updates`() {
+    @Test fun `fresh vehicle remains primary without injecting phone updates`() {
         val s = NavigationLocationFallback()
         s.at(100, null, fix())
-        s.at(1000, fix(1000), fix(1000))
-        s.at(2000, null, fix(2000))
-        assertEquals(NavigationLocationSource.PHONE, s.at(3000, fix(3000), fix(3000)).source)
-        assertEquals(NavigationLocationSource.PHONE, s.at(4000, fix(4000), fix(4000)).source)
-        assertEquals(NavigationLocationSource.PHONE, s.at(5000, fix(5000), fix(5000)).source)
+        val withPhone = s.at(1000, fix(1000), fix(1000))
+        assertEquals(NavigationLocationSource.VEHICLE, withPhone.source)
+        assertEquals("vehiclePrimary", withPhone.reason)
+        assertNotNull(withPhone.vehicleFixToInject)
+        assertNull(withPhone.phoneFixToInject)
+        assertNotNull(s.at(2000, null, fix(2000)).vehicleFixToInject)
+        val stillVehicle = s.at(3000, fix(3000), fix(3000))
+        assertEquals(NavigationLocationSource.VEHICLE, stillVehicle.source)
+        assertEquals("vehiclePrimary", stillVehicle.reason)
+        assertNotNull(stillVehicle.vehicleFixToInject)
+        assertNull(stillVehicle.phoneFixToInject)
+        assertEquals(NavigationLocationSource.VEHICLE, s.at(4000, fix(4000), fix(4000)).source)
+        assertEquals(NavigationLocationSource.VEHICLE, s.at(5000, fix(5000), fix(5000)).source)
     }
 
     @Test fun `invalid phone falls back without weakening qualification or freshness`() {
@@ -78,10 +104,14 @@ class NavigationLocationFallbackTest {
             assertNotNull(result.vehicleFixToInject)
         }
     }
-    @Test fun `qualified phone is not blocked by unrelated vehicle timestamp reversal`() {
+    @Test fun `vehicle timestamp reversal returns no fix even when phone is qualified`() {
         val s = NavigationLocationFallback()
         s.at(200, null, fix(200))
-        assertEquals(NavigationLocationSource.PHONE, s.at(201, fix(201), fix(100)).source)
+        val blocked = s.at(201, fix(201), fix(100))
+        assertEquals(NavigationLocationSource.NONE, blocked.source)
+        assertEquals("vehicleTimeReversed", blocked.reason)
+        assertNull(blocked.vehicleFixToInject)
+        assertNull(blocked.phoneFixToInject)
     }
 
     @Test fun `raw phone candidate is independent and stale external SDK echo cannot recover it`() {
