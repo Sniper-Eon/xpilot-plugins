@@ -10,7 +10,29 @@ internal data class VehicleBox(val x1: Double, val y1: Double, val x2: Double, v
     }
 }
 
+internal data class Letterbox(val scale: Double, val dx: Int, val dy: Int, val contentWidth: Int, val contentHeight: Int)
+
+/** A speed sample older than this is not reattached to a later frame. */
+internal const val SIDE_MEASUREMENT_MAX_AGE_MS = 500
+
 internal object SideVehicleGeometry {
+    fun letterbox(width: Int, height: Int, size: Int): Letterbox {
+        val scale = min(size.toDouble() / width, size.toDouble() / height)
+        val contentWidth = (width * scale).roundToInt().coerceIn(1, size)
+        val contentHeight = (height * scale).roundToInt().coerceIn(1, size)
+        return Letterbox(scale, (size - contentWidth) / 2, (size - contentHeight) / 2, contentWidth, contentHeight)
+    }
+
+    /** Whole-scene false boxes from the old labels, including ones letterbox clamping makes slightly under 80% on one axis. */
+    fun implausible(box: VehicleBox, width: Int, height: Int): Boolean {
+        if (width <= 0 || height <= 0) return true
+        val wFrac = (box.x2 - box.x1) / width
+        val hFrac = (box.y2 - box.y1) / height
+        if (wFrac > 0.8 && hFrac > 0.8) return true
+        val area = wFrac * hFrac
+        return area > 0.72 && (wFrac > 0.9 || hFrac > 0.9)
+    }
+
     fun inside(polygon: List<List<Double>>, x: Double, y: Double): Boolean {
         if (polygon.size < 3) return false
         var inside = false
@@ -42,27 +64,88 @@ internal object SideVehicleGeometry {
 
     fun decode(output: Array<FloatArray>, width: Int, height: Int, size: Int = 320): List<VehicleBox> {
         require(output.size == 5 && output.all { it.size == output[0].size })
-        val scale = min(size.toDouble() / width, size.toDouble() / height)
-        val dx = ((size - (width * scale).roundToInt()) / 2).toDouble()
-        val dy = ((size - (height * scale).roundToInt()) / 2).toDouble()
+        val placed = letterbox(width, height, size)
+        val scale = placed.scale
+        val dx = placed.dx.toDouble()
+        val dy = placed.dy.toDouble()
         val candidates = output[0].indices.mapNotNull { i ->
             val confidence = output[4][i].toDouble()
             if (!confidence.isFinite() || confidence < .30) return@mapNotNull null
             val x = output[0][i].toDouble(); val y = output[1][i].toDouble()
             val w = output[2][i].toDouble(); val h = output[3][i].toDouble()
             if (listOf(x, y, w, h).any { !it.isFinite() } || w <= 0 || h <= 0) return@mapNotNull null
+            // Drop whole-scene proposals before NMS. The old labels' full-frame
+            // boxes are the highest-confidence junk and would otherwise erase a
+            // real vehicle that overlaps them.
+            if (w > size * 0.8 && h > size * 0.8) return@mapNotNull null
             val box = VehicleBox(((x - w / 2 - dx) / scale).coerceIn(0.0, width.toDouble()),
                 ((y - h / 2 - dy) / scale).coerceIn(0.0, height.toDouble()),
                 ((x + w / 2 - dx) / scale).coerceIn(0.0, width.toDouble()),
                 ((y + h / 2 - dy) / scale).coerceIn(0.0, height.toDouble()), confidence)
-            if (box.x2 - box.x1 < 4 || box.y2 - box.y1 < 4) null else box
+            if (box.x2 - box.x1 < 4 || box.y2 - box.y1 < 4 || implausible(box, width, height)) null else box
         }.sortedByDescending { it.confidence }
         val keep = mutableListOf<VehicleBox>()
-        for (box in candidates) if (keep.none { it.iou(box) > .45 }) keep.add(box)
-        // Quarantine the scene-sized false positives found in the old training
-        // labels. Preserve NMS and the existing 64-proposal limit for other boxes.
-        return keep.take(64).filterNot { (it.x2 - it.x1) > width * .8 && (it.y2 - it.y1) > height * .8 }
+        for (candidate in candidates) if (keep.none { it.iou(candidate) > .45 }) keep.add(candidate)
+        return keep.take(64)
     }
+
+    /** Side-lane vehicles worth measuring. Uncalibrated, clipped, or scene-sized boxes are omitted. */
+    fun measurements(boxes: List<VehicleBox>, width: Int, height: Int, roi: Map<String, List<List<Double>>>,
+        inverse: List<Double>?): List<SideDetection> {
+        return boxes.mapNotNull { box ->
+            if (implausible(box, width, height)) return@mapNotNull null
+            val nx = (box.x1 + box.x2) / 2 / width
+            val ny = box.y2 / height
+            val side = listOf("left", "right").firstOrNull { inside(roi["poly_${it}_norm"] ?: emptyList(), nx, ny) }
+                ?: return@mapNotNull null
+            val range = distance(box, inverse, width, height) ?: return@mapNotNull null
+            SideDetection(box, side, range)
+        }
+    }
+}
+
+/** ARGB_8888 pixels in CHW RGB, matching side_vehicle320's `images` input. */
+internal fun planarRgb(pixels: IntArray): FloatArray {
+    val input = FloatArray(3 * pixels.size)
+    for (i in pixels.indices) {
+        val p = pixels[i]
+        input[i] = ((p shr 16) and 255) / 255f
+        input[i + pixels.size] = ((p shr 8) and 255) / 255f
+        input[i + 2 * pixels.size] = (p and 255) / 255f
+    }
+    return input
+}
+
+/**
+ * Optional speed fields. Never includes blind-spot `hits` / `confidence` / `occupied`.
+ * Returns null when the distance itself is not trustworthy.
+ */
+internal fun measurementFields(observation: SideObservation, ageMs: Int): Map<String, Any>? {
+    if (ageMs < 0 || ageMs > SIDE_MEASUREMENT_MAX_AGE_MS) return null
+    if (observation.hits < 3 || !observation.confidence.isFinite() || observation.confidence !in 0.30..1.0) return null
+    val distance = observation.distance_m?.takeIf { it.isFinite() && it in 2.0..80.0 } ?: return null
+    val fields = linkedMapOf<String, Any>(
+        "distance_m" to distance,
+        "track_id" to observation.track_id,
+        "track_hits" to observation.hits,
+        "track_confidence" to observation.confidence,
+        "age_ms" to ageMs,
+    )
+    observation.relative_speed_mps?.takeIf { it.isFinite() && abs(it) <= 25.0 }?.let { fields["relative_speed_mps"] = it }
+    observation.absolute_speed_mps?.takeIf { it.isFinite() && it in 0.0..70.0 }?.let { fields["absolute_speed_mps"] = it }
+    return fields
+}
+
+/** Blind-spot keys always win. Speed fields are added beside them. */
+internal fun mergeSidePayload(blindspot: Map<String, Any>, speed: Map<String, Any>?): Map<String, Any> {
+    if (speed.isNullOrEmpty()) return blindspot
+    val merged = LinkedHashMap<String, Any>(blindspot.size + speed.size)
+    merged.putAll(blindspot)
+    for ((key, value) in speed) {
+        if (key == "hits" || key == "confidence" || key == "occupied") continue
+        merged[key] = value
+    }
+    return merged
 }
 
 internal data class SideDetection(val box: VehicleBox, val side: String, val distance: Double?)

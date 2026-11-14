@@ -234,7 +234,7 @@
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
       "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.4.5-final.tar.gz",
-      "sha256": "29e80f7d7f11b47239e35f7851b64b99028945ad13d86e6dfed462f5a399c2c0",
+      "sha256": "50fdf4a769e7dd65a607c4bfe10de1972b1afe9c8ba006de84f340291bf76a87",
       "platform": null,
       "default": false
     },
@@ -267,13 +267,13 @@
     {
       "id": "phone_vision",
       "name": "Phone side-vehicle vision",
-      "version": "1.2.0",
+      "version": "1.2.1",
       "api": 1,
       "category": "data_source",
       "author": "Sniper-Eon",
       "description": "Optional original single wide-camera vehicle detection transport,640pixels,max4Hz; no camera while disabled.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.2.0.tar.gz",
-      "sha256": "4c5fad0b6ffd8fbf6e8badf46826603b43e825b5ae84b3470c0f80c8a70f901b",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/phone_vision-1.2.1.tar.gz",
+      "sha256": "863fd1585526cadeb495d523d015a7e3b888502df0f8dd25abdda6463f86ab10",
       "platform": null,
       "default": false
     },

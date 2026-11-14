@@ -28,6 +28,21 @@ def read_observation(path, now_ns):
     return unavailable
 
 
+def _optional_speed_fields(value):
+  """Track metadata that older car builds do not read. Malformed values are dropped, not fatal."""
+  extra = {}
+  hits = value.get('track_hits')
+  if type(hits) is int and 1 <= hits <= 100000:
+    extra['track_hits'] = hits
+  confidence = value.get('track_confidence')
+  if type(confidence) in (int, float) and not isinstance(confidence, bool) and math.isfinite(confidence) and 0 <= confidence <= 1:
+    extra['track_confidence'] = confidence
+  age = value.get('age_ms')
+  if type(age) is int and 0 <= age <= 10000:
+    extra['age_ms'] = age
+  return extra
+
+
 class FrameStore:
   def __init__(self, output: Path, clock=time.monotonic_ns):
     self.output, self.clock = output, clock
@@ -156,7 +171,10 @@ class FrameStore:
             raise ValueError('distance_out_of_bounds')
           if type(value.get('hits')) is not int or not 1 <= value['hits'] <= 100000:
             raise ValueError('invalid_hits')
+          # hits/confidence stay the blind-spot occupancy contract. Speed fields are
+          # optional and ignored by older readers that only copy the keys below.
           sides[side] = {k: value.get(k) for k in ('track_id', 'distance_m', 'relative_speed_mps', 'absolute_speed_mps', 'hits', 'confidence')}
+          sides[side].update(_optional_speed_fields(value))
         else:
           sides[side] = None
       result = dict(version=1, source='tesnav-phone', valid=True,

@@ -41,6 +41,83 @@ class PhoneSide:
   reason: str = "unavailable"
 
 
+@dataclass(frozen=True)
+class PhoneSideSpeed:
+  """Nearest confirmed side vehicle. This is not a blind-spot occupancy decision."""
+  available: bool = False
+  distance_m: float | None = None
+  relative_speed_mps: float | None = None
+  absolute_speed_mps: float | None = None
+  track_id: int | None = None
+  track_hits: int | None = None
+  track_confidence: float | None = None
+  age_ms: int | None = None
+  reason: str = "unavailable"
+
+
+def _in_range(value, low, high):
+  return type(value) in (int, float) and not isinstance(value, bool) and math.isfinite(value) and low <= float(value) <= high
+
+
+def read_side_speeds(path=OBSERVATION_PATH, now_ns=None):
+  """Per-side distance and speed from the phone, with the same freshness window as occupancy.
+
+  Blind-spot blocking stays in PhoneBlindspotAssist.read and only looks at hits/confidence.
+  """
+  import time
+  def blank(reason):
+    return {"left": PhoneSideSpeed(reason=reason), "right": PhoneSideSpeed(reason=reason)}
+  try:
+    data = bounded_json(path)
+  except (OSError, ValueError, TypeError, RecursionError, OverflowError):
+    return blank("missing_or_malformed")
+  if not isinstance(data, dict) or data.get("valid") is not True or data.get("control_eligible") is not False:
+    return blank("invalid")
+  if data.get("source") != "tesnav-phone" or type(data.get("version")) is not int or data["version"] != 1:
+    return blank("invalid")
+  stamp = data.get("updated_mono_ns")
+  now = time.monotonic_ns() if now_ns is None else now_ns
+  if type(stamp) is not int or not 0 <= now - stamp <= MAX_AGE_NS:
+    return blank("stale")
+  out = {}
+  for side in ("left", "right"):
+    value = data.get(side)
+    if not isinstance(value, dict):
+      out[side] = PhoneSideSpeed(reason="missing_side")
+      continue
+    age = value.get("age_ms")
+    if age is not None and (type(age) is not int or not 0 <= age <= 500):
+      out[side] = PhoneSideSpeed(reason="stale_measurement")
+      continue
+    hits = value.get("track_hits")
+    if type(hits) is not int or not 3 <= hits <= 100000:
+      out[side] = PhoneSideSpeed(reason="unconfirmed")
+      continue
+    distance = value.get("distance_m")
+    relative = value.get("relative_speed_mps")
+    absolute = value.get("absolute_speed_mps")
+    distance_ok = _in_range(distance, 2, 100)
+    relative_ok = _in_range(relative, -25, 25)
+    absolute_ok = _in_range(absolute, 0, 70)
+    if not (distance_ok or relative_ok or absolute_ok):
+      out[side] = PhoneSideSpeed(reason="no_measurement")
+      continue
+    track = value.get("track_id")
+    confidence = value.get("track_confidence")
+    out[side] = PhoneSideSpeed(
+      available=True,
+      distance_m=float(distance) if distance_ok else None,
+      relative_speed_mps=float(relative) if relative_ok else None,
+      absolute_speed_mps=float(absolute) if absolute_ok else None,
+      track_id=track if type(track) is int and track > 0 else None,
+      track_hits=hits,
+      track_confidence=float(confidence) if _in_range(confidence, 0, 1) else None,
+      age_ms=age if type(age) is int else None,
+      reason="ok",
+    )
+  return out
+
+
 def lane_line_state(path=OBSERVATION_PATH, now_ns=None):
   """Solid/dashed verdict per side from the phone's lane-boundary classifier.
 
