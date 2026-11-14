@@ -2,6 +2,7 @@ package com.garan.tesnav.vision
 
 import android.app.*
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.IBinder
 import android.os.PowerManager
@@ -24,6 +25,8 @@ internal data class PhoneCameraFrame(val version: Int, val request_id: String, v
 class PhoneVisionService : Service() {
     companion object {
         private const val OCCUPIED_THRESHOLD = 0.5f
+        /** side_vehicle320 is the heavy model; blind-spot still runs on every accepted frame. */
+        private const val SIDE_DETECT_PERIOD_MS = 250L
         val status = MutableStateFlow("尚未启动")
     }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -36,6 +39,8 @@ class PhoneVisionService : Service() {
     private var prefetchEnabled = true
     private var vasmDetector: VasmDetector? = null
     @Volatile private var vasmStatus: String = "未运行"
+    private var sideDetector: PhoneVehicleDetector? = null
+    @Volatile private var sideStatus: String = "未运行"
     override fun dump(fd: java.io.FileDescriptor, writer: java.io.PrintWriter, args: Array<out String>) {
         writer.println("VISION_TIMINGS " + Gson().toJson(lastTimingReport))
     }
@@ -118,7 +123,42 @@ class PhoneVisionService : Service() {
         try {
             availability.unavailable("正在加载手机视觉模型")
             run {
+                try {
+                    sideDetector = PhoneVehicleDetector(this@PhoneVisionService, cpuThreads)
+                    sideStatus = "运行中"
+                } catch (e: Exception) {
+                    sideStatus = "测速模型不可用"
+                    android.util.Log.w("PhoneVisionSide", "side vehicle model failed", e)
+                }
                 var tracker = SideVehicleTracker()
+                var lastSideDetectMs = 0L
+                val held = HashMap<String, Pair<Long, SideObservation>>()
+                fun clearMotion() {
+                    tracker = SideVehicleTracker()
+                    held.clear()
+                    lastSideDetectMs = 0L
+                }
+                fun publish(side: String, fresh: Map<String, SideObservation?>?, captureNs: Long): Map<String, Any>? {
+                    if (fresh != null) {
+                        val observation = fresh[side]
+                        if (observation == null) {
+                            held.remove(side)
+                            return null
+                        }
+                        val wire = measurementFields(observation, 0)
+                        if (wire == null) held.remove(side) else held[side] = captureNs to observation
+                        return wire
+                    }
+                    val cached = held[side] ?: return null
+                    val age = (captureNs - cached.first) / 1_000_000
+                    if (age > Int.MAX_VALUE) {
+                        held.remove(side)
+                        return null
+                    }
+                    val wire = measurementFields(cached.second, age.toInt())
+                    if (wire == null) held.remove(side)
+                    return wire
+                }
                 var lastCapture = -1L
                 var streamId: String? = null
                 var activeHost: String? = null
@@ -144,11 +184,11 @@ class PhoneVisionService : Service() {
                         // A frame from the previous host must never be posted to the new C3.
                         if (packet.host != (PhoneVisionC3Address.navigationHost ?: host)) throw ExpiredVisionFrame()
                         if (packet.host != activeHost) {
-                                activeHost = packet.host; tracker = SideVehicleTracker(); lastCapture = -1L; streamId = null
+                                activeHost = packet.host; clearMotion(); lastCapture = -1L; streamId = null
                             preferences.edit().putString("host", packet.host).apply()
                         }
                         if (streamId != frame.stream_id) {
-                                streamId = frame.stream_id; lastCapture = -1L; tracker = SideVehicleTracker()
+                                streamId = frame.stream_id; lastCapture = -1L; clearMotion()
                         }
                         if (frame.capture_mono_ns <= lastCapture) {
                             duplicates++; timings["outcome"]="duplicate"; delay(80); continue
@@ -157,15 +197,27 @@ class PhoneVisionService : Service() {
                         if (!PhoneVisionBudget.canSubmit(frame.capture_age_ms, SystemClock.elapsedRealtime()-requestStarted, frame.bridge_wait_ms)) throw ExpiredVisionFrame()
                         val beforeDecode = SystemClock.elapsedRealtime()
                         val encoded = Base64.decode(frame.jpeg_b64, Base64.DEFAULT)
-                        val bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.size) ?: error("画面解码失败")
+                        // inScaled would resize away from the calibrated frame, and a hardware
+                        // bitmap cannot be sampled. Both detectors share this software copy.
+                        val options = BitmapFactory.Options().apply {
+                            inPreferredConfig = Bitmap.Config.ARGB_8888
+                            inScaled = false
+                        }
+                        var bitmap = BitmapFactory.decodeByteArray(encoded, 0, encoded.size, options) ?: error("画面解码失败")
+                        if (bitmap.config != Bitmap.Config.ARGB_8888) {
+                            val software = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                            bitmap.recycle()
+                            bitmap = software ?: error("画面解码失败")
+                        }
                         timings["jpeg_decode_ms"] = SystemClock.elapsedRealtime()-beforeDecode
                         val beforeDetect = SystemClock.elapsedRealtime()
                         var laneCandidate: CpLaneResult? = null
                         val laneEnabled=preferences.getBoolean("cp_lane_enabled",true)
-                        val meanLuma=VisionModels.meanLuma(bitmap)
-                        val laneModel=VisionModels.select(preferences, meanLuma)
-                        val detections = try {
+                        var sideDetections: List<SideDetection>? = null
+                        val vasm = try {
                             check(bitmap.width == frame.width && bitmap.height == frame.height) { "图像尺寸不一致" }
+                            val meanLuma=VisionModels.meanLuma(bitmap)
+                            val laneModel=VisionModels.select(preferences, meanLuma)
                             if (laneEnabled) {
                                 val laneStart = SystemClock.elapsedRealtime()
                                 // 恢复 v39 行为：带路面掩码推理。删除彩色路面功能后这里被改成 false，
@@ -173,33 +225,65 @@ class PhoneVisionService : Service() {
                                 laneCandidate = cpLane.detect(bitmap, laneModel, roadEnabled=true)
                                 timings["lane_model_ms"] = SystemClock.elapsedRealtime()-laneStart
                             } else cpLane.close()
-                            emptyList<SideDetection>()
-                        } finally { }
-                        LaneLineState.publish(cpLane.lastLine, SystemClock.elapsedRealtime())
-                        val vasm = try {
-                            val left = frame.roi["poly_left_norm"] ?: emptyList()
-                            val right = frame.roi["poly_right_norm"] ?: emptyList()
-                            if (left.size >= 3 || right.size >= 3) {
-                                val d = vasmDetector ?: VasmDetector(this@PhoneVisionService).also { vasmDetector = it }
-                                val l = if (left.size >= 3) d.confidence(bitmap, left) else -1f
-                                val r = if (right.size >= 3) d.confidence(bitmap, right) else -1f
-                                vasmStatus = "运行中"
-                                l to r
-                            } else { vasmStatus = "缺少 ROI 多边形"; null }
-                        } catch (e: Exception) {
-                            vasmStatus = "盲区异常:" + (e.javaClass.simpleName) + ":" + (e.message ?: "").take(60)
-                            android.util.Log.w("PhoneVisionVasm", "vasm failed", e)
-                            null
-                        } finally { bitmap.recycle() }
+                            val nowMs = SystemClock.elapsedRealtime()
+                            if (nowMs - lastSideDetectMs >= SIDE_DETECT_PERIOD_MS) {
+                                lastSideDetectMs = nowMs
+                                val started = SystemClock.elapsedRealtime()
+                                sideDetections = try {
+                                    val detector = sideDetector
+                                    if (detector == null) {
+                                        emptyList()
+                                    } else if (bitmap.isRecycled) {
+                                        sideStatus = "测速异常:bitmap"
+                                        null
+                                    } else {
+                                        val boxes = detector.detect(bitmap)
+                                        timings.putAll(detector.lastTimingsMs)
+                                        val measured = SideVehicleGeometry.measurements(
+                                            boxes, frame.width, frame.height, frame.roi, frame.ground_inverse)
+                                        sideStatus = "运行中"
+                                        timings["side_boxes"] = measured.size
+                                        measured
+                                    }
+                                } catch (e: Exception) {
+                                    if (e is CancellationException) throw e
+                                    sideStatus = "测速异常:" + e.javaClass.simpleName
+                                    android.util.Log.w("PhoneVisionSide", "side vehicle detector failed", e)
+                                    null
+                                }
+                                timings["side_vehicle_ms"] = SystemClock.elapsedRealtime()-started
+                            } else timings["side_detect"] = "skipped"
+                            LaneLineState.publish(cpLane.lastLine, SystemClock.elapsedRealtime())
+                            try {
+                                val left = frame.roi["poly_left_norm"] ?: emptyList()
+                                val right = frame.roi["poly_right_norm"] ?: emptyList()
+                                if (left.size >= 3 || right.size >= 3) {
+                                    val d = vasmDetector ?: VasmDetector(this@PhoneVisionService).also { vasmDetector = it }
+                                    val l = if (left.size >= 3) d.confidence(bitmap, left) else -1f
+                                    val r = if (right.size >= 3) d.confidence(bitmap, right) else -1f
+                                    vasmStatus = "运行中"
+                                    l to r
+                                } else { vasmStatus = "缺少 ROI 多边形"; null }
+                            } catch (e: Exception) {
+                                if (e is CancellationException) throw e
+                                vasmStatus = "盲区异常:" + (e.javaClass.simpleName) + ":" + (e.message ?: "").take(60)
+                                android.util.Log.w("PhoneVisionVasm", "vasm failed", e)
+                                null
+                            }
+                        } finally {
+                            if (!bitmap.isRecycled) bitmap.recycle()
+                        }
                         timings["detect_total_ms"] = SystemClock.elapsedRealtime()-beforeDetect
                         val elapsed = SystemClock.elapsedRealtime()-requestStarted
                         if (!PhoneVisionBudget.canSubmit(frame.capture_age_ms, elapsed, frame.bridge_wait_ms)) throw ExpiredVisionFrame()
                         if (packet.host != (PhoneVisionC3Address.navigationHost ?: host)) throw ExpiredVisionFrame()
                         val beforeTrack = SystemClock.elapsedRealtime()
-                        val observations = tracker.update(detections, frame.capture_mono_ns, frame.ego_speed_mps)
+                        val fresh = sideDetections?.let { tracker.update(it, frame.capture_mono_ns, frame.ego_speed_mps) }
+                        val leftWire = publish("left", fresh, frame.capture_mono_ns)
+                        val rightWire = publish("right", fresh, frame.capture_mono_ns)
                         val body = gson.toJson(mapOf("request_id" to frame.request_id, "frame_id" to frame.frame_id,
-                            "left" to vasm?.first?.let { sidePayload(it, left = true) },
-                            "right" to vasm?.second?.let { sidePayload(it, left = false) },
+                            "left" to vasm?.first?.let { sidePayload(it, true, leftWire) },
+                            "right" to vasm?.second?.let { sidePayload(it, false, rightWire) },
                             "lane_cp" to if (preferences.getBoolean("cp_lane_enabled", true)) laneCandidate else null,
                             "lane_line" to cpLane.lastLine?.let { mapOf("left" to it.leftType, "right" to it.rightType,
                                 "left_conf" to it.leftConf, "right_conf" to it.rightConf) }))
@@ -218,20 +302,20 @@ class PhoneVisionService : Service() {
 
                         timings["post_ms"] = SystemClock.elapsedRealtime()-beforePost
                         accepted++; timings["outcome"]="accepted"
-                        fun line(side: String): String {
-                            val item = observations[side] ?: return "未确认车辆"
-                            val distance = item.distance_m?.let { "%.1f 米".format(it) } ?: "距离待标定"
-                            val relative = item.relative_speed_mps?.let { "相对速度 %+.1f km/h".format(it*3.6) } ?: "速度积累中"
-                            val absolute = item.absolute_speed_mps?.let { "；估计平均车速 %.1f km/h".format(it*3.6) } ?: ""
+                        fun line(wire: Map<String, Any>?): String {
+                            if (wire == null) return "未确认车辆"
+                            val distance = (wire["distance_m"] as? Double)?.let { "%.1f 米".format(it) } ?: "距离待标定"
+                            val relative = (wire["relative_speed_mps"] as? Double)?.let { "相对速度 %+.1f km/h".format(it*3.6) } ?: "速度积累中"
+                            val absolute = (wire["absolute_speed_mps"] as? Double)?.let { "；估计平均车速 %.1f km/h".format(it*3.6) } ?: ""
                             return "$distance；$relative$absolute"
                         }
                         val modelInfo=if (preferences.getBoolean("cp_lane_enabled",true)) cpLane.status else ""
-                        availability.accepted(requestStarted, "手机运算 ${elapsed} ms\n左侧：${line("left")}\n右侧：${line("right")}\n车道模型：$modelInfo\n盲区模型：$vasmStatus\n实验估算，限前方广角可见区域")
+                        availability.accepted(requestStarted, "手机运算 ${elapsed} ms\n左侧：${line(leftWire)}\n右侧：${line(rightWire)}\n车道模型：$modelInfo\n盲区模型：$vasmStatus\n测速模型：$sideStatus\n实验估算，限前方广角可见区域")
                     } catch (e: Exception) {
                         if (e is CancellationException) throw e
                         if (e is ExpiredVisionFrame) expired++
                         timings["outcome"] = if (e is ExpiredVisionFrame) "expired" else "error"
-                        tracker = SideVehicleTracker()
+                        clearMotion()
                         availability.unavailable(e.message ?: "等待 C3 画面")
                         delay(if (e is ExpiredVisionFrame) 80 else 1000)
                     } finally {
@@ -246,22 +330,27 @@ class PhoneVisionService : Service() {
                     else delay(maxOf(minimumIdleMs, 1000L/targetFps-(SystemClock.elapsedRealtime()-start)))
                 }
             }
-        } finally { cpLane.close(); prefetched?.close() }
+        } finally {
+            cpLane.close(); prefetched?.close()
+            sideDetector?.close(); sideDetector = null
+        }
     }
 
     private var leftHits = 0
     private var rightHits = 0
 
     /** Consecutive occupied frames, so the device's hits>=3 gate means "stable detection". */
-    private fun sidePayload(occupied: Float, left: Boolean): Map<String, Any> {
+    private fun sidePayload(occupied: Float, left: Boolean, speed: Map<String, Any>? = null): Map<String, Any> {
         // The device store requires hits >= 1, so an idle side keeps the minimum count.
+        // hits / confidence / occupied stay the blind-spot contract. Speed is optional beside them.
         val hits = if (occupied >= OCCUPIED_THRESHOLD) {
             (if (left) leftHits else rightHits).also { if (left) leftHits++ else rightHits++ }
         } else {
             if (left) leftHits = 0 else rightHits = 0
             1
         }
-        return mapOf("hits" to hits, "confidence" to occupied.coerceIn(0f, 1f), "occupied" to occupied.coerceIn(0f, 1f))
+        val blind = mapOf<String, Any>("hits" to hits, "confidence" to occupied.coerceIn(0f, 1f), "occupied" to occupied.coerceIn(0f, 1f))
+        return mergeSidePayload(blind, speed)
     }
 
     override fun onDestroy() {

@@ -29,3 +29,12 @@ The payload is bounded to known day/night profiles and two 1..3 classes; derived
 numbers must match and `scope=visibleCorridor`, `control_eligible=false` are mandatory.
 Missing/null lane output clears it; no output can grant lane clearance. Side vehicle
 observations keep their original contract. No new capture or automatic switch enabling.
+
+## Optional side distance and speed (1.2.1)
+
+A side object may also include `distance_m`, `relative_speed_mps`, `absolute_speed_mps`,
+`track_id`, `track_hits`, `track_confidence` and `age_ms`. These describe the nearest
+confirmed vehicle in the forward wide camera's side-front view. `hits`, `confidence` and
+`occupied` are unchanged and remain the blind-spot occupancy contract. Missing or rejected
+speed fields are omitted; they are not an empty lane and they do not grant clearance.
+`age_ms` is how old that speed sample is. The forward wide camera does not see vehicles behind.
