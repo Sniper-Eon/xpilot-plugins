@@ -93,19 +93,6 @@ internal class NavigationLocationFallback {
             return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "clockInvalid")
         }
         lastElapsedMs = nowElapsedMs
-        // User policy: independent, qualified phone positioning owns the navigation origin.
-        if (qualifiedNavigationLocation(phone, nowElapsedMs, nowWallMs)) {
-            val raw = phone!!.sourceEpoch == "phone-gps"
-            val key = phone.sourceEpoch to phone.measuredAtMs
-            val previous = lastPhoneFix
-            if (raw && previous?.first == key.first && key.second < previous.second) {
-                return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "phoneTimeReversed")
-            }
-            val newFix = raw && key != previous
-            if (newFix) lastPhoneFix = key
-            return NavigationLocationSelection(NavigationLocationSource.PHONE, reason = "phonePrimary",
-                phoneFixToInject = phone.takeIf { newFix })
-        }
         if (qualifiedNavigationLocation(vehicle, nowElapsedMs, nowWallMs)) {
             val fix = vehicle!!
             val key = fix.sourceEpoch to fix.measuredAtMs
@@ -116,7 +103,21 @@ internal class NavigationLocationFallback {
             val newFix = key != previous
             if (newFix) lastVehicleFix = key
             return NavigationLocationSelection(NavigationLocationSource.VEHICLE,
-                if (newFix) fix else null, if (newFix) "vehicleFallback" else "awaitingNewVehicleFix")
+                if (newFix) fix else null, if (newFix) "vehiclePrimary" else "awaitingNewVehicleFix")
+        }
+        // 车主策略：车端 GPS 更稳更准（2.3 米 vs 手机 3.8 米且易掉星），车辆定位优先；
+        // 车辆定位过期/不可用时自动退回手机 GNSS，两者都不可用则不启用外部定位。
+        if (qualifiedNavigationLocation(phone, nowElapsedMs, nowWallMs)) {
+            val raw = phone!!.sourceEpoch == "phone-gps"
+            val key = phone.sourceEpoch to phone.measuredAtMs
+            val previous = lastPhoneFix
+            if (raw && previous?.first == key.first && key.second < previous.second) {
+                return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "phoneTimeReversed")
+            }
+            val newFix = raw && key != previous
+            if (newFix) lastPhoneFix = key
+            return NavigationLocationSelection(NavigationLocationSource.PHONE, reason = "phoneFallback",
+                phoneFixToInject = phone.takeIf { newFix })
         }
         return NavigationLocationSelection(NavigationLocationSource.NONE, reason = "noQualifiedLocation")
     }

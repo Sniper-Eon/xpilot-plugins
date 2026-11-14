@@ -59,7 +59,7 @@ class VehicleLocationObservationTest {
         factory.reset()
         assertNotNull(factory.read(feedback(2000, 9000), 2000, 21000))
     }
-    @Test fun `vehicle bridge hands back immediately when independent phone recovers`() {
+    @Test fun `vehicle bridge keeps a qualified vehicle fix and hands back when that fix is absent`() {
         val calls = mutableListOf<String>()
         val controller = NavigationExternalLocationController(object : NavigationExternalLocationSink {
             override fun setExternalEnabled(enabled: Boolean) { calls.add("enabled=$enabled") }
@@ -71,9 +71,15 @@ class VehicleLocationObservationTest {
         assertEquals(listOf("enabled=true", "inject"), calls)
         val phone = fix.copy(sourceEpoch="phone-gps", measuredAtMs=20000, ageAtReceiptMs=0,
             measurementTimeVerified=true, observationTimeOnly=false, coordinateSystem=NavigationCoordinateSystem.WGS84)
-        assertEquals(NavigationLocationSource.PHONE, controller.update(phone, fix, true, 1000, 20000).source)
-        assertEquals(NavigationLocationSource.PHONE, controller.update(phone.copy(measuredAtMs=24000, receivedElapsedMs=5000),
-            null, true, 5000, 24000).source)
+        val held = controller.update(phone, fix, true, 1000, 20000)
+        assertEquals(NavigationLocationSource.VEHICLE, held.source)
+        assertEquals("awaitingNewVehicleFix", held.reason)
+        assertEquals("vehicle-can", controller.injectedFix?.sourceEpoch)
+        assertEquals(listOf("enabled=true", "inject"), calls)
+        val handed = controller.update(phone.copy(measuredAtMs=24000, receivedElapsedMs=5000),
+            null, true, 5000, 24000)
+        assertEquals(NavigationLocationSource.PHONE, handed.source)
+        assertEquals("phoneFallback", handed.reason)
         assertEquals("inject", calls.last())
         assertEquals("phone-gps", controller.injectedFix?.sourceEpoch)
         controller.reset()

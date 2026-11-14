@@ -11,15 +11,19 @@ class NavigationExternalLocationControllerTest {
             c.update(fix(200), fix(200), true, 200, 10200, phoneSignalWeak=true).source)
         assertEquals(listOf("enable:true", "fix:10100", "fix:10200"), sink.calls)
     }
-    @Test fun `qualified phone recovery disables vehicle injection while weak SDK callbacks cannot`() {
+    @Test fun `weak SDK callbacks cannot override a fresh vehicle and phone is used when vehicle is absent`() {
         val c = NavigationExternalLocationController(Sink())
         c.update(fix(100), fix(100), true, 100, 10100, phoneSignalWeak=true)
         assertEquals(NavigationLocationSource.VEHICLE,
             c.update(fix(3100), fix(3100), true, 3100, 13100, phoneSignalWeak=true).source)
-        assertEquals(NavigationLocationSource.PHONE,
-            c.update(fix(3200), fix(3200), true, 3200, 13200, phoneSignalWeak=false).source)
-        assertEquals(NavigationLocationSource.PHONE,
-            c.update(fix(5200), fix(5200), true, 5200, 15200, phoneSignalWeak=false).source)
+        val both = c.update(fix(3200), fix(3200), true, 3200, 13200, phoneSignalWeak=false)
+        assertEquals(NavigationLocationSource.VEHICLE, both.source)
+        assertEquals("vehiclePrimary", both.reason)
+        val phone = c.update(fix(4200), null, true, 4200, 14200, phoneSignalWeak=false)
+        assertEquals(NavigationLocationSource.PHONE, phone.source)
+        assertEquals("phoneFallback", phone.reason)
+        assertEquals(NavigationLocationSource.NONE,
+            c.update(fix(5200), null, true, 5200, 15200, phoneSignalWeak=true).source)
     }
     @Test fun `phone weak state cannot poison vehicle or clear absent vehicle data`() {
         assertTrue(selectedLocationWeak(false, false, true))
@@ -91,17 +95,27 @@ class NavigationExternalLocationControllerTest {
         assertEquals(listOf("enable:true", "fix:10100", "enable:false", "enable:false"), sink.calls)
     }
 
-    @Test fun `independent recovered phone GPS replaces vehicle feed without vehicle feedback loop`() {
+    @Test fun `independent phone GPS stays behind a fresh vehicle and replaces it when the vehicle fix is absent`() {
         val sink = Sink(); val c = NavigationExternalLocationController(sink)
         c.update(null, fix(100), true, 100, 10100, phoneSignalWeak=true)
         val raw = fix(1100).copy(sourceEpoch="phone-gps", coordinateSystem=NavigationCoordinateSystem.WGS84)
-        assertEquals(NavigationLocationSource.PHONE,
-            c.update(raw, fix(1100), true, 1100, 11100, phoneSignalWeak=true).source)
+        val both = c.update(raw, fix(1100), true, 1100, 11100, phoneSignalWeak=true)
+        assertEquals(NavigationLocationSource.VEHICLE, both.source)
+        assertEquals("vehiclePrimary", both.reason)
         assertTrue(c.isExternalEnabled)
-        assertEquals(raw, c.injectedFix)
+        assertEquals(fix(1100), c.injectedFix)
         assertEquals(listOf("enable:true", "fix:10100", "fix:11100"), sink.calls)
+        val recovered = fix(2100).copy(sourceEpoch="phone-gps", coordinateSystem=NavigationCoordinateSystem.WGS84)
+        assertEquals(NavigationLocationSource.PHONE,
+            c.update(recovered, null, true, 2100, 12100, phoneSignalWeak=true).source)
+        assertTrue(c.isExternalEnabled)
+        assertEquals(recovered, c.injectedFix)
+        assertEquals("phone-gps", c.injectedFix?.sourceEpoch)
+        assertEquals(listOf("enable:true", "fix:10100", "fix:11100", "fix:12100"), sink.calls)
         assertEquals(NavigationLocationSource.NONE,
-            c.update(raw, null, true, 4100, 14100, phoneSignalWeak=true).source)
+            c.update(recovered, null, true, 5100, 15100, phoneSignalWeak=true).source)
+        assertFalse(c.isExternalEnabled)
+        assertNull(c.injectedFix)
     }
 
     /** Cold phone-only path: real GNSS must reach SDK despite stale SDK weak flag;
