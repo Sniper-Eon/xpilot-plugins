@@ -47,6 +47,16 @@ public final class NavigationObservations {
         else location=observation(values,wall,mono);
         sequence++;
     }
+    /** Engine lifecycle can clear stale facts; it cannot create or retime a source observation. */
+    public synchronized void contextRoute(String id,boolean active) {
+        if(!active) {
+            if(!released){events.clear();released=true;sequence++;if(!route.isEmpty())ended.add(route);}
+        } else if(id!=null&&!id.isEmpty()&&(!route.equals(id)||released)) {
+            if(!route.isEmpty())ended.add(route);
+            ended.remove(id);route=id;released=false;events.clear();revision++;sequence++;
+            while(ended.size()>16)ended.remove(ended.iterator().next());
+        }
+    }
     public synchronized Map<String,Object> snapshot(long exportMono) {
         Map<String,Object> out=new LinkedHashMap<>();
         out.put("schemaVersion",1);out.put("messageType","tencent_legacy_observations");

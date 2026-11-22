@@ -1,3 +1,20 @@
+# Current status — v7 (2026-11-22)
+
+The X-Pilot v67 phone app now has a Tencent basic navigation source adapter.
+The probe still exports raw observations with controlUsable=false; the adapter
+checks lifecycle, matching, source clocks and independent phone GNSS separately.
+C3 is online and unchanged; its passive offroad stream has no live GNSS fixes. This is not a completed HD lane-driving replacement.
+Full lane boundaries, connectivity and absolute ego-lane semantics remain unverified.
+
+V7 adds read-only lifecycle context from the existing navigator, source-timestamped
+original fixes, the verified HighFreqLoc.getTimeStamp getter, and route invalidation
+when the SDK clears its UI observers. Mode is re-read on callbacks as well as the
+periodic sampler; polling cannot create fresh guidance or position observations.
+
+See ../tesnav/docs/TENCENT_SOURCE_20261122.md for current acceptance and limitations.
+The v5 preparation record below is historical. Build output is now
+`out/tc-v61-navigation-observer-v7.apk`.
+
 # Tencent legacy navigation observation bridge
 
 Source preparation for the user's requested Tencent → integrated navassist switch.
@@ -41,7 +58,7 @@ match the installed probe; never uninstall an existing app to work around a mism
 ```sh
 python build_candidate.py --base /absolute/path/to/original-tc-v61.apk
 TENCENT_BASE_APK=/absolute/path/to/original-tc-v61.apk \
-GEOMETRY_APK="$PWD/out/tc-v61-navigation-observer-v5.apk" \
+GEOMETRY_APK="$PWD/out/tc-v61-navigation-observer-v7.apk" \
 python -m pytest -q tests/test_apk_contract.py tests/test_callback_contract.py tests/test_navigation_contract.py
 ```
 
@@ -59,6 +76,6 @@ python -m pytest -q tests/test_apk_contract.py tests/test_callback_contract.py t
    separately. Existing high-confidence safety/DS/Chinese-localization fixes stay.
 
 2026-11-22 device check: host API 1 / ABI 2 matches local; navassist 2.4.5-final.
-The probe v5 is installed; actual navigation capture awaits phone unlock. No Tencent
+The earlier installation predates the final v7; installation acceptance is recorded separately in the integration document. No Tencent
 navigation driving source has been activated. The earlier v4 geometry capture was
 simulation-triggered cached guide-area geometry, not real ego-lane acceptance.

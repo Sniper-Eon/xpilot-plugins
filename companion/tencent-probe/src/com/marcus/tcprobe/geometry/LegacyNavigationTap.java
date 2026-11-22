@@ -19,6 +19,7 @@ public final class LegacyNavigationTap {
     private static volatile Object uiManager,locationManager;
     private static Object uiObserver,locationObserver,hdObserver;
     private static volatile String error="not_attached";
+    private static volatile Map<String,Object> context;
     private LegacyNavigationTap(){}
     private static Object field(Object object,String name) {
         if(object==null)return null;
@@ -109,6 +110,9 @@ public final class LegacyNavigationTap {
     }
     private static void onNavigation(Object event,Object data) {
         if(!(event instanceof Enum))return;
+        // Bind lifecycle to the callback too; a switch to simulation must not
+        // wait for the periodic context sampler before it becomes visible.
+        sampleContext(event.getClass().getClassLoader());
         String kind=((Enum<?>)event).name();
         Object guidance=field(data,"guidance"),status=field(data,"status"),route=field(guidance,"route");
         String routeId=text(get(route,"getRouteId"));
@@ -132,15 +136,20 @@ public final class LegacyNavigationTap {
         STORE.navigation(kind,routeId,out,System.currentTimeMillis(),SystemClock.elapsedRealtime());
     }
     private static void onLocation(Object value) {
+        if(value!=null)sampleContext(value.getClass().getClassLoader());
         Map<String,Object> out=fields(value,"latitude","longitude","accuracy","direction","speed","coordinateType",
             "timestamp","tickTime","receivetimestamp","status","rssi","provider","sourceProvider","fakeReason","emptyCode","isMatchResult");
         Object match=field(value,"matchLocationResult");
         out.put("match",getters(match,"getMainRouteId","getMatchStatus","getTimestamp","getPosType","getPosSubType"));
         out.put("routeMatch",getters(get(match,"getRouteMatchResult"),"getMatchedIndex","getLinkId","getLinkRawId","getRoadKind","getFuncClass"));
+        // Preserve the original fix's own coordinates, accuracy and measurement time.
+        // A zero-accuracy matched point must never borrow a fabricated accuracy.
+        out.put("originalFix",fields(get(locationManager,"getOriginalLatestLocationForce"),
+            "latitude","longitude","accuracy","direction","speed","coordinateType","timestamp","status","rssi","provider","sourceProvider","fakeReason","emptyCode"));
         STORE.location("location",out,System.currentTimeMillis(),SystemClock.elapsedRealtime());
     }
     private static void onHD(Object value) {
-        Map<String,Object> out=getters(value,"getTimestamp","getTickTime","getLatitude","getLongitude","getSpeed","getBearing");
+        Map<String,Object> out=getters(value,"getTimeStamp","getAcc","getFrequency","getLatitude","getLongitude","getSpeed","getYaw","getVdrStatus");
         Object lane=get(value,"getHDLaneMatchResult");
         out.put("lane",getters(lane,"getWorkMode","getCurLaneNum","getLaneMatchedIndex","getFreePosLaneNum","getCurLaneNumConf","getTotalLaneCntConf","getRatio","getSlope"));
         out.put("locLane",getters(get(lane,"getLocLane"),"getLaneID","getLaneId","getTileId"));
@@ -148,7 +157,18 @@ public final class LegacyNavigationTap {
     }
     public static Map<String,Object> snapshot() {
         Map<String,Object> out=STORE.snapshot(SystemClock.elapsedRealtime());
+        out.put("androidUserId",android.os.Process.myUid()/100000);
         out.put("listenerError",error);out.put("uiAttached",uiManager!=null);out.put("locationAttached",locationManager!=null);
+        out.put("engineContext",context);
         return out;
+    }
+    public static void sampleContext(ClassLoader loader) {
+        Map<String,Object> next;
+        try{next=LegacyEngineContext.capture(loader);}
+        catch(Throwable e){next=new LinkedHashMap<>();next.put("navigationMode","unknown");next.put("error",e.getClass().getSimpleName());}
+        String mode=text(next.get("navigationMode"));
+        if(mode.equals("realtime")||mode.equals("simulation"))STORE.contextRoute(text(next.get("routeId")),true);
+        else if(mode.equals("idle"))STORE.contextRoute(text(next.get("routeId")),false);
+        next.put("sampledMonoMs",SystemClock.elapsedRealtime());context=next;
     }
 }

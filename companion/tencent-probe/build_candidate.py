@@ -125,7 +125,7 @@ def main():
         dest.write(dex/'classes.dex','classes26.dex',compress_type=zipfile.ZIP_DEFLATED)
     aligned=build/'geometry-aligned.apk'
     run([tools/'zipalign','-P','16','-f','4',unsigned,aligned],env)
-    signed=out/'tc-v61-navigation-observer-v5.apk'
+    signed=out/'tc-v61-navigation-observer-v7.apk'
     run([tools/'apksigner','sign','--ks',args.keystore,'--ks-key-alias','androiddebugkey','--ks-pass','pass:android','--key-pass','pass:android','--out',signed,aligned],env)
     run([tools/'apksigner','verify','--verbose',signed],env)
     run([tools/'zipalign','-P','16','-c','4',signed],env)

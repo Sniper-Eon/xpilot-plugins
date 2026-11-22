@@ -46,7 +46,7 @@ object LaneGuidancePresenter {
             !oem.positionValid && oem.c3LaneEstimate?.valid != true && oem.c3LanePosition?.valid != true -> "原车车道位置未知 · 无法判定"
             else -> "${presentation?.title ?: "车道数据待确认"} · 无法判定"
         }
-        return "车道级引导（从左向右编号）\n高德推荐：$recommendation\n本车位置：$position\n${markingText(oem)}\n本车是否在推荐车道：$status" +
+        return "车道级引导（从左向右编号）\n导航推荐：$recommendation\n本车位置：$position\n${markingText(oem)}\n本车是否在推荐车道：$status" +
             if (presentation?.currentLaneStatus == null) decisionText(oem)?.let { "\n$it" }.orEmpty() else ""
     }
 

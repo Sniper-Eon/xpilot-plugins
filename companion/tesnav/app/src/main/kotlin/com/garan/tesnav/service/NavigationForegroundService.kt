@@ -111,6 +111,8 @@ class NavigationForegroundService : Service() {
     internal val amapAutoBroadcasts: StateFlow<Map<String, AmapAutoBroadcastSnapshot>> = mutableAmapAutoBroadcasts.asStateFlow()
     private val mutableAmapAutoNavigationState = MutableStateFlow<NavigationState?>(null)
     internal val amapAutoNavigationState: StateFlow<NavigationState?> = mutableAmapAutoNavigationState.asStateFlow()
+    private val mutableTencentState = MutableStateFlow<NavigationState?>(null)
+    private var tencentClient: TencentProbeClient? = null
     private val mutableNavigationDataSource = MutableStateFlow(NavigationDataSource.AMAP_API)
     val navigationDataSource: StateFlow<NavigationDataSource> = mutableNavigationDataSource.asStateFlow()
     lateinit var selectedNavigationStateFlow: StateFlow<NavigationState>
@@ -184,8 +186,8 @@ class NavigationForegroundService : Service() {
         AMapLocationClient.updatePrivacyAgree(applicationContext, true)
 
         stateStore = NavigationStateStore()
-        selectedNavigationStateFlow = combine(stateStore.state, amapAutoNavigationState, navigationDataSource) {
-            api, auto, source -> NavigationSourcePolicy.stateFor(source, api, auto)
+        selectedNavigationStateFlow = combine(stateStore.state, amapAutoNavigationState, mutableTencentState, navigationDataSource) {
+            api, auto, tencent, source -> NavigationSourcePolicy.stateFor(source, api, auto, tencent)
         }.stateIn(scope, SharingStarted.Eagerly, selectedNavigationState())
         if (BuildConfig.EXTENDED_NAV_SOURCES) {
             phoneDiagnostics = PhoneNavigationDiagnostics(
@@ -194,6 +196,11 @@ class NavigationForegroundService : Service() {
                 { selectedNavigationStateFlow.value },
             ).also { it.start(scope) }
         }
+        tencentClient = TencentProbeClient(
+            { mutableNavigationDataSource.value == NavigationDataSource.TENCENT_API },
+            { state -> mutableTencentState.value = state?.let { tencentWithPhoneFix(it,
+                locationBridge?.latestPlanningLocation(), android.os.SystemClock.elapsedRealtime(), System.currentTimeMillis()) } },
+        ).also { it.start(scope) }
         registerTrafficLightReceiver()
         commaStateStore = CommaStateStore()
         homeAssistantClient = HomeAssistantNavigationClient()
@@ -279,12 +286,20 @@ class NavigationForegroundService : Service() {
         return com.garan.tesnav.ui.AmapAutoActions.navigate(this, name, latitude, longitude)
     }
     fun selectRoute(routeId: Int): Boolean = repository.selectRoute(routeId)
-    fun startRealtime(): Boolean = repository.startRealtime().also { accepted ->
-        if (accepted) sourceGate.arm(android.os.SystemClock.elapsedRealtime())
-        if (accepted && ::navAssistV2Exporter.isInitialized) navAssistV2Exporter.requestRediscovery()
+    fun startRealtime(): Boolean {
+        if (mutableNavigationDataSource.value == NavigationDataSource.TENCENT_API) {
+            tencentClient?.reset(); sourceGate.arm(android.os.SystemClock.elapsedRealtime()); return true
+        }
+        return repository.startRealtime().also { accepted ->
+            if (accepted) sourceGate.arm(android.os.SystemClock.elapsedRealtime())
+            if (accepted && ::navAssistV2Exporter.isInitialized) navAssistV2Exporter.requestRediscovery()
+        }
     }
-    fun startSimulation(): Boolean = repository.startSimulation().also { accepted ->
-        if (accepted && ::navAssistV2Exporter.isInitialized) navAssistV2Exporter.requestRediscovery()
+    fun startSimulation(): Boolean {
+        if (mutableNavigationDataSource.value == NavigationDataSource.TENCENT_API) return false
+        return repository.startSimulation().also { accepted ->
+            if (accepted && ::navAssistV2Exporter.isInitialized) navAssistV2Exporter.requestRediscovery()
+        }
     }
     fun pauseSimulation(): Boolean = repository.pauseSimulation()
     fun resumeSimulation(): Boolean = repository.resumeSimulation()
@@ -393,7 +408,12 @@ class NavigationForegroundService : Service() {
             return "当前应用不支持${source.displayName}"
         }
         if (!source.integrated) return "${source.displayName}接口已保留，当前构建尚未配置SDK和授权"
-        if (mutableNavigationDataSource.value == source) return null
+        if (mutableNavigationDataSource.value == source && source != NavigationDataSource.TENCENT_API) return null
+        if (source == NavigationDataSource.TENCENT_API) {
+            repository.stopNavigation()
+            tencentClient?.reset()
+            mutableTencentState.value = null
+        }
         if (mutableTeslaBleSyncEnabled.value) resetTeslaSyncTracking()
         laneSpeech.cancel()
         sourceGate.disarm()
@@ -433,6 +453,7 @@ class NavigationForegroundService : Service() {
         if (!userStopped) scheduleRestart()
         trafficLightReceiver?.let { runCatching { unregisterReceiver(it) } }
         trafficLightReceiver = null
+        tencentClient?.close()
         locationBridge?.close()
         if (::laneSpeech.isInitialized) laneSpeech.close()
         exporterObservationJobs.forEach(Job::cancel)
@@ -586,11 +607,14 @@ class NavigationForegroundService : Service() {
                             )
                         }
                     }
+                } else if (mutableNavigationDataSource.value == NavigationDataSource.TENCENT_API) {
+                    mutableTencentState.update { current -> current?.copy(
+                        navAssistSourceStatus = sourceStatus, navAssistControlAllowed = prepared.navAssistControlAllowed) }
                 } else if (stateStore.state.value.navAssistSourceStatus != sourceStatus ||
                     stateStore.state.value.navAssistControlAllowed != prepared.navAssistControlAllowed) {
                     stateStore.update { copy(navAssistSourceStatus = sourceStatus, navAssistControlAllowed = prepared.navAssistControlAllowed) }
                 }
-                prepared
+                if (mutableNavigationDataSource.value == NavigationDataSource.TENCENT_API) tencentWireState(prepared) else prepared
             },
             identity = navAssistIdentity,
             endpointDiscovery = UdpNavAssistV2EndpointDiscovery(navAssistIdentity, navAssistPairingStore),
@@ -607,7 +631,7 @@ class NavigationForegroundService : Service() {
     }
 
     private fun selectedNavigationState(): NavigationState = NavigationSourcePolicy.stateFor(
-        mutableNavigationDataSource.value, stateStore.state.value, mutableAmapAutoNavigationState.value,
+        mutableNavigationDataSource.value, stateStore.state.value, mutableAmapAutoNavigationState.value, mutableTencentState.value,
     )
 
     private fun refreshAmapAutoLocation() {

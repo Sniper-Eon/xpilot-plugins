@@ -658,6 +658,11 @@ class MainActivity : Activity(), AddressLookupView {
     }
 
     private fun openNavigationPage(target: LatLng? = null) {
+        if (runtimeService?.navigationDataSource?.value == NavigationDataSource.TENCENT_API) {
+            val launch = packageManager.getLaunchIntentForPackage("com.tencent.map")
+            if (launch != null) startActivity(launch) else toast("请先安装腾讯导航探针")
+            return
+        }
         // Only the car-map source hands the route over. The SDK source keeps navigating in this app.
         if (BuildConfig.EXTENDED_NAV_SOURCES &&
             runtimeService?.navigationDataSource?.value == NavigationDataSource.AMAP_AUTO && target != null

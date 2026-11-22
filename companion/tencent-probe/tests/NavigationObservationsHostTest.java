@@ -42,6 +42,18 @@ public final class NavigationObservationsHostTest {
         store.location("location",data("latitude",null),2100,1100);
         check(((Map<?,?>)((Map<?,?>)store.snapshot(1101).get("location")).get("values")).get("latitude")==null);
         check(store.snapshot(1101).get("controlUsable").equals(false));
+        // SDK clears UI observers during route changes; its authoritative lifecycle
+        // can invalidate/bind a route without fabricating a guidance callback.
+        store.contextRoute("route-D",true);
+        check(store.snapshot(1200).get("routeId").equals("route-D"));
+        check(((Map<?,?>)store.snapshot(1200).get("events")).isEmpty());
+        store.navigation("LeftDistance","route-C",data("distanceM",10),2200,1200);
+        check(((Map<?,?>)store.snapshot(1201).get("events")).isEmpty());
+        store.navigation("LeftDistance","route-D",data("distanceM",90),2300,1300);
+        check(((Map<?,?>)store.snapshot(1301).get("events")).size()==1);
+        store.contextRoute("route-D",false);
+        check(store.snapshot(1400).get("released").equals(true));
+        check(((Map<?,?>)store.snapshot(1400).get("events")).isEmpty());
         System.out.println("Navigation observations: callback clocks, route fencing, release, no carryover and bounds OK");
     }
 }

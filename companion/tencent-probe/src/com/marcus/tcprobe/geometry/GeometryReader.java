@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class GeometryReader {
     private static final String MONITOR="com.tencent.map.ama.navigation.engine.car.hd.monitor.inner.HDMonitor";
-    private static final String BUILD="tc-geometry-nav-observer-v5-20261122";
+    private static final String BUILD="tc-geometry-nav-observer-v7-20261122";
     private static final AtomicBoolean STARTED=new AtomicBoolean();
     private static volatile String snapshot="{\"schema\":1,\"controlUsable\":false,\"objectPresent\":false,\"state\":\"starting\"}";
     private static volatile int port;
@@ -37,6 +37,10 @@ public final class GeometryReader {
     public static void start(final Context context) {
         if(!STARTED.compareAndSet(false,true))return;
         final Context app=context.getApplicationContext();
+        final Handler main=new Handler(Looper.getMainLooper());
+        main.post(new Runnable(){public void run(){
+            LegacyNavigationTap.sampleContext(app.getClassLoader());main.postDelayed(this,500);
+        }});
         Thread server=new Thread(new Runnable(){public void run(){serve();}},"tc-geometry-http");
         server.setDaemon(true);server.start();
         Thread worker=new Thread(new Runnable(){public void run(){poll(app);}},"tc-geometry-read");

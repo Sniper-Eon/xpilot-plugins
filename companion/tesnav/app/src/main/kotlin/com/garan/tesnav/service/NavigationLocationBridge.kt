@@ -23,7 +23,7 @@ internal class NavigationLocationBridge(
     private val coordinateConverter = CoordinateConverter(context.applicationContext)
     private val vehicle = VehicleLocationObservation()
     private var rawPhone: NavigationLocationObservation? = null
-    private var planningPhone: NavigationLocationObservation? = null
+    @Volatile private var planningPhone: NavigationLocationObservation? = null
     private var listening = false
     private var active = false
     private var phoneHandbackAt: Long? = null
@@ -84,6 +84,12 @@ internal class NavigationLocationBridge(
                 manager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, listener, Looper.getMainLooper())
                 true
             }.getOrDefault(false)
+        }
+        if (state.navigationProvider == "TENCENT_API") {
+            // Observe independent phone GPS without feeding the inactive Amap navigator.
+            if (active) repository.updateExternalLocation(null, null)
+            active = false
+            return
         }
         if (!enabled) {
             if (active) {

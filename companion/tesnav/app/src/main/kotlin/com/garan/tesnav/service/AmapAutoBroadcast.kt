@@ -13,7 +13,7 @@ enum class NavigationDataSource(
 ) {
     AMAP_API("高德 API", true),
     AMAP_AUTO("高德车机", true),
-    TENCENT_API("腾讯 API", false),
+    TENCENT_API("腾讯探针", true),
     GOOGLE_API("Google API", false),
     ;
 
@@ -22,7 +22,7 @@ enum class NavigationDataSource(
 }
 
 internal object NavigationSourcePolicy {
-    private val tesNavSources = listOf(NavigationDataSource.AMAP_API, NavigationDataSource.AMAP_AUTO)
+    private val tesNavSources = listOf(NavigationDataSource.AMAP_API, NavigationDataSource.AMAP_AUTO, NavigationDataSource.TENCENT_API)
 
     fun visibleSources(extendedSources: Boolean): List<NavigationDataSource> =
         if (extendedSources) NavigationDataSource.entries else tesNavSources
@@ -33,15 +33,16 @@ internal object NavigationSourcePolicy {
     fun canSelect(source: NavigationDataSource, extendedSources: Boolean): Boolean =
         isVisible(source, extendedSources) && source.integrated
 
-    fun stateFor(source: NavigationDataSource, api: NavigationState, auto: NavigationState?): NavigationState =
+    fun stateFor(source: NavigationDataSource, api: NavigationState, auto: NavigationState?, tencent: NavigationState? = null): NavigationState =
         when (source) {
             NavigationDataSource.AMAP_API -> api
             NavigationDataSource.AMAP_AUTO -> auto ?: NavigationState()
+            NavigationDataSource.TENCENT_API -> tencent ?: NavigationState()
             else -> NavigationState()
         }.copy(navigationProvider = source.name)
 
     fun canSearch(source: NavigationDataSource, apiMode: NavigationMode): Boolean =
-        source == NavigationDataSource.AMAP_AUTO || apiMode == NavigationMode.IDLE
+        source != NavigationDataSource.TENCENT_API && (source == NavigationDataSource.AMAP_AUTO || apiMode == NavigationMode.IDLE)
 
     fun syncOwnsNavigation(source: NavigationDataSource, api: NavigationState): Boolean =
         source == NavigationDataSource.AMAP_API && api.startedFromTeslaSync
@@ -55,6 +56,8 @@ internal object NavigationSourcePolicy {
     fun buttonText(source: NavigationDataSource, extendedSources: Boolean): String =
         if (extendedSources) {
             source.buttonText
+        } else if (source == NavigationDataSource.TENCENT_API) {
+            "来源：腾讯"
         } else if (source == NavigationDataSource.AMAP_AUTO) {
             "来源：车机"
         } else {
