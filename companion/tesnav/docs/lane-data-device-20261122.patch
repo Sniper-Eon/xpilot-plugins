@@ -1,0 +1,75 @@
+--- a/navassist/runtime.py
++++ b/navassist/runtime.py
+@@ -19,0 +20 @@
++from .road_total import RoadTotalMemory
+@@ -73 +74 @@
+-    self._road_total_cand = None
++    self._road_memory = RoadTotalMemory()
+@@ -75 +75,0 @@
+-    self._road_total_since = 0
+@@ -334,0 +335,8 @@
++    # Current-road count expires before fusion and display consume it.
++    _map_lanes = list(nav.get('lanes') or ())
++    _map_rec = tuple(l['index'] for l in _map_lanes if l.get('recommended') is True)
++    _layout_allowed = is_current_road_layout(len(_map_lanes), _map_rec, self._road_total,
++      nav.get('distanceM'), _road_kind, nav.get('maneuver'))
++    self._road_total = self._road_memory.update(current, nav, now_ns,
++      enabled=self.settings.enabled, layout_allowed=_layout_allowed)
++
+@@ -372,21 +379,0 @@
+-    # ROAD_TOTAL_TRACKER：路口的高德 lanes 会多出左转/待转车道。
+-    # 高德常常在 800–1100 米就下发路口拓宽列表，>300 米不足以排除。
+-    # 只把「当前路」布局计入道路总数；路口拓宽列表等进入接近窗口再给 v3/融合 remap。
+-    try:
+-      _amap_lanes = list(nav.get('lanes') or ())
+-      _amap_n = len(_amap_lanes)
+-      _amap_rec = tuple(int(l['index']) for l in _amap_lanes
+-                        if l.get('recommended') is True and isinstance(l.get('index'), int))
+-      _dist_m = nav.get('distanceM')
+-      if _amap_n >= 2 and is_current_road_layout(
+-          _amap_n, _amap_rec, self._road_total, _dist_m,
+-          _road_kind, nav.get('maneuver')):
+-        if self._road_total_cand != _amap_n:
+-          self._road_total_cand = _amap_n
+-          self._road_total_since = now_ns
+-        elif now_ns - self._road_total_since >= 1_000_000_000:
+-          self._road_total = _amap_n
+-      elif _amap_n >= 2:
+-        self._road_total_cand = None
+-    except Exception:
+-      pass
+@@ -423,0 +411,5 @@
++        if self._road_total is None or not nav.get('lanes'):
++          topology['laneV3'].update(provisional=True, reason='roadLayoutPending',
++                                    road_layout_unknown=self._road_total is None)
++          if self._road_total is None:
++            topology['laneV3'].update(n=None, reason='roadLayoutUnknown')
+--- a/navassist/lane_fused.py
++++ b/navassist/lane_fused.py
+@@ -98 +98,4 @@
+-    road_n = road_total if isinstance(road_total, int) and road_total >= 1 else n_now
++    road_n = road_total if isinstance(road_total, int) and road_total >= 1 else 0
++    if road_n < 1:
++      near = False
++      rec1 = None
+@@ -171 +174 @@
+-    lane1 = res.get("lane")  # 1-based or None
++    lane1 = res.get("lane") if res.get("valid") else None  # 1-based or None
+@@ -173 +176 @@
+-    prob = float(res.get("prob") or 0.0)
++    prob = float(res.get("prob") or 0.0) if res.get("valid") else 0.0
+@@ -182 +185 @@
+-      "n": res.get("n"),
++      "n": res.get("n") if road_n >= 1 else 0,
+--- a/navassist/process.py
++++ b/navassist/process.py
+@@ -411,0 +412,4 @@
++      if _v3.get('road_layout_unknown'):
++        _geo_n = 0
++      if _v3.get('reason') in ('roadLayoutPending', 'roadLayoutUnknown'):
++        _uncertain, _disp_src = True, 'roadLayoutPending'
+--- a/navassist/plugin.json
++++ b/navassist/plugin.json
+@@ -4 +4 @@
+-  "version": "2.4.5-final",
++  "version": "2.4.7-lane-data",

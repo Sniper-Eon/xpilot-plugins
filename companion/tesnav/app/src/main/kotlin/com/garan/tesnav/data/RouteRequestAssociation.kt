@@ -7,6 +7,12 @@ internal fun confirmedLanePath(acceptedPathId: Long?, guidancePathId: Long?, eng
                                routeRecalculating: Boolean): Long? =
     acceptedPathId?.takeIf { !routeRecalculating && it > 0 && guidancePathId == it && enginePathId == it }
 
+/** Capture the installed path at the lane callback; export still waits for keyed guidance. */
+internal fun capturedLanePath(acceptedPathId: Long?, guidancePathId: Long?, enginePathId: Long?,
+                              routeRecalculating: Boolean): Long? =
+    acceptedPathId?.takeIf { !routeRecalculating && it > 0 && enginePathId == it &&
+        (guidancePathId == null || guidancePathId == it) }
+
 internal fun com.garan.tesnav.model.NavigationState.acceptsUnkeyedRouteFacts(enginePathId: Long?): Boolean =
     routePlanned && unkeyedRouteFactsConfirmed &&
         confirmedLanePath(acceptedPathId, guidancePathId, enginePathId, routeRecalculating) != null

@@ -232,14 +232,17 @@ object NavAssistV2Mapper {
         // Lane selection is an action even when the SDK has no turn icon. Only
         // route-bound exported lane facts may provide this stable step identity.
         val routeLanes = if (state.lanesPathId != null && state.lanesPathId == state.acceptedPathId &&
-            state.guidancePathId == state.acceptedPathId && !state.routeRecalculating) lanes(state) else null
+            state.guidancePathId == state.acceptedPathId && !state.routeRecalculating &&
+            state.lanesObservedAtMs?.let { sourceWallTimeMs - it in 0..10_000L } == true) lanes(state) else null
         // AMap Auto broadcast lanes are display-only facts and were previously
         // transient, so C3 never received them. Export them as a fallback when
         // the SDK path has no lane callback.
         val autoLanes = if (state.autoDisplayLanesPathId != null &&
             state.autoDisplayLanesPathId == state.acceptedPathId &&
-            state.guidancePathId == state.acceptedPathId && !state.routeRecalculating) {
-            lanesFrom(state.autoDisplayLanes, state.guidanceObservedAtMs, state.laneCount)
+            state.guidancePathId == state.acceptedPathId && !state.routeRecalculating &&
+            state.lanesObservedAtMs?.let { sourceWallTimeMs - it in 0..10_000L } == true) {
+            // Auto primary and display projections share this driveWay callback clock.
+            lanesFrom(state.autoDisplayLanes, state.lanesObservedAtMs, state.laneCount)
         } else null
         val exportLanes = routeLanes ?: autoLanes
         val eventAction = when {

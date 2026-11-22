@@ -238,10 +238,12 @@ internal object AmapAutoBroadcast {
             },
             lanesObservedAtMs = previous?.lanesObservedAtMs,
             autoDisplayLanes = previous?.autoDisplayLanes.orEmpty().takeIf {
-                routeActive && !newRoute && !maneuverChanged && !distanceReset && previous?.autoDisplayLanesPathId == pathId
+                routeActive && !newRoute && !maneuverChanged && !distanceReset && previous?.autoDisplayLanesPathId == pathId &&
+                    previous?.lanesObservedAtMs?.let { observedAtMs - it in 0..10_000L } == true
             }.orEmpty(),
             autoDisplayLanesPathId = previous?.autoDisplayLanesPathId?.takeIf {
-                routeActive && !newRoute && !maneuverChanged && !distanceReset && it == pathId
+                routeActive && !newRoute && !maneuverChanged && !distanceReset && it == pathId &&
+                    previous.lanesObservedAtMs?.let { stamp -> observedAtMs - stamp in 0..10_000L } == true
             },
             laneCallbackCount = previous?.laneCallbackCount ?: 0,
             laneLastEvent = previous?.laneLastEvent,

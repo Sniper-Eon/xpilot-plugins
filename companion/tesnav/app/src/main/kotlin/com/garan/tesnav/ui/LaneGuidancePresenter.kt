@@ -55,11 +55,11 @@ object LaneGuidancePresenter {
 
     private fun displayState(state: NavigationState, nowWallMs: Long?): NavigationState {
         val valid = state.navigationProvider == "AMAP_AUTO" && state.routePlanned && !state.routeRecalculating &&
-            nowWallMs != null && state.guidanceObservedAtMs?.let { nowWallMs - it in 0..3_000 } == true &&
+            nowWallMs != null && state.lanesObservedAtMs?.let { nowWallMs - it in 0..10_000 } == true &&
             state.autoDisplayLanesPathId != null && state.autoDisplayLanesPathId == state.acceptedPathId &&
             state.guidancePathId == state.acceptedPathId
         return if (valid) state.copy(lanes = state.autoDisplayLanes, lanesPathId = state.autoDisplayLanesPathId,
-            lanesObservedAtMs = state.guidanceObservedAtMs) else state
+            lanesObservedAtMs = state.lanesObservedAtMs) else state
     }
 
     private fun presentDisplay(state: NavigationState, oem: OemVehicleLaneState,
@@ -142,7 +142,8 @@ object LaneGuidancePresenter {
         val estimate=oem.c3LaneEstimate?.takeIf { it.valid && it.routeRevision==state.routeRevision
             && it.laneCount==lanes.size && it.laneNumber!=null && it.laneNumber in 1..lanes.size }
         val c3 = oem.c3LanePosition?.takeIf {
-            oem.c3LaneEstimate==null && it.valid && it.laneNumber != null && it.laneNumber in 1..lanes.size
+            oem.c3LaneEstimate==null && it.valid && it.laneNumber != null && it.laneNumber in 1..lanes.size &&
+                it.laneCount == lanes.size && it.reason !in setOf("roadLayoutPending", "roadLayoutUnknown")
         }
         val c3Index = estimate?.laneNumber?.minus(1) ?: c3?.laneNumber?.minus(1)
         val comparisonReady = state.navigationMode == NavigationMode.REALTIME &&
@@ -202,11 +203,12 @@ object LaneGuidancePresenter {
         val position = oem.c3LanePosition ?: return null
         if (!position.valid || position.laneNumber == null) return null
         if (position.source=="cpPhoneVision") return "模型估计：第${position.laneNumber}条/可见共${position.laneCount}条"
-        return if (position.laneCount != null) {
+        val label = if (position.laneCount != null) {
             "C3 第${position.laneNumber}条/共${position.laneCount}条"
         } else {
-            "C3 第${position.laneNumber}条"
+            "C3 第${position.laneNumber}条 · 总数未知"
         }
+        return label + if (position.reason in setOf("roadLayoutPending", "roadLayoutUnknown")) " · 布局待确认" else ""
     }
 
     fun markingText(oem: OemVehicleLaneState): String {

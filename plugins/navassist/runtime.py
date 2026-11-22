@@ -11,6 +11,7 @@ from .phone_lane import PhoneLaneEvidence, planning_index
 from .lane_estimate import estimate as lane_estimate
 from .position import AbsolutePosition
 from .overtake import OvertakeController
+from .road_total import RoadTotalMemory
 
 # 绝对车道号防抖：新值必须持续这么久才切换，避免在最右车道两个来源来回跳。
 ABS_DEBOUNCE_NS = 500_000_000
@@ -36,8 +37,7 @@ class NavigationRuntime:
     self._abs_hold = None       # 绝对车道号的防抖状态
     self._lane_history = None   # 统一估计器用的历史值
     self._road_total = None     # 道路实际车道总数（远离路口时稳定值）
-    self._road_total_cand = None
-    self._road_total_since = 0
+    self._road_memory = RoadTotalMemory()
     self.overtake = OvertakeController()
     self.last_overtake = {}
 
@@ -266,20 +266,11 @@ class NavigationRuntime:
 
     # LANE_ESTIMATE_OBSERVE：统一估计器先只做观察，日志里和现有 abs 并排输出，
     # 跑够数据确认置信度表后再切换为正式输出。
-    # ROAD_TOTAL_TRACKER：路口的高德 lanes 会多出左转/待转车道，
-    # 只在远离路口（>300 米或无机动）时观察总数，稳定 1 秒才采纳。
-    try:
-      _amap_n = len(nav.get('lanes') or ())
-      _dist = float(nav.get('maneuverDistanceM') or 0.0)
-      _far = _dist <= 0.0 or _dist > 300.0
-      if _amap_n >= 2 and _far:
-        if self._road_total_cand != _amap_n:
-          self._road_total_cand = _amap_n
-          self._road_total_since = now_ns
-        elif now_ns - self._road_total_since >= 1_000_000_000:
-          self._road_total = _amap_n
-    except Exception:
-      pass
+    # Bound the current-road memory; source callback age, not loop heartbeats, renews it.
+    _amap_n = len(nav.get('lanes') or ())
+    _dist = float(nav.get('maneuverDistanceM') or 0.0)
+    self._road_total = self._road_memory.update(current, nav, now_ns,
+      enabled=self.settings.enabled, layout_allowed=_amap_n >= 2 and (_dist <= 0.0 or _dist > 300.0))
     try:
       _est = lane_estimate(nav, topology, position, candidate, _line, self._lane_history, now_ns,
                            road_total=self._road_total)

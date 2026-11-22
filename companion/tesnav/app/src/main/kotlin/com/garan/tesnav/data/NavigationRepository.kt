@@ -777,7 +777,7 @@ class NavigationRepository(
 
     override fun showLaneInfo(laneInfos: Array<out AMapLaneInfo>?, background: ByteArray?, recommended: ByteArray?) {
         traceSdk("lane_callback") {
-            "kind=legacy sourceId=unavailable routeFactsConfirmed=${stateStore.state.value.unkeyedRouteFactsConfirmed} " +
+            "kind=legacy sourceId=unavailable routeFactsConfirmed=${stateStore.state.value.unkeyedRouteFactsConfirmed} acceptedPath=${stateStore.state.value.acceptedPathId} guidancePath=${stateStore.state.value.guidancePathId} enginePath=${navi?.naviPath?.pathid} " +
                 "laneInfos=${laneInfos?.size} declaredLaneCount=${laneInfos?.firstOrNull()?.laneCount} " +
                 "background=${background?.toUnsignedList()?.take(16)} " +
                 "foreground=${recommended?.toUnsignedList()?.take(16)}"
@@ -787,7 +787,7 @@ class NavigationRepository(
         val raw = background ?: byteArrayOf()
         val front = recommended ?: byteArrayOf()
         val currentState = stateStore.state.value
-        val lanePathId = confirmedLanePath(currentState.acceptedPathId, currentState.guidancePathId,
+        val lanePathId = capturedLanePath(currentState.acceptedPathId, currentState.guidancePathId,
             navi?.naviPath?.pathid, currentState.routeRecalculating)
         if (modernLaneCallbackOwnsResult(currentState.laneLastEvent, currentState.lanesObservedAtMs,
                 currentState.lanesPathId, lanePathId, observedAtMs)) {
@@ -823,14 +823,14 @@ class NavigationRepository(
 
     override fun showLaneInfo(laneInfo: AMapLaneInfo?) {
         traceSdk("lane_callback") {
-            "kind=modern sourceId=unavailable routeFactsConfirmed=${stateStore.state.value.unkeyedRouteFactsConfirmed} " +
+            "kind=modern sourceId=unavailable routeFactsConfirmed=${stateStore.state.value.unkeyedRouteFactsConfirmed} acceptedPath=${stateStore.state.value.acceptedPathId} guidancePath=${stateStore.state.value.guidancePathId} enginePath=${navi?.naviPath?.pathid} " +
                 "laneCount=${laneInfo?.laneCount} background=${laneInfo?.backgroundLane?.take(16)} " +
                 "foreground=${laneInfo?.frontLane?.take(16)}"
         }
         if (laneInfo == null || !stateStore.state.value.routePlanned || stateStore.state.value.routeRecalculating) return
         val observedAtMs = System.currentTimeMillis()
         val currentState = stateStore.state.value
-        val lanePathId = confirmedLanePath(currentState.acceptedPathId, currentState.guidancePathId,
+        val lanePathId = capturedLanePath(currentState.acceptedPathId, currentState.guidancePathId,
             navi?.naviPath?.pathid, currentState.routeRecalculating)
         val lanes = AmapLaneNormalizer.modern(laneInfo.laneCount, laneInfo.backgroundLane, laneInfo.frontLane)
         val count = lanes.size
