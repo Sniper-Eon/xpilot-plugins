@@ -22,3 +22,17 @@
 - Source development does not authorize device deployment. Never describe the
   cp_nav source foundation as a packaged or activated plugin before entry hooks,
   original-client integration and release gates are actually complete.
+
+## Tencent navigation switch (user, 2026-11-22)
+
+- User explicitly requests actual Tencent navigation driving integration in existing
+  integrated navassist, rather than a shadow-only deliverable. Prepare source,
+  validation, rollback, same-identity phone updates and parked activation; no firmware
+  migration is implied. Do not claim completion before actual source activation.
+- Cached/simulation guide-area geometry, unknown coordinates or unknown HD lane-index
+  semantics cannot grant control. Verify fresh real navigation, matching, route/step
+  identity and failure paths before switching the control input. Preserve SP/BSM,
+  paint/edge, physical signal prerequisites, engagement and driver overrides.
+- Keep planning thresholds 250/800/640/400 m unchanged. Retain current source as
+  rollback; do not overwrite unrelated dirty navassist files. Source checks, builds,
+  device installation/activation and road validation are separate acceptance records.
