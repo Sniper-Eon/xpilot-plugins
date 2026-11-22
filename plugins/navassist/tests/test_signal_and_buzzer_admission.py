@@ -66,8 +66,10 @@ def test_explicit_route_action_needs_local_corridor_not_absolute_number(maneuver
 
 class State(dict):
   def __init__(self):
-    super().__init__(modelV2=N(meta=N(laneChangeState=log.LaneChangeState.laneChangeStarting,
-      laneChangeDirection=log.LaneChangeDirection.right)),
+    model=log.ModelDataV2.new_message()
+    model.meta.laneChangeState='laneChangeStarting'
+    model.meta.laneChangeDirection='right'
+    super().__init__(modelV2=model,
       carState=N(leftBlinker=False, rightBlinker=True, leftBlindspot=False, rightBlindspot=False), carControl=N(latActive=True))
     self.alive = self.valid = {key: True for key in self}
     self.logMonoTime = {key: time.monotonic_ns() for key in self}

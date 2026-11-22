@@ -145,7 +145,7 @@ def test_turn_coordinator_window():
   turns = TurnSignalCoordinator()
   now = time.monotonic_ns()
   nav = {"valid": True, "sessionId": "s", "routeRevision": 1, "maneuverEventId": 5,
-         "maneuver": "turn_left", "distanceM": 80.0}
+         "maneuver": "turn_left", "distanceM": 35.0}
   out = turns.update(nav, speed_mps=10.0, now_ns=now)
   assert out["signalRequested"] and out["direction"] == "left"
   far = dict(nav, distanceM=500.0, maneuverEventId=6)

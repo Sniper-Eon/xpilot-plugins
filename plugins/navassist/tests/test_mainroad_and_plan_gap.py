@@ -18,7 +18,8 @@ def nav(maneuver='mergeRight',lanes=True):
 @pytest.mark.parametrize('maneuver',['mergeLeft','mergeRight'])
 @pytest.mark.parametrize('lanes',[False,True])
 def test_merge_without_absolute_position_uses_one_relative_step(maneuver,lanes):
- p=build_lane_plan(nav(maneuver,lanes),N(visibleLaneCount=3,egoLaneIndexFromLeft=1),healthy=True)
+ highway=nav(maneuver,lanes);highway.roadKind='expressway'
+ p=build_lane_plan(highway,N(visibleLaneCount=3,egoLaneIndexFromLeft=1),healthy=True)
  assert p.valid and p.heuristic and p.relative_change_limit == 1
  assert not p.force_fork and not p.ignore_solid_boundary
 

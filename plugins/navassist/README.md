@@ -1,3 +1,12 @@
+# Current source baseline (2026-11-23)
+
+The navigation source is synchronized from the actual running C3 plugin, including
+its FusedLaneMatcher and LaneNumberV3 modules. The device is still 2.4.5-final on
+host a0c4486247. This repository's 2.4.8-aligned contains explicitly undeployed
+lane-data/source-withdrawal repairs; it is not the device's active version.
+See runtime-source.json and companion/tesnav/docs/NAVASSIST_ALIGNMENT_20261123.md.
+Earlier notes below describe their recorded historical state.
+
 # Navigation Assist 2.0.1
 
 Current release 2.0.3 requires host c1f33cf2f4a2eaa287025369a930e4a468888999 (or compatible descendant) and qualified Panda ABI-2 firmware. Explicit per-rule primary_or_lateral guard preserves native MADS-only lamp permission without changing any ABI-1 rule. Brake, relay, template, counter, checksum, time and session gates still apply. Never install this archive onto the old deployed host/firmware alone.

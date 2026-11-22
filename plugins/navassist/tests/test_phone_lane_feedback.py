@@ -1,34 +1,46 @@
 """The HUD model observation must reach phone feedback, with its original age;
 legacy absolute-lane feedback and legacy ACK shapes must remain unchanged."""
 import json
+import os
+from navassist import feedback
 from types import SimpleNamespace as N
 from navassist.feedback import lane_model_feedback
 
 
-def test_single_frame_estimate_feedback_is_route_bound_and_expires(tmp_path):
+def test_single_frame_estimate_feedback_is_route_bound_and_expires(tmp_path,monkeypatch):
   path=tmp_path/'estimate.json';now=1_000_000_000
   data=dict(version=1,valid=True,laneNumber=2,laneCount=3,captureMonoNs=now,
     source='cpPhoneVision',scope='visibleCorridor',controlEligible=False,
     navSessionId='s',routeRevision=2)
   path.write_text(json.dumps(data));snap=N(session_id='s',route_revision=2)
+  wall=1_800_000_000_000_000_000
+  os.utime(path,ns=(wall,wall))
+  monkeypatch.setattr(feedback.time,'time_ns',lambda:wall)
   out=lane_model_feedback(snap,path=path,now_ns=now)
   assert out['valid'] and out['laneNumber']==2 and out['laneCount']==3
+  monkeypatch.setattr(feedback.time,'time_ns',lambda:wall+800_000_001)
   assert not lane_model_feedback(snap,path=path,now_ns=now+800_000_001)['valid']
+  monkeypatch.setattr(feedback.time,'time_ns',lambda:wall)
   assert not lane_model_feedback(N(session_id='new',route_revision=2),path=path,now_ns=now)['valid']
   assert not lane_model_feedback(N(session_id='s',route_revision=3),path=path,now_ns=now)['valid']
 
 
-def test_model_replaces_original_position_channel_and_does_not_fall_back_when_stale(tmp_path):
+def test_model_replaces_original_position_channel_and_does_not_fall_back_when_stale(tmp_path,monkeypatch):
   from navassist.feedback import lane_position_feedback
   model=tmp_path/'model';geometry=tmp_path/'geometry';now=1_000_000_000
   model.write_text(json.dumps(dict(enabled=True,version=1,valid=True,laneNumber=2,laneCount=3,
     captureMonoNs=now,source='cpPhoneVision',scope='visibleCorridor',controlEligible=False,
     navSessionId='s',routeRevision=2)))
   snapshot=N(session_id='s',route_revision=2)
+  wall=1_800_000_000_000_000_000
+  os.utime(model,ns=(wall,wall))
+  monkeypatch.setattr(feedback.time,'time_ns',lambda:wall)
   out=lane_position_feedback(snapshot,path=geometry,model_path=model,now_ns=now)
   assert out['valid'] and out['laneIndex']==2 and out['source']=='cpPhoneVision'
   assert out['absoluteConfirmed'] is False and out['validForMs']==800
+  monkeypatch.setattr(feedback.time,'time_ns',lambda:wall+800_000_001)
   assert not lane_position_feedback(snapshot,path=geometry,model_path=model,now_ns=now+800_000_001)['valid']
+  monkeypatch.setattr(feedback.time,'time_ns',lambda:wall)
   assert not lane_position_feedback(N(session_id='s',route_revision=3),path=geometry,model_path=model,now_ns=now)['valid']
 
 

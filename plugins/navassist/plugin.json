@@ -1,7 +1,7 @@
 {
   "id": "navassist",
   "name": "Navigation Assist (phone)",
-  "version": "2.4.7-lane-data",
+  "version": "2.4.8-aligned",
   "api": 1,
   "category": "navigation",
   "entry": "plugin:NavAssist",

@@ -9,6 +9,12 @@ from .navstate import build as build_nav_state
 from .oem import OemLaneSignals
 from .phone_lane import PhoneLaneEvidence, planning_index
 from .lane_estimate import estimate as lane_estimate
+from .lane_number_v3 import LaneNumberV3, V3Config   # LANE_V3
+from .v3_adapter import frame_from_runtime           # LANE_V3
+from .lane_fused import FusedLaneMatcher
+from .rec_gate import is_current_road_layout
+from .avoid_confirm import AvoidanceConfirm, is_night as night_now
+from .navstate import road_kind as classify_road_kind
 from .position import AbsolutePosition
 from .overtake import OvertakeController
 from .road_total import RoadTotalMemory
@@ -20,7 +26,32 @@ ABS_STALE_NS = 1_500_000_000
 # 绕过车端 ALC「可用性」判断：只用自己的传感器（车道线/盲区/实线/路沿）。
 # 车端雷达盲区与 DesireHelper 的盲区检查仍然生效。
 BYPASS_OEM_CROSSING = True
+# PLAN_LANES_HOLD 11-14：高德 API 版的车道引导只在路口前短暂下发（日志里大部分时间 lanes=0），
+# 变道后几秒车道信息就消失，规划没有推荐车道，司机变回原车道后不会再提示。
+# 只给规划（build_intent）沿用同一机动最近一次的车道列表，最多 30 秒、距离必须连续递减；
+# 车道号融合/v3/邻道判断仍用原始 nav。设 0 关闭。
+PLAN_LANES_HOLD_S = 30.0
 from .topology import from_model
+from .recording_observer import observe as observe_recording
+
+
+
+def _resolve_road_kind(current):
+  kind, name = "unknown", ""
+  if current is None:
+    return kind, name
+  try:
+    inner = current.snapshot
+    kind = classify_road_kind(
+      getattr(inner, "road_class", None), getattr(inner, "road_type", None),
+      road_name=getattr(inner, "current_road", "") or "",
+      speed_kph=float(getattr(inner, "speed_kph", 0.0) or 0.0),
+      parallel_status=str(getattr(inner, "parallel_road_status", "unknown")),
+      elevated_status=str(getattr(inner, "elevated_road_status", "unknown")))
+    name = str(getattr(inner, "current_road", "") or "")
+  except Exception:
+    kind, name = "unknown", ""
+  return kind, name
 
 
 class NavigationRuntime:
@@ -36,10 +67,37 @@ class NavigationRuntime:
     self._topo_hold = None      # 模型拓扑短时抖动时的保持缓存
     self._abs_hold = None       # 绝对车道号的防抖状态
     self._lane_history = None   # 统一估计器用的历史值
+    self._geo_lane = FusedLaneMatcher()       # 融合方案（主线，不再用 DeepSeek 几何匹配）
+    self._lane_v3 = LaneNumberV3(V3Config())  # LANE_V3：车道号仲裁（只管手机显示和日志）
+    self._lane_v3_mode = 'strict'             # 'strict'=拿不准报未知；'hold'=保持旧号；'off'=关闭
     self._road_total = None     # 道路实际车道总数（远离路口时稳定值）
     self._road_memory = RoadTotalMemory()
+    self._avoid_confirm = AvoidanceConfirm()  # 避让打灯：夜里 2 帧、白天 3 帧
     self.overtake = OvertakeController()
     self.last_overtake = {}
+
+  def _plan_lanes(self, nav, now_ns):
+    """PLAN_LANES_HOLD：只用于规划输入的车道列表保持。"""
+    try:
+      if PLAN_LANES_HOLD_S <= 0:
+        return nav
+      key = (str(nav.get('sessionId', '')), str(nav.get('maneuver') or 'none'))
+      d = float(nav.get('distanceM') or 0.0)
+      lanes = list(nav.get('lanes') or ())
+      if key[1] in ('none', 'unknown', 'destination', ''):
+        self._lanes_hold = None
+        return nav
+      if lanes:
+        self._lanes_hold = (key, lanes, nav.get('laneTotalCount', -1), d, now_ns, int(nav.get('maneuverEventId') or 0))
+        return nav
+      h = getattr(self, '_lanes_hold', None)
+      if (h is not None and h[0] == key and 0 <= now_ns - h[4] <= PLAN_LANES_HOLD_S * 1e9
+          and 0.0 < d <= h[3] + 20.0
+          and not (int(nav.get('maneuverEventId') or 0) and h[5] and int(nav.get('maneuverEventId') or 0) != h[5])):
+        return dict(nav, lanes=h[1], laneTotalCount=h[2], lanesHeld=True)
+    except Exception:
+      pass
+    return nav
 
   def status_snapshot(self) -> dict:
     """只读状态：给手机 App 展示当前超车/视觉判定。"""
@@ -57,7 +115,8 @@ class NavigationRuntime:
   def tick(self, current, model, model_ns, car, cc, now_ns, *, can_list=(), vehicle_fresh=False,
            left_phone=False, right_phone=False, turn_geometry_active=False,
            localization_valid=True, map_snapshot=None, phone_lane_observation=None,
-           phone_lane_estimate=None):
+           phone_lane_estimate=None, lane_offset_m=None, lane_width_m=None,
+           lane_sigma_m=None, yaw_rate_dps=None, bearing_deg=None, route_bearing=None):
     self.oem.update(can_list, now_ns)
     oem = self.oem.payload(now_ns)
     topology = from_model(model, now_ns, model_ns)
@@ -73,6 +132,12 @@ class NavigationRuntime:
     else:
       self._topo_hold = (now_ns, dict(topology))
     nav = build_nav_state(current, now_ns, oem_nav_route_active=oem['navRouteActive'])
+    # Read-only shadow diagnostics.  Deliberately not used by any downstream
+    # planning, intent, lamp or lane-change input.
+    _recording = observe_recording(nav, getattr(self, '_recording_road_key', None))
+    if _recording.get('roadKey') is not None:
+      self._recording_road_key = _recording['roadKey']
+    topology['holdRoadRecording'] = _recording
     # The C3 lane model often cannot see lanes on ordinary roads; the phone's MNN estimate is the
     # driver-visible truth there, so use it as the lane geometry when it is fresh.
     est = phone_lane_estimate or {}
@@ -264,13 +329,54 @@ class NavigationRuntime:
     except Exception:
       pass
 
+    # 路种提前算好：融合接近窗口和 v3 锁号都要用（与规划门槛同一套）。
+    _road_kind, _road_name = _resolve_road_kind(current)
+
+    # Current-road count expires before fusion and display consume it.
+    _map_lanes = list(nav.get('lanes') or ())
+    _map_rec = tuple(l['index'] for l in _map_lanes if l.get('recommended') is True)
+    _layout_allowed = is_current_road_layout(len(_map_lanes), _map_rec, self._road_total,
+      nav.get('distanceM'), _road_kind, nav.get('maneuver'))
+    self._road_total = self._road_memory.update(current, nav, now_ns,
+      enabled=self.settings.enabled, layout_allowed=_layout_allowed)
+
+    # FUSED_LANE：用融合方案接管车道号（航向积分 + GPS + 视觉 + 路口拓宽映射）。
+    # 结果仍写在 geoValue 上，手机和后面的估计器逻辑不用改。置信度不够时退回估计器。
+    try:
+      _meta = model.meta if model is not None else None
+      _geo = self._geo_lane.update(
+        t=(now_ns / 1e9),
+        nav=nav,
+        topology=topology,
+        candidate=candidate,
+        road_total=self._road_total,
+        lane_offset_m=lane_offset_m,
+        lane_width_m=lane_width_m,
+        lane_sigma_m=lane_sigma_m,
+        speed_mps=float(getattr(car, 'vEgo', 0.0) or 0.0),
+        yaw_rate_dps=yaw_rate_dps,
+        bearing_deg=bearing_deg,
+        route_bearing=route_bearing,
+        lane_change_state=str(getattr(_meta, 'laneChangeState', '')) if _meta is not None else '',
+        lane_change_direction=str(getattr(_meta, 'laneChangeDirection', '')) if _meta is not None else '',
+        left_line=_line.get('left') if isinstance(_line, dict) else None,
+        right_line=_line.get('right') if isinstance(_line, dict) else None,
+        road_kind=_road_kind)
+      topology['geoValue'] = _geo.get('value')
+      topology['geoConfidence'] = _geo.get('confidence')
+      topology['geoReason'] = _geo.get('reason')
+      topology['geoOffsetM'] = _geo.get('offsetM')
+      topology['fnav'] = _geo.get('debug') or {}
+      if isinstance(_geo.get('value'), int) and _geo.get('confidence', 0.0) >= 0.5:
+        topology['absoluteEgoIndex'] = int(_geo['value'])
+        topology['estimatedEgoIndex'] = int(_geo['value'])
+        topology['absoluteSource'] = str(_geo.get('reason'))
+        self._lane_history = dict(value=int(_geo['value']), ns=now_ns)
+    except Exception:
+      topology['fnav'] = {'err': 'runtime'}
+
     # LANE_ESTIMATE_OBSERVE：统一估计器先只做观察，日志里和现有 abs 并排输出，
     # 跑够数据确认置信度表后再切换为正式输出。
-    # Bound the current-road memory; source callback age, not loop heartbeats, renews it.
-    _amap_n = len(nav.get('lanes') or ())
-    _dist = float(nav.get('maneuverDistanceM') or 0.0)
-    self._road_total = self._road_memory.update(current, nav, now_ns,
-      enabled=self.settings.enabled, layout_allowed=_amap_n >= 2 and (_dist <= 0.0 or _dist > 300.0))
     try:
       _est = lane_estimate(nav, topology, position, candidate, _line, self._lane_history, now_ns,
                            road_total=self._road_total)
@@ -278,8 +384,10 @@ class NavigationRuntime:
       topology['estimateSource'] = _est.get('source')
       topology['estimateConfidence'] = _est.get('confidence')
       topology['estimateNote'] = _est.get('note')
-      # LANE_ESTIMATE_ACTIVE：估计器成为正式来源（旧 if 链只作为它没有结论时的兜底）。
-      if isinstance(_est.get('value'), int):
+      # GEO 优先：几何匹配有结论时它就是正式车道号，估计器只记日志不覆盖。
+      _geo_wins = (isinstance(topology.get('geoValue'), int)
+                   and float(topology.get('geoConfidence') or 0.0) >= 0.5)
+      if isinstance(_est.get('value'), int) and not _geo_wins:
         topology['absoluteEgoIndex'] = int(_est['value'])
         topology['estimatedEgoIndex'] = int(_est['value'])
         topology['absoluteSource'] = 'est:' + str(_est.get('source'))
@@ -287,6 +395,26 @@ class NavigationRuntime:
           self._lane_history = dict(value=int(_est['value']), ns=now_ns)
     except Exception:
       pass
+
+    # LANE_V3：车道号仲裁。只写 topology['laneV3']（手机显示 + 日志），
+    # 不改 absoluteEgoIndex/estimatedEgoIndex：规划、并道避让、超车、阻塞判断仍用原来的输入。
+    if self._lane_v3_mode != 'off':
+      try:
+        _v3 = self._lane_v3.update(frame_from_runtime(
+          now_ns=now_ns, nav=nav, topology=topology, candidate=candidate, road_total=self._road_total,
+          geo=locals().get('_geo'), lane_offset_m=lane_offset_m, lane_width_m=lane_width_m,
+          lane_sigma_m=lane_sigma_m, speed_mps=float(getattr(car, 'vEgo', 0.0) or 0.0),
+          meta=getattr(model, 'meta', None) if model is not None else None, car=car,
+          road_kind=_road_kind))
+        _v3_val = _v3['strict'] if self._lane_v3_mode == 'strict' else _v3['hold']
+        topology['laneV3'] = dict(_v3, value=_v3_val, amap_rec=list(_v3['amap_rec']))
+        if self._road_total is None or not nav.get('lanes'):
+          topology['laneV3'].update(provisional=True, reason='roadLayoutPending',
+                                    road_layout_unknown=self._road_total is None)
+          if self._road_total is None:
+            topology['laneV3'].update(n=None, reason='roadLayoutUnknown')
+      except Exception as _v3_exc:
+        topology['laneV3'] = {'err': type(_v3_exc).__name__}
 
     # NEIGHBOR_FROM_ABS：模型只看得见 2-3 条车道，窗口外的邻道会被判成「不存在」，
     # 导致协调器一直 lanePositionRecoveryWaiting。绝对号 + 高德总数能确定邻道是否存在。
@@ -321,22 +449,9 @@ class NavigationRuntime:
       usable_nav.update(valid=False, linked=False)
       self.turns.reset()
       self.lanes.reset()
+      self._avoid_confirm.reset()
     meta = getattr(model, 'meta', None)
-    _snap = current
-    _road_kind = 'unknown'
-    _road_name = ''
-    if _snap is not None:
-      try:
-        from .navstate import road_kind as _rk
-        _inner = _snap.snapshot
-        _road_kind = _rk(getattr(_inner, 'road_class', None), getattr(_inner, 'road_type', None),
-                         road_name=getattr(_inner, 'current_road', '') or '',
-                         speed_kph=float(getattr(_inner, 'speed_kph', 0.0) or 0.0),
-                         parallel_status=str(getattr(_inner, 'parallel_road_status', 'unknown')),
-                         elevated_status=str(getattr(_inner, 'elevated_road_status', 'unknown')))
-        _road_name = str(getattr(_inner, 'current_road', '') or '')
-      except Exception:
-        _road_kind = 'unknown'
+    # _road_kind / _road_name 已在融合前算过，这里沿用。
     overtake = self.overtake.update(car=car, model=model, topology=topology, nav=usable_nav,
       now_ns=now_ns, settings=self.settings, road_kind=_road_kind,
       left_blocked=left_blocked, right_blocked=right_blocked,
@@ -347,8 +462,9 @@ class NavigationRuntime:
     usable_nav['overtake'] = overtake
     self.last_overtake = overtake
     nav['overtake'] = overtake
-    intent = build_intent(usable_nav, topology, settings=self.settings,
+    intent = build_intent(self._plan_lanes(usable_nav, now_ns), topology, settings=self.settings,
       v_ego=float(getattr(car, 'vEgo', 0.)), now_ns=now_ns, left_blocked=left_blocked, right_blocked=right_blocked,
+      avoid_confirm=self._avoid_confirm, is_night=night_now(),
       blindspot_left=bool(getattr(car, 'leftBlindspot', False)),
       blindspot_right=bool(getattr(car, 'rightBlindspot', False)),
       lateral_active=bool(vehicle_fresh and getattr(cc, 'latActive', False)),

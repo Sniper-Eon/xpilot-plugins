@@ -16,6 +16,7 @@ def empty_state(reason: str = "noData") -> dict:
   return {"valid": False, "stale": True, "reason": reason, "maneuver": "none", "distanceM": 0.0,
           "nextManeuver": "none", "nextDistanceM": 0.0, "lanes": [], "laneTotalCount": -1,
           "sessionId": "", "routeRevision": 0, "maneuverEventId": 0, "sequence": 0,
+          "currentStepIndex": -1, "currentLinkIndex": -1, "currentPointIndex": -1,
           "sourceWallTimeMs": 0, "ageMs": 0.0, "advisorySpeedMps": 0.0, "routeActive": False,
           "source": "", "mode": "idle", "navRouteActive": False}
 
@@ -42,6 +43,7 @@ USER_ROAD_WHITELIST = ("桂丹路", "禅西大道")
 FREEWAY_KINDS = frozenset(("expressway", "urban_expressway"))
 VALID_HOLD_NS = 1_500_000_000
 _valid_hold = 0
+_valid_hold_key = None
 
 
 def road_kind(road_class, road_type, *, road_name="", speed_kph=0.0,
@@ -61,10 +63,13 @@ def road_kind(road_class, road_type, *, road_name="", speed_kph=0.0,
 
 def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   """Control-valid only for a fresh, matched realtime Android/iOS route with guidance."""
+  global _valid_hold, _valid_hold_key
   if current is None:
+    _valid_hold, _valid_hold_key = 0, None
     return empty_state()
   from .cpnav import CPStore
   if isinstance(current, CPStore):
+    _valid_hold, _valid_hold_key = 0, None
     return current.normalized(now_ns)
   snapshot = current.snapshot
   stale = current.is_stale(now_ns)
@@ -83,7 +88,8 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
   # baseline, a fresh matched snapshot keeps turn-only guidance available.
   # Lane/slowdown validity below still requires recent guidance and positioning.
   guidance_known = snapshot.guidance_present and guidance_age >= 0
-  linked = bool(not stale and control_source_valid and guidance_known and snapshot.location_present)
+  linked = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched
+                and guidance_known and snapshot.location_present)
   valid = bool(not stale and control_source_valid and snapshot.route_active and snapshot.route_matched
                and snapshot.location_present and guidance_valid and not snapshot.gps_weak and phone_observations_valid)
   if stale:
@@ -102,15 +108,16 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
     reason = "phoneLocalization"
   else:
     reason = "none"
-  global _valid_hold
+  hold_key = (snapshot.session_id, snapshot.route_revision, snapshot.maneuver_event_id)
   if valid:
-    _valid_hold = now_ns
-  elif not stale and _valid_hold and 0 <= now_ns - _valid_hold <= VALID_HOLD_NS:
+    _valid_hold, _valid_hold_key = now_ns, hold_key
+  elif (not stale and control_source_valid and snapshot.route_active and snapshot.route_matched
+        and _valid_hold_key == hold_key and _valid_hold and 0 <= now_ns - _valid_hold <= VALID_HOLD_NS):
     valid = True
     if reason != "stale":
       reason = "none"
-  elif not stale:
-    _valid_hold = 0
+  else:
+    _valid_hold, _valid_hold_key = 0, None
   lanes = []
   if lane_valid:
     for lane in snapshot.lanes:
@@ -123,6 +130,9 @@ def build(current, now_ns: int, *, oem_nav_route_active: bool = False) -> dict:
     "lanes": lanes, "laneTotalCount": snapshot.lane_total_count,
     "sessionId": snapshot.session_id, "routeRevision": snapshot.route_revision,
     "maneuverEventId": snapshot.maneuver_event_id, "sequence": snapshot.sequence,
+    "currentStepIndex": snapshot.current_step_index,
+    "currentLinkIndex": snapshot.current_link_index,
+    "currentPointIndex": snapshot.current_point_index,
     "sourceWallTimeMs": snapshot.source_wall_time_ms, "ageMs": current.age_ms(now_ns),
     "advisorySpeedMps": snapshot.advisory_speed_mps or 0.0, "routeActive": snapshot.route_active,
     "source": snapshot.source_platform, "mode": snapshot.navigation_mode,

@@ -20,7 +20,8 @@ def test_chime_waits_for_execution_after_clearance():
   from .test_signal_and_buzzer_admission import State
   def state(meta):
     sm = State()
-    sm['modelV2'].meta = meta
+    sm['modelV2'].meta.laneChangeState = meta.laneChangeState
+    sm['modelV2'].meta.laneChangeDirection = meta.laneChangeDirection
     sm['carState'].leftBlinker, sm['carState'].rightBlinker = True, False
     return sm
   chime = NavigationChime(Params())

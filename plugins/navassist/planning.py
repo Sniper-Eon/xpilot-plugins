@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from .intent_types import NavLanePlan, NavLaneIntent, LaneIntentDirection
 from .settings import NavSettings
+from .avoid_confirm import AvoidanceConfirm
 
 
 LEFT_TURN_LANE_MANEUVERS = frozenset(("turnLeft", "sharpLeft", "uTurnLeft"))
@@ -36,7 +37,9 @@ FORK_NOW_DISTANCE_M = 50.0
 
 
 def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | None = None,
-                    amap_ego_index: int | None = None) -> NavLanePlan:
+                    amap_ego_index: int | None = None,
+                    avoid_confirm: AvoidanceConfirm | None = None,
+                    is_night: bool = False) -> NavLanePlan:
   settings = settings if settings is not None else NavSettings()
   nav_valid = bool(healthy and nav.valid and not nav.stale and settings.enabled and settings.lane_change_enabled)
   lanes = tuple(nav.lanes)
@@ -65,12 +68,19 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     fallback_side, lookahead_m = "left", settings.exit_lane_lookahead_m * scale
   elif maneuver in RIGHT_EXIT_LANE_MANEUVERS:
     fallback_side, lookahead_m = "right", settings.exit_lane_lookahead_m * scale
+  # RELATIVE_HIGHWAY_ONLY：普通道路关掉「汇入/出口朝边上并」这一层，
+  # 只跟随高德推荐车道；高速/快速路仍然保留（那是必须提前靠边的）。
+  _relative_active = road_kind in ("expressway", "urban_expressway")
+  # 只有高速/快速路，或者目的就是转弯（必须到边上那条才能转），才允许"朝边上并"。
+  _edge_layer_active = _relative_active or maneuver in (
+      LEFT_TURN_LANE_MANEUVERS | RIGHT_TURN_LANE_MANEUVERS)
   fork_now = bool(
+    _relative_active and
     maneuver in LEFT_EXIT_LANE_MANEUVERS | RIGHT_EXIT_LANE_MANEUVERS
     and math.isfinite(distance_m) and 0.0 < distance_m <= FORK_NOW_DISTANCE_M
   )
 
-  if maneuver in RELATIVE_ROUTE_MANEUVERS:
+  if maneuver in RELATIVE_ROUTE_MANEUVERS and _relative_active:
     if amap_ego_index is None:
       # A missing full-road lane number is not a reason to discard a fresh
       # merge/exit/ramp instruction. Prepare one adjacent relative step, not an edge
@@ -95,13 +105,18 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # Translate AMap full-road recommendations into the local visible window.
     # Passing AMap indices raw makes the coordinator compare them with a
     # different egoLaneIndexFromLeft and steer to the wrong edge.
-    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+    # 已在避让车道里时不走这两条（仍带距离门槛的）平移，改走下面带帧确认的 ABS_STEP。
+    _in_avoid = bool(nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+                     and recommended and amap_ego_index not in recommended)
+    if (not _in_avoid and nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
         and (not math.isfinite(distance_m) or distance_m <= 0.0 or distance_m <= _rec_gate_m)):
       visual_ego = int(topology.egoLaneIndexFromLeft)
       if 0 <= visual_ego < lane_count:
         offset = amap_ego_index - visual_ego
         visual_recommended = tuple(index - offset for index in recommended if 0 <= index - offset < lane_count)
         if visual_recommended:
+          if avoid_confirm is not None:
+            avoid_confirm.update(False, None, night=is_night)
           return NavLanePlan(
             True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
             lane_count, visual_recommended,
@@ -109,7 +124,7 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # A confirmed absolute lane also permits one adjacent step toward a
     # recommendation outside the local window. Do not equate the local index
     # with an absolute lane or require the final destination to be visible.
-    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+    if (not _in_avoid and nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
         and (not math.isfinite(distance_m) or distance_m <= 0.0 or distance_m <= _rec_gate_m)):
       visual_ego = int(topology.egoLaneIndexFromLeft)
       absolute_recommended = tuple(index for index in recommended if 0 <= index < amap_lane_count)
@@ -118,15 +133,38 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
         step = -1 if nearest < amap_ego_index else (1 if nearest > amap_ego_index else 0)
         adjacent = visual_ego + step
         if step and 0 <= adjacent < lane_count:
+          if avoid_confirm is not None:
+            avoid_confirm.update(False, None, night=is_night)
           return NavLanePlan(
             True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
             lane_count, (adjacent,),
           )
+    # ABS_STEP：已知绝对车道号且不在推荐车道里 → 按绝对号朝推荐一侧只并一条。
+    # 避让打灯不再用距离门槛，改为连续帧确认（夜里 2 帧、白天 3 帧）。
+    # _rec_gate_m 数字本身不变，仍用于上面两条推荐平移，以及显示/锁号的接近窗口。
+    _abs_rec = tuple(index for index in recommended if 0 <= index < amap_lane_count) if _in_avoid else ()
+    if _in_avoid and _abs_rec:
+      if avoid_confirm is not None:
+        _key = (str(nav.sessionId), int(nav.maneuverEventId), int(amap_ego_index), _abs_rec)
+        _ready = avoid_confirm.update(True, _key, night=is_night)
+      else:
+        _ready = math.isfinite(distance_m) and 0.0 < distance_m <= _rec_gate_m
+      if _ready:
+        _nearest = min(_abs_rec, key=lambda index: (abs(index - amap_ego_index), index))
+        _abs_target = amap_ego_index + (1 if _nearest > amap_ego_index else -1)
+        return NavLanePlan(
+          True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
+          amap_lane_count, (_abs_target,), allow_unknown_crossing=True,
+          relative_change_limit=1, absolute_ego_index=int(amap_ego_index),
+        )
+    elif avoid_confirm is not None:
+      avoid_confirm.update(False, None, night=is_night)
     edge_recommended = bool(
       (fallback_side == "left" and 0 in recommended)
       or (fallback_side == "right" and amap_lane_count - 1 in recommended)
     )
-    if nav_valid and edge_recommended and math.isfinite(distance_m) and 0.0 <= distance_m <= lookahead_m:
+    if (nav_valid and edge_recommended and _edge_layer_active
+        and math.isfinite(distance_m) and 0.0 <= distance_m <= lookahead_m):
       target = 0 if fallback_side == "left" else max(0, lane_count - 1)
       return NavLanePlan(
         True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
@@ -137,7 +175,7 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # Last resort: nothing recommends a lane and the maneuver is close. Head for the edge on the
     # maneuver's own side, one step at a time, and stop asking once that edge lane is reached.
     visual_ego = int(topology.egoLaneIndexFromLeft)
-    if (nav_valid and not recommended and maneuver in DIRECTIONAL_MANEUVERS
+    if (nav_valid and not recommended and maneuver in DIRECTIONAL_MANEUVERS and _edge_layer_active
         and math.isfinite(distance_m) and 0.0 < distance_m <= EDGE_FALLBACK_FROM_M
         and 0 <= visual_ego < lane_count):
       side = "left" if "left" in maneuver.lower() else "right"
@@ -156,23 +194,27 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # No trustworthy absolute lane number: follow the recommendation's own geometry. Recommended
     # lanes left of the road centre mean one step left, otherwise one step right, once per event.
     visual_ego = int(topology.egoLaneIndexFromLeft)
-    if nav_valid and recommended and lane_count > 1 and 0 <= visual_ego < lane_count:
-      if len(lanes) == lane_count and visual_ego in recommended:
+    # SAME_SPACE_ONLY：高德推荐索引是整条路的编号，visual_ego 是模型窗口里的序号。
+    # 两者车道数不一致时无法比较"是否已在推荐里"，以前照样每帧朝推荐中心并一步，
+    # 于是就出现"已经在推荐车道却还在请求变道"。此时宁可不控制。
+    if nav_valid and recommended and lane_count > 1 and len(lanes) == lane_count:
+      if visual_ego in recommended:
         return NavLanePlan(
           False, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId), lane_count, (),
           observation_interrupted=True,
         )
-      centre = (len(lanes) - 1) / 2.0
-      rec_centre = sum(recommended) / len(recommended)
-      side = "left" if rec_centre < centre else "right"
-      target = max(0, visual_ego - 1) if side == "left" else min(lane_count - 1, visual_ego + 1)
-      if target != visual_ego:
-        return NavLanePlan(
-          True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
-          lane_count, (target,), heuristic=True,
-          edge_direction=LaneIntentDirection.left if side == "left" else LaneIntentDirection.right,
-          allow_unknown_crossing=True, relative_change_limit=1,
-        )
+      if 0 <= visual_ego < lane_count:
+        centre = (len(lanes) - 1) / 2.0
+        rec_centre = sum(recommended) / len(recommended)
+        side = "left" if rec_centre < centre else "right"
+        target = max(0, visual_ego - 1) if side == "left" else min(lane_count - 1, visual_ego + 1)
+        if target != visual_ego:
+          return NavLanePlan(
+            True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
+            lane_count, (target,), heuristic=True,
+            edge_direction=LaneIntentDirection.left if side == "left" else LaneIntentDirection.right,
+            allow_unknown_crossing=True, relative_change_limit=1,
+          )
     # AMap lane indices describe the complete road while modelV2 exposes only a
     # local visible window. Without an edge-qualified directional target there
     # is no common absolute index, so retain the observation but do not control.

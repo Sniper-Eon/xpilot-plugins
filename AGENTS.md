@@ -36,3 +36,16 @@
 - Keep planning thresholds 250/800/640/400 m unchanged. Retain current source as
   rollback; do not overwrite unrelated dirty navassist files. Source checks, builds,
   device installation/activation and road validation are separate acceptance records.
+
+## Running-device source authority (user, 2026-11-23)
+
+- The user sometimes has other AIs edit C3 directly. Its current actual files are
+  the source baseline; equal version strings or Git HEADs do not establish equal
+  plugin code. Read and hash the running files before new navigation work.
+- Preserve those latest changes. Back up differing local/device trees before
+  synchronization. Do not replace the current device with an older local checkout.
+- Keep undeployed local repairs explicit and separate from imported device facts;
+  `plugins/navassist/runtime-source.json` records reference hashes and pending files.
+  Synchronizing source never by itself authorizes deploying, restarting or flashing.
+- Do not change current driving behavior merely to make old tests pass. Report
+  incompatible historical assertions separately from reproduced current behavior.

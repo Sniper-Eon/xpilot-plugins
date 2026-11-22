@@ -78,7 +78,7 @@ def test_existing_device_lane_display_is_preserved_beside_phone_estimate():
 
 def test_model_planning_index_requires_matching_map_count_and_master():
   from navassist.phone_lane import planning_index
-  candidate=dict(valid=True,laneNumber=2,laneCount=3)
+  candidate=dict(valid=True,laneNumber=2,laneCount=3,samples=4)
   assert planning_index(candidate,dict(valid=True,laneTotalCount=3),enabled=True)==1
   assert planning_index(candidate,dict(valid=True,laneTotalCount=4),enabled=True) is None
   assert planning_index(candidate,dict(valid=True,laneTotalCount=3),enabled=False) is None

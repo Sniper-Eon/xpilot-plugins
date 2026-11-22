@@ -52,6 +52,8 @@ def from_model(model, now_ns: int, model_mono_ns: int) -> dict:
   try:
     lines, probs = list(model.laneLines), list(model.laneLineProbs)
     out['frameId'] = int(model.frameId)
+    # 恢复「必须 4 条线」：实测 3 条线时窗口更小，旧的车道号规则会少算一条。
+    # 几何匹配（lane_geo）不依赖拓扑，所以这里收紧不影响 GPS 车道号。
     if len(lines) != 4 or len(probs) != 4:
       return out
     ys = []

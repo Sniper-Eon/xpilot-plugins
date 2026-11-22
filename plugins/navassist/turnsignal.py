@@ -62,6 +62,7 @@ class TurnSignalController:
     self.active: dict | None = None
     self._last_send_ns: int | None = None
     self._failed_key = None
+    self._done_key = None   # LAMP_ONCE：本请求的灯已经亮过并被车端熄灭（变道完成/三闪结束），不再重发
 
   def reset(self) -> None:
     self.active = None
@@ -75,8 +76,8 @@ class TurnSignalController:
 
   @staticmethod
   def _key(intent):
-    return (intent.get("sessionId"), int(intent.get("routeRevision", 0)),
-            int(intent.get("requestId", 0)), str(intent.get("direction", "none")))
+    # LAMP_ONCE：不再带 routeRevision——高德每次路径刷新都会 +1，旧逻辑会把同一个提示当成新请求再亮一次。
+    return (intent.get("sessionId"), int(intent.get("requestId", 0)), str(intent.get("direction", "none")))
 
   def _can_send(self, now_ns):
     return self._last_send_ns is None or now_ns-self._last_send_ns >= SEND_INTERVAL_NS
@@ -133,8 +134,7 @@ class TurnSignalController:
     if self.active is not None:
       age = now_ns - int(self.active["started_ns"])
       same = (direction == self.active["direction"] and intent.get("sessionId") == self.active["sessionId"]
-              and int(intent.get("routeRevision", 0)) == self.active["routeRevision"]
-              and int(intent.get("requestId", 0)) == self.active["requestId"])
+              and int(intent.get("requestId", 0)) == self.active["requestId"])   # LAMP_ONCE：忽略 routeRevision
       if self.active["phase"] == "cancelling":
         # Cancellation owns the lamp until CarState confirms it is off, or the bound expires.
         if not physical_left and not physical_right:
@@ -150,12 +150,25 @@ class TurnSignalController:
       elif _brake_cancel:
         return self._cancel(now_ns)
       elif not requested:
+        if self.active.get("confirmed") and self.active.get("turn_prompt"):
+          self._done_key = self.active.get("key")   # LAMP_ONCE：这个提示的灯已经亮过，之后同号请求不再亮
         # 不再无限期保持：以前这里在「灯已亮 + 导航有效」时直接 return []，
         # 结果是意图停止请求后灯还一直亮着（实测 17 秒以上），并且挡住新的反向机动。
         return self._cancel(now_ns)
       else:
+        if physical_on:
+          self.active["confirmed"] = True
+          self.active["turn_prompt"] = int(intent.get("targetLaneIndex", -1)) < 0
+          self.active["key"] = self._key(intent)
         self.active["held"] = physical_on
         if physical_on:
+          return []
+        if self.active.get("confirmed") and int(intent.get("targetLaneIndex", -1)) < 0:
+          # 只管导航转弯提示灯（targetLaneIndex<0）；并道/避让/超车的灯（有目标车道）保持原来的重发逻辑。
+          # LAMP_ONCE：灯已经亮过、现在被车端熄灭（变道完成或三闪结束）。同一个提示只亮一次：
+          # 不重发（旧逻辑每秒重发，滑行到路口前会连续触发多次打灯/变道）。
+          self._done_key = self._key(intent)
+          self.active = None
           return []
         # 灯没亮就周期性重发，而不是 2.5 秒后放弃：
         # 车端变道需要灯持续亮着，提前放弃会让它永远不满足条件。
@@ -173,7 +186,8 @@ class TurnSignalController:
         self.active["action_sent_ns"] = int(now_ns)
         return self._emit(direction, counter, now_ns)
 
-    if not requested or self._key(intent) == self._failed_key or not self._can_send(now_ns):
+    if (not requested or self._key(intent) == self._failed_key or self._key(intent) == self._done_key
+        or not self._can_send(now_ns)):
       return []
     if physical_on:
       # The driver already signals this side: do not inject a duplicate frame.
@@ -200,6 +214,7 @@ class TurnSignalController:
     elif (direction=='left' and right) or (direction=='right' and left):reason='driverOppositeSignal'
     elif physical:reason='physicalConfirmed'
     elif self._key(intent)==self._failed_key:reason='feedbackTimeout'
+    elif self._key(intent)==self._done_key:reason='lampOnceDone'
     elif self.template is None:reason='templateMissing'
     elif now_ns-self.template_ns>TEMPLATE_MAX_AGE_NS:reason='templateStale'
     if frames:reason='cancelBuilt' if decode(frames[-1][1])['turn']==3 else 'requestBuilt'

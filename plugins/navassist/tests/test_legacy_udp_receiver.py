@@ -41,12 +41,15 @@ def test_udp_accepts_canonical_v3_snapshot_without_credentials():
   store, server, thread = run_server()
   try:
     response = send(server.server_address[1], encode(payload()))
-    assert response == {
+    expected = {
       "messageType": UDP_ACK_TYPE,
       "schemaVersion": 3,
       "sessionId": "session-a",
       "sequence": 1,
     }
+    assert {k:response[k] for k in expected} == expected
+    assert set(response) == set(expected) | {'vehicleTelemetry'}
+    assert isinstance(response['vehicleTelemetry'],dict)
     assert store.current().snapshot.session_id == "session-a"
     assert server.diagnostics()['accepted'] == 1
     assert server.diagnostics()['received'] == 1

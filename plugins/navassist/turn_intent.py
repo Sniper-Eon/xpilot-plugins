@@ -13,6 +13,7 @@ class NavTurnSignalCoordinator:
   """Requests a physical lamp for a route turn without authorizing a lane change."""
 
   SIGNAL_TIMEOUT_NS = 60_000_000_000
+  DEDICATED_LANE_GUIDANCE = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight"))
   PLAN_GAP_GRACE_NS = 1_500_000_000
   LOOKAHEAD_TIME_S = 8.0
   # Forks, exits and merges should warn as soon as they are announced, but only from a sane distance.
@@ -30,7 +31,8 @@ class NavTurnSignalCoordinator:
     "mergeLeft": 400.0, "mergeRight": 400.0,
   }
   MIN_LOOKAHEAD_M = 40.0
-  REARM_LOCK_NS = 20_000_000_000      # 同一机动事件亮过一次后，20 秒内不再重复亮
+  REARM_LOCK_NS = 120_000_000_000     # LAMP_ONCE 11-14：同一机动事件亮过一次后 120 秒内不再亮（原 20 秒，
+                                      # 路口等红灯时会过 20 秒再亮一次，车主要求一个提示最多打一次灯）
   DRIVER_CANCEL_LOCK_NS = 30_000_000_000  # 驾驶员反向打灯后，本机动 30 秒内不再自动打灯
   # 市区转弯：低速时不要提前上百米就打灯，按「够用就好」的窗口。
   URBAN_TURN_SPEED_MPS = 16.0
@@ -92,8 +94,16 @@ class NavTurnSignalCoordinator:
              turn_geometry_active: bool = False, lookahead_time_s: float | None = None,
              lookahead_distance_m: float | None = None,
              left_blinker: bool = False, right_blinker: bool = False) -> NavLaneIntent:
+    # Check the effective maneuver here, including next-maneuver fallback and
+    # synthetic events. The lane coordinator still owns preparation signals.
+    if plan.maneuver in self.DEDICATED_LANE_GUIDANCE:
+      self._pulse_until_ns = 0
+      self._stopped_since_ns = 0
+      return self._reset("dedicatedLanePreparationOnly")
     direction = self.MANEUVER_DIRECTIONS.get(plan.maneuver, LaneIntentDirection.none)
-    event_key = (plan.session_id, plan.route_revision, plan.maneuver_event_id)
+    # A route refresh is not a new intersection. Keep the tuple layout used
+    # below, but exclude revision from lamp identity, as the CAN controller does.
+    event_key = (plan.session_id, 0, plan.maneuver_event_id)
     # 驾驶员手动打了反方向的灯 = 明确要求取消本机动的自动打灯：
     # 记下来并连续锁定 30 秒，避免灯灭了以后我们再抢回来反复闪。
     _driver_left, _driver_right = bool(left_blinker), bool(right_blinker)

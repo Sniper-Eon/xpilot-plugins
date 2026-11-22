@@ -9,7 +9,7 @@ import threading
 import time
 
 from . import gpsfeed
-from .feedback import REQUEST_TYPE, lane_position_feedback, lane_model_feedback
+from .feedback import REQUEST_TYPE, lane_position_feedback, lane_model_feedback, geo_lane_active
 from .rate import ClientRateLimiter
 from .wire import NavAssistProtocolError
 from .store import NavAssistStore
@@ -116,7 +116,9 @@ class NavAssistUDPServer:
           if _telemetry is not None:
             ack["vehicleTelemetry"] = _telemetry
 
-          if query.get("laneEstimateVersion") == 1:
+          if query.get("laneEstimateVersion") == 1 and not geo_lane_active(current.snapshot):
+            # 几何匹配接管时不再回传手机模型车道号：App 优先显示 c3LaneEstimate，
+            # 继续回传会让界面继续用手机窗口计数（就是你看到的 3-4 车道不准）。
             estimate = lane_model_feedback(current.snapshot)
             if estimate is not None:ack["laneEstimate"] = estimate
             ack.update(vehicle_feedback(current.snapshot))

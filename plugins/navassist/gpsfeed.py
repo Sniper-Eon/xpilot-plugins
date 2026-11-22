@@ -85,6 +85,7 @@ def update(gps, now_mono_ns: int) -> None:
   glat, glon = wgs84_to_gcj02(lat, lon)
   speed_kph = max(0.0, min(MAX_SPEED_KPH, float(getattr(gps, "speed", 0.0) or 0.0) * 3.6))
   bearing = float(getattr(gps, "bearingDeg", 0.0) or 0.0) % 360.0
+  _state["wgs"] = (lat, lon)
   _state.update(lat=glat, lon=glon, accuracy=max(MIN_ACCURACY_M, min(MAX_ACCURACY_M, acc)),
                 speed_kph=speed_kph, bearing=bearing, stamp_ms=stamp,
                 mono_ns=int(now_mono_ns), valid=True)
@@ -125,3 +126,28 @@ def telemetry(now_mono_ns: int) -> dict | None:
     "gpsPositionAgeMs": age_ms,
     "gpsMotionAgeMs": age_ms,
   }
+
+
+def raw_fix(now_mono_ns: int) -> tuple[float, float] | None:
+  """WGS-84 (lat, lon) while the fix is fresh — used for route offset diagnostics."""
+  s = _state
+  if not s["valid"] or not s["mono_ns"] or now_mono_ns - s["mono_ns"] > MAX_AGE_MS * 1_000_000:
+    return None
+  return s.get("wgs")
+
+
+def accuracy_m(now_mono_ns: int) -> float | None:
+  """Horizontal accuracy of the fresh fix, for GPS weight in the lane matcher."""
+  st = _state
+  if not st["valid"] or not st["mono_ns"] or now_mono_ns - st["mono_ns"] > MAX_AGE_MS * 1_000_000:
+    return None
+  acc = st.get("accuracy")
+  return float(acc) if isinstance(acc, (int, float)) else None
+
+def bearing_deg(now_mono_ns: int) -> float | None:
+  """GPS course-over-ground of the fresh fix, degrees clockwise from north."""
+  st = _state
+  if not st["valid"] or not st["mono_ns"] or now_mono_ns - st["mono_ns"] > MAX_AGE_MS * 1_000_000:
+    return None
+  b = st.get("bearing")
+  return float(b) if isinstance(b, (int, float)) else None

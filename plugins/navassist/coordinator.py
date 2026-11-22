@@ -1,13 +1,56 @@
 from __future__ import annotations
 
+from dataclasses import replace as _dc_replace
+
 from .intent_types import (LaneIntentDirection, ObservedLaneChangeState, NavLanePlan, LaneTopologyInput, LaneVehicleInput, NavTurnPlan, NavLaneIntent)
 from .turn_intent import NavTurnSignalCoordinator
 from .preparation import LanePreparation
 
 
+def _absolute_topology(plan: NavLanePlan, topology: LaneTopologyInput) -> LaneTopologyInput:
+  # ABS_STEP：绝对车道计划用高德车道数/绝对车道号做健康判断和方向；
+  # 邻道只有在可见拓扑明确看到路沿(False)或高德说没有那条车道时才算不存在。
+  ego, count = int(plan.absolute_ego_index), int(plan.lane_count)
+  def side(visible, exists):
+    return False if (visible is False or not exists) else True
+  return _dc_replace(topology, visible_lane_count=count, ego_lane_index=ego,
+                     left_neighbor_exists=side(topology.left_neighbor_exists, ego > 0),
+                     right_neighbor_exists=side(topology.right_neighbor_exists, ego < count - 1))
+
+
 class NavLaneIntentCoordinator(LanePreparation):
+  _abs_start = None   # ABS_STEP：当前候选的起始绝对车道号（非绝对计划为 None）
+  _abs_done = None    # ABS_STEP：(event_key, 起始绝对号)，绝对号未更新前不再发下一步
+  _abs_other_since_ns = 0   # REPLAN_RESET 11-14：绝对号离开起始号的开始时间
+  _abs_left_start = False   # REPLAN_RESET：绝对号已稳定离开过起始号（说明车道号跟上了变道）
+  ABS_LEFT_STABLE_NS = 2_000_000_000
+
+  def note_abs_observation(self, ego, lane_change_starting: bool, now_ns: int) -> None:
+    """REPLAN_RESET 11-14：每帧由 intent.LaneIntentCoordinator 调用（导航车道信息缺失时也会调用）。
+
+    变道完成后融合车道号经常不跟（日志 21:21、21:28 两次变道后 abs 仍是起始号），旧逻辑对整个机动一直
+    “等绝对车道号”(waitingAbsoluteLane)，司机再变回原车道后也不会再提示。
+    现在：绝对号稳定(>=2 秒)离开过起始号、之后又回到起始号 = 司机变回去了 -> 清掉，允许重新规划；
+    绝对号一直停在起始号（融合没跟上）时仍然等待，避免对同一步重复变道。"""
+    if self._abs_done is None or self._phase != "idle":
+      return
+    if not isinstance(ego, int) or ego < 0:
+      return
+    if ego != self._abs_done[1]:
+      if self._abs_other_since_ns == 0:
+        self._abs_other_since_ns = now_ns
+      elif now_ns - self._abs_other_since_ns >= self.ABS_LEFT_STABLE_NS:
+        self._abs_left_start = True
+    else:
+      self._abs_other_since_ns = 0
+      if self._abs_left_start:
+        self._abs_done = None
+
   def update(self, plan: NavLanePlan, topology: LaneTopologyInput, vehicle: LaneVehicleInput,
              *, now_ns: int, allow_new_lane_change: bool = True) -> NavLaneIntent:
+    _abs_mode = bool(plan.valid and getattr(plan, 'absolute_ego_index', None) is not None)
+    if _abs_mode:
+      topology = _absolute_topology(plan, topology)
     if self._phase in ("signaling", "ready", "observing") and self._candidate is not None:
       _event_key, start_ego, direction, _target_index, _relative_edge = self._candidate
       if vehicle.lane_change_state == ObservedLaneChangeState.starting and vehicle.lane_change_direction == direction:
@@ -21,14 +64,19 @@ class NavLaneIntentCoordinator(LanePreparation):
     if event_key != self._plan_recovery_count_key:
       self._plan_recovery_count_key = event_key
       self._plan_recovery_count = 0
+    # 油门不算接管，照样打灯变道；只有踩刹车才取消。
     vehicle_healthy = bool(
-      vehicle.lateral_active and not vehicle.brake_pressed and not vehicle.gas_pressed
+      vehicle.lateral_active and not vehicle.brake_pressed
       and vehicle.speed_mps <= self.MAX_SPEED_MPS
       and (self._phase == "changing" or vehicle.speed_mps >= self.MIN_SPEED_MPS)
     )
+    # ABS_ONLY_OK: 视觉看不到车道时，只要规划带了 GPS 绝对车道号，控制链依然可用。
+    _absolute_ok = (plan.absolute_ego_index is not None
+                    and 0 <= int(plan.absolute_ego_index) < max(int(plan.lane_count), 1))
     topology_healthy = bool(
-      topology.valid_for_control and plan.lane_count == topology.visible_lane_count
-      and 0 <= topology.ego_lane_index < topology.visible_lane_count
+      (topology.valid_for_control and plan.lane_count == topology.visible_lane_count
+       and 0 <= topology.ego_lane_index < topology.visible_lane_count)
+      or _absolute_ok
     )
     base_healthy = bool(plan.valid and vehicle_healthy)
     recovery = self._recover_plan_observation(
@@ -151,8 +199,13 @@ class NavLaneIntentCoordinator(LanePreparation):
         if self._completion_since_ns == 0:
           self._completion_since_ns = now_ns
         elif now_ns - self._completion_since_ns >= self.LANE_INDEX_STABLE_NS:
-          if relative_edge:
+          if relative_edge and self._abs_start is None:
             self._relative_consistency.note_lane_change_completed(now_ns)
+          if self._abs_start is not None:
+            self._abs_done = (event_key, self._abs_start)
+            self._abs_other_since_ns = 0
+            self._abs_left_start = False
+            self._abs_start = None
           self._phase = "cooldown"
           self._phase_since_ns = now_ns
           return self._idle("laneChangeObserved")
@@ -178,12 +231,17 @@ class NavLaneIntentCoordinator(LanePreparation):
       self._reset()
       return self._idle("turnApproachHandoff")
 
+    if (_abs_mode and self._phase == "idle" and self._abs_done is not None
+        and self._abs_done == (event_key, topology.ego_lane_index)):
+      return self._idle("waitingAbsoluteLane")
     target_index = self._target(plan, topology.ego_lane_index)
     if target_index is None:
       self._reset()
       return self._idle("noRecommendedLane")
     direction = relative_direction if relative_direction != LaneIntentDirection.none else self._direction(topology.ego_lane_index, target_index)
-    candidate = (event_key, topology.ego_lane_index, direction, target_index, plan.heuristic)
+    candidate = (event_key, topology.ego_lane_index, direction, target_index, plan.heuristic or _abs_mode)
+    if self._phase == "idle":
+      self._abs_start = topology.ego_lane_index if _abs_mode else None
     same_preparation = bool(
       self._phase in ("signaling", "ready", "observing") and self._candidate is not None
       and self._candidate[:4] == candidate[:4]

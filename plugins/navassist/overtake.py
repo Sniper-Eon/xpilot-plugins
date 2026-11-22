@@ -84,11 +84,22 @@ class OvertakeController:
   def _road_ok(self, road_kind, settings=None):
     return road_kind in CONTROLLED_ACCESS
 
+  @staticmethod
+  def _nav_turn(nav):
+    # TBT_KEYS：navstate 给的是 maneuver='turn_left' 蛇形 + distanceM，这里原来读 camelCase + maneuverDistanceM，
+    # 永远对不上，转弯/出口前的禁止超车门槛从未生效。两种写法都认。
+    raw = str(nav.get('maneuver', 'none'))
+    first, *rest = raw.split('_')
+    maneuver = first + ''.join(p[:1].upper() + p[1:] for p in rest)
+    distance = nav.get('maneuverDistanceM')
+    if distance is None:
+      distance = nav.get('distanceM')
+    return maneuver, float(distance or 0.0)
+
   def _tbt_gate(self, nav, settings):
     """Do not pass against an upcoming turn, and stop near the turn."""
     try:
-      maneuver = str(nav.get('maneuver', 'none'))
-      distance = float(nav.get('maneuverDistanceM') or 0.0)
+      maneuver, distance = self._nav_turn(nav)
     except (TypeError, ValueError):
       return ''
     turn_left = maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'exitLeft', 'rampLeft')
@@ -101,9 +112,8 @@ class OvertakeController:
 
   def _tbt_bias(self, nav):
     """前方转向点方向：返回 ('left'|'right'|None, 距离米)。"""
-    maneuver = str(nav.get('maneuver', 'none'))
     try:
-      distance = float(nav.get('maneuverDistanceM') or 0.0)
+      maneuver, distance = self._nav_turn(nav)
     except (TypeError, ValueError):
       return None, 0.0
     if distance <= 0.0 or distance > TBT_BIAS_DISTANCE_M:
@@ -137,8 +147,8 @@ class OvertakeController:
       return '辅助未激活'
     if bool(getattr(car, 'steeringPressed', False)):
       return '驾驶员接管'
-    if bool(getattr(car, 'brakePressed', False)) or bool(getattr(car, 'gasPressed', False)):
-      return '驾驶员踩踏板'
+    if bool(getattr(car, 'brakePressed', False)):
+      return '驾驶员踩刹车'
     if bool(getattr(car, 'leftBlinker', False)) or bool(getattr(car, 'rightBlinker', False)):
       return '转向灯已开'
     if abs(_f(getattr(car, 'steeringAngleDeg', 0.0))) > MAX_STEERING_DEG:

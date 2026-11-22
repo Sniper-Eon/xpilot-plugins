@@ -11,7 +11,7 @@ from navassist.turnsignal import TurnSignalController, checksum, decode
 
 def nav(event=7, **changes):
   return dict(valid=True, linked=True, stale=False, sessionId='route', routeRevision=1,
-              maneuverEventId=event, maneuver='turn_right', distanceM=80., **changes)
+              maneuverEventId=event, maneuver='turn_right', distanceM=45., **changes)
 
 
 def observe(controller, now):

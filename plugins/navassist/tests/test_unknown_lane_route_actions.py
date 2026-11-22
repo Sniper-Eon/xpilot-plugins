@@ -34,7 +34,8 @@ def test_merge_relative_cap_does_not_repeat_after_observed_completion():
   from navassist.coordinator import NavLaneIntentCoordinator, ObservedLaneChangeState, LaneIntentDirection
   from .test_mainroad_and_plan_gap import nav
   from .test_legacy_lane_intent import topology, vehicle
-  p=build_lane_plan(nav('mergeLeft',False),N(visibleLaneCount=3,egoLaneIndexFromLeft=1),healthy=True)
+  highway=nav('mergeLeft',False);highway.roadKind='expressway'
+  p=build_lane_plan(highway,N(visibleLaneCount=3,egoLaneIndexFromLeft=1),healthy=True)
   assert p.valid and p.relative_change_limit==1
   c=NavLaneIntentCoordinator()
   t=topology(ego=1,left_cross=True)

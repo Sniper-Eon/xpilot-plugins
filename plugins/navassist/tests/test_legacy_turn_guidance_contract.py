@@ -13,6 +13,7 @@ from navassist.intent import TurnSignalCoordinator
 def test_fresh_stream_with_unchanged_guidance_keeps_turn_signal_only():
   body = json.loads(snapshot_body())
   body['guidance']['observedAtMs'] = body['sourceWallTimeMs'] - 5000
+  body['guidance']['maneuverDistanceM'] = 45
   store = NavAssistStore(clock_ns=lambda: 1_000_000_000, wall_clock_ms=lambda: body['sourceWallTimeMs'])
   accepted = store.accept(json.dumps(body).encode(), 'a'*32)
   nav = build(accepted, 1_000_000_000)

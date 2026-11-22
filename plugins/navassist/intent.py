@@ -10,8 +10,47 @@ from dataclasses import dataclass
 from types import SimpleNamespace as N
 
 from .coordinator import NavLaneIntentCoordinator, NavTurnSignalCoordinator
-from .intent_types import LaneIntentDirection, LaneTopologyInput, LaneVehicleInput, NavTurnPlan, ObservedLaneChangeState
+from .intent_types import LaneIntentDirection, LaneTopologyInput, LaneVehicleInput, NavLanePlan, NavTurnPlan, ObservedLaneChangeState
 from .planning import build_lane_plan, lane_alignment_may_start, RELATIVE_ROUTE_MANEUVERS
+
+# JUNCTION_NO_LC：路口/红绿灯前 50 米内不发起任何新的变道（推荐车道变道、超车/避让、并道类转弯提示灯）。
+# 距离来源：高德引导的 distanceM（到下一个机动点/路口的距离，日志字段 d=）。高德 API 版没有红绿灯距离字段。
+# 只拦“发起”，已经开始的变道不打断。
+JUNCTION_NO_LC_M = 50.0
+# 并道类提示灯：车端看到灯就会自己变道，所以在 50 米内同样算“发起变道”。真正的路口转弯灯（turn*/sharp*/uTurn*）不拦。
+_LC_TYPE_LAMPS = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight",
+                            "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight"))
+# 轻微左/右与保持左/右本质是「进入分流/专用道」的路线引导。需要换道时由
+# LaneIntentCoordinator 负责唯一的一次提示；已经在推荐专用道后，不能再由
+# NavTurnSignalCoordinator 以同方向补一次“路口灯”，否则车端会重新进入转向意图，
+# 使通过分流口后的速度被压住。真正 turn*/sharp*/uTurn* 路口转弯不在此集合。
+_DEDICATED_LANE_GUIDANCE = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight"))
+
+
+def junction_distance_m(nav):
+  """到下一个路口/机动点的距离（米）。没有导航或距离未知时返回 None。"""
+  man = str(nav.get('maneuver') or 'none')
+  try:
+    d = float(nav.get('distanceM') or 0.0)
+  except (TypeError, ValueError):
+    d = 0.0
+  if man not in ('', 'none', 'unknown', 'destination'):
+    # 高德在到达机动点时报 0：按“就在路口”处理。
+    return max(0.0, d)
+  # 路口换段时当前机动常报 none，用下一个机动的距离兜底。
+  nxt = str(nav.get('nextManeuver') or 'none')
+  try:
+    nd = float(nav.get('nextDistanceM') or 0.0)
+  except (TypeError, ValueError):
+    nd = 0.0
+  if nxt not in ('', 'none', 'unknown', 'destination') and nd > 0.0:
+    return nd
+  return None
+
+
+def junction_no_lane_change(nav):
+  d = junction_distance_m(nav)
+  return bool(d is not None and d <= JUNCTION_NO_LC_M and (nav.get('routeActive') or nav.get('valid')))
 
 
 def camel(name):
@@ -58,14 +97,17 @@ def planning_ego_index(topology):
   return None
 
 
-def lane_plan(nav, topology, settings, *, v_ego):
+def lane_plan(nav, topology, settings, *, v_ego, avoid_confirm=None, is_night=False):
   n = navigation(nav)
   count, ego = int(topology.get('visibleLaneCount', 0)), int(topology.get('egoLaneIndexFromLeft', -1))
   absolute = planning_ego_index(topology)
   if type(absolute) is not int:
     absolute = None
   core = build_lane_plan(n, N(visibleLaneCount=count, egoLaneIndexFromLeft=ego),
-                         healthy=True, settings=settings, amap_ego_index=absolute)
+                         healthy=True, settings=settings, amap_ego_index=absolute,
+                         avoid_confirm=avoid_confirm, is_night=is_night)
+  if core.valid and getattr(core, 'absolute_ego_index', None) is not None:
+    ego = int(core.absolute_ego_index)  # ABS_STEP：绝对车道计划按绝对号算方向
   target = NavLaneIntentCoordinator._target(core, ego) if core.valid else None
   direction = (NavLaneIntentCoordinator._relative_direction(core) or
                NavLaneIntentCoordinator._direction(ego, target)) if target is not None else LaneIntentDirection.none
@@ -83,7 +125,7 @@ def payload(intent, nav):
               targetLaneIndex=intent.target_lane_index, spLaneChangeReady=intent.lane_change_ready,
               laneChangeAllowed=intent.lane_change_ready, reason=intent.reason, requestId=intent.request_id,
               forkNow=False, allowUnknownCrossing=False, ignoreSolidBoundary=False,
-              signalPurpose='nativeLaneChange' if nav.get('maneuver') in ('slight_left', 'slight_right')
+              signalPurpose='nativeLaneChange' if camel(nav.get('maneuver', 'none')) in ('slightLeft', 'slightRight')
                 and intent.target_lane_index < 0 else 'lanePreparation' if nav.get('maneuver') in
                 ('merge_left', 'merge_right', 'exit_left', 'exit_right', 'ramp_left', 'ramp_right')
                 or intent.target_lane_index >= 0 else 'junction')
@@ -99,6 +141,8 @@ class TurnSignalCoordinator:
     self._lamp_seen_key = None
     self._lamp_off_since_ns = 0
     self._lamp_drops = 0
+    self._real_event = None   # TURN_EV_STICKY：(session, maneuver, event_id, distance, now_ns)
+    self._lc_lamp_key = None  # JUNCTION_NO_LC：已在 50 米外亮起的并道类提示灯（允许继续，不算新发起）
 
   def reset(self):
     self.core = NavTurnSignalCoordinator()
@@ -115,10 +159,20 @@ class TurnSignalCoordinator:
     armed = bool((nav.get('linked', nav.get('valid', False)) or nav.get('routeActive', False))
                  and not nav.get('stale', False))
     event_id = int(n.maneuverEventId)
+    # TURN_EV_STICKY：高德 API 版同一个路口的事件号会在真实号和 0 之间来回跳（日志 21:18:37–21:19:12 右转，
+    # 3585↔0 跳了 4 次，每次都被当成新提示重新打灯）。同一路线、同一机动、距离连续时沿用上一个真实事件号。
+    if event_id:
+      self._real_event = (n.sessionId, n.maneuver, event_id, n.maneuverDistanceM, now_ns)
+    elif self._real_event is not None:
+      _s, _m, _e, _d, _t = self._real_event
+      if (_s == n.sessionId and _m == n.maneuver and now_ns - _t <= 30_000_000_000
+          and abs(n.maneuverDistanceM - _d) <= 60.0):
+        event_id = _e
+        n = type(n)(**{**n.__dict__, 'maneuverEventId': _e})
     # 路口换段时手机常把当前机动报成 none（ev=0），此时用下一步机动兜底，
     # 否则转弯那一刻灯反而不亮。
     if armed and n.maneuver in ("", "none", "unknown"):
-      _next = str(nav.get('nextManeuver', 'none'))
+      _next = camel(nav.get('nextManeuver', 'none'))
       try:
         _next_d = float(nav.get('nextDistanceM') or 0.0)
       except (TypeError, ValueError):
@@ -126,7 +180,9 @@ class TurnSignalCoordinator:
       if _next not in ("", "none", "destination", "unknown") and 0.0 < _next_d <= 200.0:
         n = type(n)(**{**n.__dict__, 'maneuver': _next, 'maneuverDistanceM': _next_d})
     if event_id == 0 and armed and n.maneuver not in ("", "none", "destination", "unknown") and n.maneuverDistanceM > 0:
-      key = (n.sessionId, n.routeRevision, n.maneuver)
+      # Keep one synthetic request through route refreshes. A maneuver/session
+      # change or a near-to-far distance reset still starts a new intersection.
+      key = (n.sessionId, n.maneuver)
       passed = (self._synth_last_distance is not None and self._synth_last_distance < 30.0
                 and n.maneuverDistanceM > 100.0)
       if key != self._synth_key or passed:
@@ -218,6 +274,10 @@ class LaneIntentCoordinator:
                  'right': LaneIntentDirection.right}.get(str(model_direction), LaneIntentDirection.none)
     vehicle = LaneVehicleInput(lateral_active, plan.speed, blindspot_left, blindspot_right,
       left_blinker, right_blinker, brake_pressed, gas_pressed, steering_pressed, state, direction)
+    try:   # REPLAN_RESET：司机变回原车道后允许重新规划（只清“等绝对号”标记，不改变道执行条件）
+      self.core.note_abs_observation(planning_ego_index(t), state == ObservedLaneChangeState.starting, now_ns)
+    except Exception:
+      pass
     result = self.core.update(plan.core, topology, vehicle, now_ns=now_ns,
                               allow_new_lane_change=allow_new_lane_change)
     event = (nav.get('sessionId'), nav.get('routeRevision'), nav.get('maneuverEventId'))
@@ -265,34 +325,65 @@ def _at_road_edge(direction, topology):
   return int(topology.get('laneMarkingRight', -1) or -1) == 1
 
 
-def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
+def build_intent(nav, topology, *, turns, **kw):
+  """JUNCTION_NO_LC 外层：路口 50 米内不让并道类提示灯（无目标车道、车端会自己变道）新亮起。
+  推荐车道变道 / 超车避让在 _build_intent_core 里通过 allow_new_lane_change 拦。"""
+  out = _build_intent_core(nav, topology, turns=turns, **kw)
+  try:
+    if (out.get('signalRequested') and int(out.get('targetLaneIndex', -1)) < 0
+        and camel(nav.get('maneuver', 'none')) in _LC_TYPE_LAMPS):
+      _lk = (str(nav.get('sessionId', '')), int(out.get('requestId', 0) or 0), str(out.get('direction')))
+      if getattr(turns, '_lc_lamp_key', None) == _lk:
+        pass                      # 50 米外已经发出的同一个提示灯：继续，不算新发起
+      elif junction_no_lane_change(nav):
+        out = dict(out, signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False,
+                   direction='none', reason='junctionNoLaneChange')
+      else:
+        turns._lc_lamp_key = _lk
+  except Exception:
+    pass
+  return out
+
+
+def _build_intent_core(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_blocked,
                  blindspot_left, blindspot_right, lateral_active, turns, lanes,
                  left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
                  steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False,
-                 overtake=None):
+                 overtake=None, avoid_confirm=None, is_night=False):
   turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns, lookahead_time_s=settings.signal_lead_time_s,
                       lookahead_distance_m=settings.turn_lane_lookahead_m,
                       turn_geometry_active=turn_geometry_active,
                       left_blinker=left_blinker, right_blinker=right_blinker)
   n = navigation(nav)
+  # JUNCTION_NO_LC：50 米内不发起新的变道。
+  _jn = junction_no_lane_change(nav)
   intersection = n.maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'turnRight', 'sharpRight', 'uTurnRight')
   approaching = bool(intersection and turn['signalRequested'])
-  plan = lane_plan(nav, topology, settings, v_ego=v_ego)
+  plan = lane_plan(nav, topology, settings, v_ego=v_ego,
+                   avoid_confirm=avoid_confirm, is_night=is_night)
+  _overtake_plan = False
   if overtake and overtake.get('request') and str(overtake.get('direction')) in ('left', 'right'):
     _count = int(topology.get('visibleLaneCount', 0) or 0)
-    _ego = int(topology.get('egoLaneIndexFromLeft', -1) or -1)
+    _ego = topology.get('egoLaneIndexFromLeft', -1)
+    _ego = int(_ego) if isinstance(_ego, int) and not isinstance(_ego, bool) else -1  # 最左车道 ego=0 不能被 `or -1` 吃掉
     if _count > 1 and 0 <= _ego < _count:
       _target = max(0, _ego - 1) if overtake['direction'] == 'left' else min(_count - 1, _ego + 1)
       if _target != _ego:
-        plan = NavLanePlan(True, str(nav.get('sessionId', '')), int(nav.get('routeRevision', 0)),
-                           int(nav.get('maneuverEventId', 0) or 0), _count, (_target,), heuristic=True,
-                           allow_unknown_crossing=False, relative_change_limit=1)
+        # OVT_WRAP：协调器要的是 LanePlan 包装（.core/.topology/.speed），不是裸 NavLanePlan。
+        plan = LanePlan(str(overtake['direction']), _target, -1, 'overtake', False,
+                        NavLanePlan(True, str(nav.get('sessionId', '')), int(nav.get('routeRevision', 0)),
+                                    int(nav.get('maneuverEventId', 0) or 0), _count, (_target,), heuristic=True,
+                                    allow_unknown_crossing=False, relative_change_limit=1),
+                        topology, v_ego)
+        _overtake_plan = True
   out = lanes.update(nav, plan, now_ns=now_ns, topology_valid=bool(topology.get('valid')),
     left_blocked=left_blocked, right_blocked=right_blocked,
     blindspot_left=blindspot_left, blindspot_right=blindspot_right, lateral_active=lateral_active,
     left_blinker=left_blinker, right_blinker=right_blinker, brake_pressed=brake_pressed,
     gas_pressed=gas_pressed, steering_pressed=steering_pressed, model_state=model_state,
-    model_direction=model_direction, allow_new_lane_change=n.maneuverDistanceM > 0 and not approaching)
+    model_direction=model_direction,
+    # 超车不依赖导航机动距离（无路线/d=0 时也可超车）；路口打灯窗口 approaching 仍然拦。
+    allow_new_lane_change=(n.maneuverDistanceM > 0 or _overtake_plan) and not approaching and not _jn)
   if (n.maneuver in RELATIVE_ROUTE_MANEUVERS and planning_ego_index(topology) is None
       and out.get('relativeStepComplete')):
     out.update(signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False, reason='heuristicChangeLimit')
@@ -300,11 +391,25 @@ def build_intent(nav, topology, *, settings, v_ego, now_ns, left_blocked, right_
   if out['signalRequested']:
     # 并道灯也不能往路沿那一侧亮：已经在最左/最右车道时，再往那一侧并没有车道。
     # 只拦并道请求，路口转弯灯（turn*/sharp*/uTurn*）不受影响。
-    if _at_road_edge(out.get('direction'), topology):
+    # ABS_STEP：绝对车道计划的路沿由高德车道数和可见路沿标志判断（已在协调器里），不按可见窗口边缘拦。
+    _abs_plan = getattr(plan.core, 'absolute_ego_index', None) is not None
+    if not _abs_plan and _at_road_edge(out.get('direction'), topology):
       return dict(out, signalRequested=False, spLaneChangeReady=False, laneChangeAllowed=False,
                   reason='atRoadEdge')
     return out
   if settings.turn_signal_enabled and turn['signalRequested']:
+    # 专用道/分流引导只能由车道协调器发灯。若已经进入专用道（或本来无需换道），
+    # 不允许 turn-only fallback 再点同方向灯；避免在季华五路这类右前方专用道后
+    # 又触发一次右灯。普通的左/右转、急转和掉头仍完整走原来的 turn fallback。
+    if n.maneuver in _DEDICATED_LANE_GUIDANCE:
+      return out
+    # A physical edge proves there is no adjacent corridor on this side.
+    # Apply this before the turn-only return, where the old edge check was
+    # unreachable. A visible-window boundary alone is not a road edge.
+    _side = str(turn.get('direction', '')).lower()
+    if (n.maneuver in _LC_TYPE_LAMPS and _side in ('left', 'right')
+        and topology.get(_side + 'RoadEdge') is True):
+      return dict(out, reason='atRoadEdge')
     relative_route_action = n.maneuver in ('mergeLeft', 'mergeRight', 'exitLeft', 'exitRight', 'rampLeft', 'rampRight')
     if relative_route_action and out.get('laneRequestOwned'):
       return out  # Never bypass a lane coordinator's pause/abort via a turn-only fallback.

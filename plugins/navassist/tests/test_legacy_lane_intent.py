@@ -24,7 +24,7 @@ def vehicle(*, bsm_left=False, bsm_right=False, state=ObservedLaneChangeState.of
                           lane_change_direction=direction)
 
 
-def turn_plan(*, valid=True, maneuver="turnLeft", distance=100.0, session="session-a", revision=1, event=11):
+def turn_plan(*, valid=True, maneuver="turnLeft", distance=45.0, session="session-a", revision=1, event=11):
   return NavTurnPlan(valid, session, revision, event, maneuver, distance)
 
 
@@ -79,7 +79,7 @@ def test_navigation_turn_signal_supports_right_turns_and_waits_until_lookahead_w
   coordinator = NavTurnSignalCoordinator()
 
   early = coordinator.update(turn_plan(maneuver="turnRight", distance=200.0), speed_mps=15.0, now_ns=0)
-  active = coordinator.update(turn_plan(maneuver="turnRight", distance=120.0), speed_mps=15.0, now_ns=1_000_000_000)
+  active = coordinator.update(turn_plan(maneuver="turnRight", distance=50.0), speed_mps=15.0, now_ns=1_000_000_000)
 
   assert not early.signal_requested
   assert active.signal_requested
@@ -111,7 +111,7 @@ def test_navigation_turn_signal_stays_on_through_zero_distance_then_cancels_on_e
 
 def test_navigation_turn_signal_waits_for_sp_turn_geometry_to_clear_after_event_change():
   coordinator = NavTurnSignalCoordinator()
-  coordinator.update(turn_plan(distance=80.0), speed_mps=12.0, now_ns=0)
+  coordinator.update(turn_plan(distance=45.0), speed_mps=12.0, now_ns=0)
 
   changed_while_turning = coordinator.update(
     turn_plan(maneuver="straight", distance=500.0, event=12), speed_mps=6.0,

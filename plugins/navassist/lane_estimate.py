@@ -106,7 +106,10 @@ def estimate(nav, topology, position, phone, line, history, now_ns, road_total=N
                           or topology.get("rightRoadEdge"))
     right_solid_edge = bool(topology.get("rightEdgeDetected") and right_solid
                             and right_gap <= EDGE_SOLID_MAX_GAP_M)
-    if right_adjacent or right_solid_edge:
+    # RIGHT_EDGE_CROSS_CHECK：手机明确说"右边还有车道"时不采信最右结论，
+    # 避免单侧弱路沿把中间车道判成最后一条（右路沿单独一致性只有 84%）。
+    _phone_sees_right_lane = bool(phone_usable and phone_number < phone_count)
+    if (right_adjacent or right_solid_edge) and not _phone_sees_right_lane:
       conf = CONF_RIGHT_ADJACENT if right_adjacent else CONF_RIGHT_SOLID
       if 0 <= ego < max(visible, 1):
         add(total - visible + ego, "rightEdge", conf)
