@@ -88,7 +88,7 @@
     "plugin.json"
   ],
   "device_activation": false,
-  "local_candidate_version": "2.4.8-aligned",
+  "local_candidate_version": "2.4.9-lane-data",
   "reference_unchanged_at_final_check": true,
   "source_alignment_only": true,
   "pending_local_hashes": {
@@ -102,5 +102,21 @@
   "upstream_references": {
     "onemiless/xpilot:xpilot": "f60234e3aedb5bebd01a9c11f58683da8acaf413",
     "onemiless/xpilot-plugins:main": "b6f59582c114c0f43ce00b892427b6a5cfce67b1"
-  }
+  },
+  "reference_kind": "predeployment_device_baseline",
+  "structural_splits": [
+    "intent_helpers.py",
+    "runtime_observations.py",
+    "lane_number_state.py",
+    "lanenav/hmm_observations.py",
+    "process_diagnostics.py"
+  ],
+  "structural_behavior_comparison": {
+    "v3_frames": 600,
+    "hmm_frames": 600,
+    "intent_frames": 240,
+    "runtime_frames": 7,
+    "identical_outputs": true
+  },
+  "deployment_receipt": "companion/tesnav/docs/NAVASSIST_DEPLOY_20261123.md"
 }

@@ -228,13 +228,13 @@
     {
       "id": "navassist",
       "name": "Navigation Assist (phone)",
-      "version": "2.4.5-final",
+      "version": "2.4.9-lane-data",
       "api": 1,
       "category": "navigation",
       "author": "Sniper-Eon",
       "description": "TesNav v3 navigation with integrated lane positioning, bounded physical signals, maneuver slowdown and chime. CP native navigation is a separate mutually exclusive plugin.",
-      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.4.5-final.tar.gz",
-      "sha256": "50fdf4a769e7dd65a607c4bfe10de1972b1afe9c8ba006de84f340291bf76a87",
+      "url": "https://raw.githubusercontent.com/Sniper-Eon/xpilot-plugins/main/dist/navassist-2.4.9-lane-data.tar.gz",
+      "sha256": "84cfa0ee926caee9d4330df54764fb43f024c491cc8b37fa2ea1bca85119b5c5",
       "platform": null,
       "default": false
     },

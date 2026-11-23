@@ -1,5 +1,7 @@
 # xpilot-plugins
 
+2026-11-23 已部署并停车验收：C3 navassist 2.4.9-lane-data、手机 v68。保留现车改动和设置；未路试、未完成腾讯高精驾驶替换。当前事实、已知失败及腾讯入口问题见 [部署记录](companion/tesnav/docs/NAVASSIST_DEPLOY_20261123.md)。包内 README/runtime-source 是安装前快照。
+
 Plugin repository for [xpilot](https://github.com/Sniper-Eon/xpilot) (Tesla-only sunnypilot fork).
 Devices list this repository under Settings → Plugins → Plugin Store, install while parked, and apply on restart.
 
