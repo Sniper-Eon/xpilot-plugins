@@ -20,11 +20,6 @@ JUNCTION_NO_LC_M = 50.0
 # 并道类提示灯：车端看到灯就会自己变道，所以在 50 米内同样算“发起变道”。真正的路口转弯灯（turn*/sharp*/uTurn*）不拦。
 _LC_TYPE_LAMPS = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight",
                             "exitLeft", "exitRight", "rampLeft", "rampRight", "mergeLeft", "mergeRight"))
-# 轻微左/右与保持左/右本质是「进入分流/专用道」的路线引导。需要换道时由
-# LaneIntentCoordinator 负责唯一的一次提示；已经在推荐专用道后，不能再由
-# NavTurnSignalCoordinator 以同方向补一次“路口灯”，否则车端会重新进入转向意图，
-# 使通过分流口后的速度被压住。真正 turn*/sharp*/uTurn* 路口转弯不在此集合。
-_DEDICATED_LANE_GUIDANCE = frozenset(("slightLeft", "slightRight", "keepLeft", "keepRight"))
 
 
 def junction_distance_m(nav):
@@ -97,15 +92,14 @@ def planning_ego_index(topology):
   return None
 
 
-def lane_plan(nav, topology, settings, *, v_ego, avoid_confirm=None, is_night=False):
+def lane_plan(nav, topology, settings, *, v_ego):
   n = navigation(nav)
   count, ego = int(topology.get('visibleLaneCount', 0)), int(topology.get('egoLaneIndexFromLeft', -1))
   absolute = planning_ego_index(topology)
   if type(absolute) is not int:
     absolute = None
   core = build_lane_plan(n, N(visibleLaneCount=count, egoLaneIndexFromLeft=ego),
-                         healthy=True, settings=settings, amap_ego_index=absolute,
-                         avoid_confirm=avoid_confirm, is_night=is_night)
+                         healthy=True, settings=settings, amap_ego_index=absolute)
   if core.valid and getattr(core, 'absolute_ego_index', None) is not None:
     ego = int(core.absolute_ego_index)  # ABS_STEP：绝对车道计划按绝对号算方向
   target = NavLaneIntentCoordinator._target(core, ego) if core.valid else None
@@ -125,7 +119,7 @@ def payload(intent, nav):
               targetLaneIndex=intent.target_lane_index, spLaneChangeReady=intent.lane_change_ready,
               laneChangeAllowed=intent.lane_change_ready, reason=intent.reason, requestId=intent.request_id,
               forkNow=False, allowUnknownCrossing=False, ignoreSolidBoundary=False,
-              signalPurpose='nativeLaneChange' if camel(nav.get('maneuver', 'none')) in ('slightLeft', 'slightRight')
+              signalPurpose='nativeLaneChange' if nav.get('maneuver') in ('slight_left', 'slight_right')
                 and intent.target_lane_index < 0 else 'lanePreparation' if nav.get('maneuver') in
                 ('merge_left', 'merge_right', 'exit_left', 'exit_right', 'ramp_left', 'ramp_right')
                 or intent.target_lane_index >= 0 else 'junction')
@@ -172,7 +166,7 @@ class TurnSignalCoordinator:
     # 路口换段时手机常把当前机动报成 none（ev=0），此时用下一步机动兜底，
     # 否则转弯那一刻灯反而不亮。
     if armed and n.maneuver in ("", "none", "unknown"):
-      _next = camel(nav.get('nextManeuver', 'none'))
+      _next = str(nav.get('nextManeuver', 'none'))
       try:
         _next_d = float(nav.get('nextDistanceM') or 0.0)
       except (TypeError, ValueError):
@@ -180,9 +174,7 @@ class TurnSignalCoordinator:
       if _next not in ("", "none", "destination", "unknown") and 0.0 < _next_d <= 200.0:
         n = type(n)(**{**n.__dict__, 'maneuver': _next, 'maneuverDistanceM': _next_d})
     if event_id == 0 and armed and n.maneuver not in ("", "none", "destination", "unknown") and n.maneuverDistanceM > 0:
-      # Keep one synthetic request through route refreshes. A maneuver/session
-      # change or a near-to-far distance reset still starts a new intersection.
-      key = (n.sessionId, n.maneuver)
+      key = (n.sessionId, n.routeRevision, n.maneuver)
       passed = (self._synth_last_distance is not None and self._synth_last_distance < 30.0
                 and n.maneuverDistanceM > 100.0)
       if key != self._synth_key or passed:
@@ -349,7 +341,7 @@ def _build_intent_core(nav, topology, *, settings, v_ego, now_ns, left_blocked, 
                  blindspot_left, blindspot_right, lateral_active, turns, lanes,
                  left_blinker=False, right_blinker=False, brake_pressed=False, gas_pressed=False,
                  steering_pressed=False, model_state='off', model_direction='none', turn_geometry_active=False,
-                 overtake=None, avoid_confirm=None, is_night=False):
+                 overtake=None):
   turn = turns.update(nav, speed_mps=v_ego, now_ns=now_ns, lookahead_time_s=settings.signal_lead_time_s,
                       lookahead_distance_m=settings.turn_lane_lookahead_m,
                       turn_geometry_active=turn_geometry_active,
@@ -359,8 +351,7 @@ def _build_intent_core(nav, topology, *, settings, v_ego, now_ns, left_blocked, 
   _jn = junction_no_lane_change(nav)
   intersection = n.maneuver in ('turnLeft', 'sharpLeft', 'uTurnLeft', 'turnRight', 'sharpRight', 'uTurnRight')
   approaching = bool(intersection and turn['signalRequested'])
-  plan = lane_plan(nav, topology, settings, v_ego=v_ego,
-                   avoid_confirm=avoid_confirm, is_night=is_night)
+  plan = lane_plan(nav, topology, settings, v_ego=v_ego)
   _overtake_plan = False
   if overtake and overtake.get('request') and str(overtake.get('direction')) in ('left', 'right'):
     _count = int(topology.get('visibleLaneCount', 0) or 0)
@@ -398,18 +389,6 @@ def _build_intent_core(nav, topology, *, settings, v_ego, now_ns, left_blocked, 
                   reason='atRoadEdge')
     return out
   if settings.turn_signal_enabled and turn['signalRequested']:
-    # 专用道/分流引导只能由车道协调器发灯。若已经进入专用道（或本来无需换道），
-    # 不允许 turn-only fallback 再点同方向灯；避免在季华五路这类右前方专用道后
-    # 又触发一次右灯。普通的左/右转、急转和掉头仍完整走原来的 turn fallback。
-    if n.maneuver in _DEDICATED_LANE_GUIDANCE:
-      return out
-    # A physical edge proves there is no adjacent corridor on this side.
-    # Apply this before the turn-only return, where the old edge check was
-    # unreachable. A visible-window boundary alone is not a road edge.
-    _side = str(turn.get('direction', '')).lower()
-    if (n.maneuver in _LC_TYPE_LAMPS and _side in ('left', 'right')
-        and topology.get(_side + 'RoadEdge') is True):
-      return dict(out, reason='atRoadEdge')
     relative_route_action = n.maneuver in ('mergeLeft', 'mergeRight', 'exitLeft', 'exitRight', 'rampLeft', 'rampRight')
     if relative_route_action and out.get('laneRequestOwned'):
       return out  # Never bypass a lane coordinator's pause/abort via a turn-only fallback.

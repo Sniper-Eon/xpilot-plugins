@@ -63,7 +63,10 @@ def is_current_road_layout(n, rec, road_total, distance_m, road_kind=None, maneu
     rec_set = {int(i) for i in (rec or ()) if isinstance(i, int)}
     all_rec = (not rec_set) or (len(rec_set) >= n)
     approaching = in_approach_window(distance_m, road_kind, maneuver)
-    directional = is_directional_maneuver(maneuver)
+    # DIRECTIONAL_ONLY_NEAR：只有进入接近窗口，"方向性机动"才该影响车道表判断。
+    # 之前 5 公里外的 merge 也算 directional，配合"推荐只覆盖部分车道"，
+    # 会让首次确认永远返回 False（这就是 lanes=4 却一直 noLaneCount 的原因）。
+    directional = is_directional_maneuver(maneuver) and approaching
     if approaching:
         # BOOTSTRAP_ALL_REC：还没确认过总数时，接近窗口里的"全部车道都推荐"
         # 说明这就是本条路的车道表，不是路口拓宽（拓宽只会推荐其中几条）。

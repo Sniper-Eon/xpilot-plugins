@@ -12,9 +12,6 @@ Design (box prototype, not installed):
   * Amap lane count must be stable COUNT_STABLE_S (0.8 s) before renumbering; a widening is
     remapped onto the side that did NOT widen (junction_side evidence, then recommended-set
     continuity); if neither is known the strict output goes to unknown until reconfirmed.
-  * HOLD_ROAD: when Gaode's intersection (often widened) list appears early, the lock keeps
-    the current-road numbering; remapping onto the intersection layout waits until the
-    planning approach window (250 / 800 / 640 / 400 m). rec_prev is not updated while holding.
   * During a lane change the strict output is unknown ("变道中"), the hold output keeps the old
     number; afterwards the predicted number must be reconfirmed by the sources.
   * Fused error -> fused treated as absent, lock kept.
@@ -33,8 +30,6 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field, asdict
-
-from .rec_gate import in_approach_window
 
 TURNING = ("turn_", "slight_", "ramp_", "uturn", "u_turn", "roundabout", "exit", "fork", "merge")
 
@@ -58,17 +53,10 @@ class V3Config:
     lat_shift_sustain_s: float = 1.5
     gps_ref_tau_s: float = 20.0
     lc_min_starting_s: float = 0.5
-    lc_finish_confirm_s: float = 0.5  # target lane must stay supported after Starting ends
-    lc_finish_timeout_s: float = 4.0  # otherwise the attempt is treated as cancelled
     reconfirm_s: float = 6.0
     relock_s: float = 4.0              # disagreement with corroboration (vision/GPS) before correcting
     relock_fused_only_s: float = 10.0  # fused alone must disagree this long before correcting
     shift_needs_support: bool = True   # GPS lateral shift needs blinker (last 10 s) or source support
-    # Keep the existing inertial/visual correction behaviour.  The HOLD_ROAD
-    # fix must not remove a useful correction path based on one drive alone.
-    allow_inertial_lane_change: bool = True
-    inertial_requires_source: bool = False
-    locked_visual_only_correction: bool = True
     blinker_memory_s: float = 10.0
     lc_protect_s: float = 12.0         # after a confirmed LC, a fused value equal to the pre-LC lane is
                                        # treated as stale (fused gets no car LC events live) unless vision agrees
@@ -127,9 +115,6 @@ class LaneNumberV3:
         self.gate_fail_t0 = None
         self.n_raw = None
         self.n_raw_t0 = None
-        self.pending_n = None   # Amap count held back until the approach window
-        self.pending_t0 = None
-        self.pending_current_n = None  # independently reported current-layout change, awaiting mapping
         self.rec_prev = ()
         self.offs = deque(maxlen=7)
         self.gps_ref = None
@@ -137,9 +122,6 @@ class LaneNumberV3:
         self.shift_dir = 0
         self.lc_t0 = None
         self.lc_dir = None
-        self.lc_start_gps = None
-        self.lc_start_dr = None
-        self.lc_pending = None       # dict(direction, target, t0, support_t0)
         self.lcs_prev = ""
         self.tent_t0 = None
         self.junction_t0 = None
@@ -166,12 +148,10 @@ class LaneNumberV3:
         return float(w) if isinstance(w, (int, float)) and 2.4 <= w <= 4.6 else self.cfg.width_default_m
 
     def _n_now(self, f):
+        n = f.get("n_amap") or 0
+        if n >= 1:
+            return n
         rt = f.get("road_total")
-        # AMap's lane list describes the upcoming junction layout.  It is not a
-        # current-road lane count and must never bootstrap the current numbering.
-        amap_n = int(f.get("n_amap") or 0)
-        if self.n is None and amap_n >= 1:
-            return None
         return rt if isinstance(rt, int) and rt >= 1 else None
 
     def _vision(self, f, n):
@@ -283,36 +263,36 @@ class LaneNumberV3:
             elif isinstance(dist, (int, float)):
                 self.step_min_d = dist if self.step_min_d is None else min(self.step_min_d, dist)
 
-        # ---- current layout latch + future-layout snapshot
-        # The planning distance gate says when a manoeuvre may be prepared.  It
-        # does NOT prove that the car has entered the widened junction layout.
-        # Keep AMap's count as a pending future snapshot and number the car only
-        # in the independently latched current-road coordinate system.
-        approaching = in_approach_window(dist, f.get("road_kind"), man)
-        amap_n = int(f.get("n_amap") or 0)
-        if self.n is not None and amap_n >= 1 and amap_n != self.n:
-            if self.pending_n != amap_n:
-                self.pending_n, self.pending_t0 = amap_n, t
-        else:
-            self.pending_n, self.pending_t0 = None, None
-
+        # ---- Amap count debounce + remap
         n = self.n if self.n is not None else n_in
-        if self.n is None and n_in is not None:
-            self.n = n = n_in
-        elif self.n is not None and n_in is not None and n_in != self.n:
-            # A current-layout source reports a new total, but it still does not
-            # say how old lanes connect to new lanes.  Per driver preference,
-            # retain the OLD-road number and mark it pending; do not reinterpret
-            # the same integer in the new coordinate system and do not guess an
-            # added-left offset.
-            self.pending_current_n = n_in
-            self.pending_n = n_in
-            self.state = "TENTATIVE" if self.value is not None else "UNLOCKED"
-            self.reason = "layoutPending:%d->%d" % (self.n, n_in)
-            n = self.n
-        elif n_in == self.n:
-            self.pending_current_n = None
-        if f.get("rec") and amap_n == self.n:
+        if n_in is None:
+            n = None
+        elif self.n is None:
+            n = n_in
+        elif n_in != self.n:
+            if self.n_raw != n_in:
+                self.n_raw, self.n_raw_t0 = n_in, t
+            elif t - self.n_raw_t0 >= c.count_stable_s:
+                if self.value is not None:
+                    nv, why = self._remap(self.n, n_in, f)
+                    if nv is None:
+                        st = "REMAP_UNSURE"
+                        self.state, self.reason = st, "count%d->%d:unmapped" % (self.n, n_in)
+                        self.value = max(0, min(n_in - 1, self.value))
+                        self.tent_t0 = t
+                    else:
+                        self.value = nv
+                        self.reason = "remap%d->%d:%s" % (self.n, n_in, why)
+                        if self.value is not None:
+                            self.last_shown = (self.value, n_in, t)
+                self.n = n_in
+                n = n_in
+                self.n_raw = None
+        else:
+            self.n_raw = None
+        if self.n is None and n is not None:
+            self.n = n
+        if f.get("rec"):
             self.rec_prev = tuple(f.get("rec"))
 
         if n is None:
@@ -333,66 +313,19 @@ class LaneNumberV3:
         pair_stable = self.pair_v is not None and t - self.pair_t0 >= c.vision_pair_min_s
 
         # ---- lane-change state machine (car)
-        # This C3 fork does not emit laneChangeFinishing.  Starting ending only
-        # means the model's lane-change probability fell; it may be completion
-        # OR cancellation.  Hold the old number and wait for the fused/visual
-        # lane estimate to remain on the expected adjacent lane.
         lcs = str(f.get("lcs") or "")
-        lcs_low = lcs.lower()
-        starting = "starting" in lcs_low
         lc_event = None
-        if starting:
+        if "Starting" in lcs or "starting" in lcs:
             if self.lc_t0 is None:
                 self.lc_t0 = t
-                hacc = f.get("gps_hacc_m")
-                self.lc_start_gps = (f.get("gps_off_m")
-                                     if hacc is not None and hacc <= c.gps_shift_max_hacc_m else None)
-                self.lc_start_dr = f.get("lc_dr_lat")
             d = f.get("lc_dir")
             if d in ("left", "right"):
                 self.lc_dir = d
         elif self.lc_t0 is not None:
-            if (t - self.lc_t0 >= c.lc_min_starting_s and self.lc_dir
-                    and self.value is not None and n >= 1):
-                step = -1 if self.lc_dir == "left" else 1
-                target = max(0, min(n - 1, self.value + step))
-                if target != self.value:
-                    self.lc_pending = {"direction": self.lc_dir, "target": target,
-                                       "t0": t, "support_t0": None,
-                                       "gps0": self.lc_start_gps, "dr0": self.lc_start_dr}
+            if t - self.lc_t0 >= c.lc_min_starting_s and self.lc_dir:
+                lc_event = self.lc_dir
             self.lc_t0, self.lc_dir = None, None
-            self.lc_start_gps, self.lc_start_dr = None, None
-
-        if self.lc_pending is not None and not starting:
-            p = self.lc_pending
-            fused_supported = bool(fz_strong and fz == p["target"])
-            vision_supported = bool(pair_stable and self.pair_v == p["target"])
-            sign = -1 if p["direction"] == "left" else 1
-            need_motion = c.lc_shift_frac * w
-            dr_now, gps_now = f.get("lc_dr_lat"), f.get("gps_off_m")
-            dr_delta = (sign * (dr_now - p["dr0"])
-                        if isinstance(dr_now, (int, float)) and isinstance(p["dr0"], (int, float)) else None)
-            hacc = f.get("gps_hacc_m")
-            gps_delta = (sign * (gps_now - p["gps0"])
-                         if (isinstance(gps_now, (int, float)) and isinstance(p["gps0"], (int, float))
-                             and hacc is not None and hacc <= c.gps_shift_max_hacc_m) else None)
-            motion_confirmed = ((dr_delta is not None and dr_delta >= need_motion)
-                                or (gps_delta is not None and gps_delta >= need_motion))
-            # Completion is a 2-of-3 vote: physical lateral motion, fused lane,
-            # and independent phone+camera visual pair.  This tolerates a
-            # missing GPS source without allowing one drifting source to decide.
-            evidence_count = int(motion_confirmed) + int(fused_supported) + int(vision_supported)
-            if evidence_count >= 2:
-                if p["support_t0"] is None:
-                    p["support_t0"] = t
-                elif t - p["support_t0"] >= c.lc_finish_confirm_s:
-                    lc_event = p["direction"]
-                    self.lc_pending = None
-            else:
-                p["support_t0"] = None
-            if self.lc_pending is not None and t - p["t0"] >= c.lc_finish_timeout_s:
-                self.lc_pending = None
-        in_lc = starting
+        in_lc = self.lc_t0 is not None
         self.lcs_prev = lcs
         if f.get("lc_dir") in ("left", "right"):
             self.blink_t, self.blink_dir = t, f.get("lc_dir")
@@ -400,18 +333,12 @@ class LaneNumberV3:
         # ---- lateral shift (dead-reckoning first, GPS vs slow reference second)
         shift = None
         dr = f.get("dr_lat")
-        if c.allow_inertial_lane_change and self.value is not None and not in_lc and lc_event is None:
+        if self.value is not None and not in_lc and lc_event is None:
             if isinstance(dr, (int, float)):
                 if self.dr_ref is None:
                     self.dr_ref = dr
                 if abs(dr - self.dr_ref) >= c.lc_shift_frac * w:
-                    sdir = "right" if dr > self.dr_ref else "left"
-                    sd = 1 if sdir == "right" else -1
-                    target = max(0, min(n - 1, self.value + sd))
-                    source_ok = ((fz_strong and fz == target)
-                                 or (pair_stable and self.pair_v == target))
-                    if (not c.inertial_requires_source) or source_ok:
-                        shift = sdir
+                    shift = "right" if dr > self.dr_ref else "left"
                     self.dr_ref = dr
             hacc = f.get("gps_hacc_m")
             if shift is None and len(self.offs) >= 3 and hacc is not None and hacc <= c.gps_shift_max_hacc_m:
@@ -428,13 +355,8 @@ class LaneNumberV3:
                         target = max(0, min(n - 1, self.value + sd))
                         blink_ok = (self.blink_t is not None and t - self.blink_t <= c.blinker_memory_s
                                     and self.blink_dir == sdir)
-                        src_ok = ((fz_strong and fz == target)
-                                  or (pair_stable and self.pair_v == target))
-                        if c.inertial_requires_source:
-                            supported = src_ok and not near
-                        else:
-                            supported = (not c.shift_needs_support) or blink_ok or (src_ok and not near)
-                        if supported:
+                        src_ok = (fz_ok and fz == target) or (self.pair_v == target)
+                        if (not c.shift_needs_support) or blink_ok or (src_ok and not near):
                             shift = sdir
                         self.gps_ref = med
                         self.shift_dir = 0
@@ -463,8 +385,6 @@ class LaneNumberV3:
                 self._set(nv, "TENTATIVE", ("lc_" if lc_event else "shift_") + d, t, n)
                 self.tent_t0 = t
                 self.dis_v = None
-                if shift:
-                    self.lc_pending = None
             else:
                 if self.state == "PAUSE":
                     self.state = "TENTATIVE"     # LC ended without direction / aborted: reconfirm
@@ -476,21 +396,19 @@ class LaneNumberV3:
                     corroborated = (vis_single is not None and fz in vis_single) or \
                         (self._gps_gate(f, n, self.value) is False and self._gps_gate(f, n, fz) is True)
                 elif pair_stable and (not fz_ok or fz == self.pair_v):
-                    if self.state != "LOCKED" or c.locked_visual_only_correction:
-                        evid, corroborated = self.pair_v, True
+                    evid, corroborated = self.pair_v, True
                 if (evid is not None and self.pre_lc_value is not None and evid == self.pre_lc_value
                         and not (pair_stable and self.pair_v == evid)
                         and t - (self.tent_t0 or t) <= c.lc_protect_s):
                     evid = None   # stale fused right after our own confirmed lane change
                 gate = self._gps_gate(f, n, self.value)
-                target_gate = self._gps_gate(f, n, evid) if evid is not None else None
                 if frozen:
                     self.dis_v = None
                     self.gate_fail_t0 = None
                     if self.state in ("LOCKED", "TENTATIVE"):
                         self.reason = "junctionHold"
                 else:
-                    if evid is not None and evid != self.value and target_gate is not False:
+                    if evid is not None and evid != self.value and self._gps_gate(f, n, evid) is not False:
                         if self.dis_v != evid:
                             self.dis_v, self.dis_t0 = evid, t
                         need = c.relock_s if corroborated else c.relock_fused_only_s
@@ -574,14 +492,8 @@ class LaneNumberV3:
                 hold = v
         if hold is None and pair is not None:
             hold = pair
-        reason = self.reason
-        if self.pending_current_n is not None and self.n is not None:
-            reason = "layoutPending:%d->%d" % (self.n, self.pending_current_n)
-        elif self.pending_n is not None and self.n is not None and self.pending_n != self.n:
-            reason = "holdRoad:%d->%d" % (self.n, self.pending_n)
         return {"strict": strict, "hold": hold, "provisional": provisional, "state": self.state,
-                "reason": reason, "n": n, "amap_rec": tuple(f.get("rec") or ()),
-                "pending_n": self.pending_n, "approaching": in_approach_window(f.get("dist_m"), f.get("road_kind"), f.get("maneuver"))}
+                "reason": self.reason, "n": n, "amap_rec": tuple(f.get("rec") or ())}
 
     def config_dict(self):
         return asdict(self.cfg)

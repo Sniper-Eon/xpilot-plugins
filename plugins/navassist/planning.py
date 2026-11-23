@@ -3,7 +3,6 @@ from __future__ import annotations
 import math
 from .intent_types import NavLanePlan, NavLaneIntent, LaneIntentDirection
 from .settings import NavSettings
-from .avoid_confirm import AvoidanceConfirm
 
 
 LEFT_TURN_LANE_MANEUVERS = frozenset(("turnLeft", "sharpLeft", "uTurnLeft"))
@@ -37,9 +36,7 @@ FORK_NOW_DISTANCE_M = 50.0
 
 
 def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | None = None,
-                    amap_ego_index: int | None = None,
-                    avoid_confirm: AvoidanceConfirm | None = None,
-                    is_night: bool = False) -> NavLanePlan:
+                    amap_ego_index: int | None = None) -> NavLanePlan:
   settings = settings if settings is not None else NavSettings()
   nav_valid = bool(healthy and nav.valid and not nav.stale and settings.enabled and settings.lane_change_enabled)
   lanes = tuple(nav.lanes)
@@ -105,18 +102,13 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # Translate AMap full-road recommendations into the local visible window.
     # Passing AMap indices raw makes the coordinator compare them with a
     # different egoLaneIndexFromLeft and steer to the wrong edge.
-    # 已在避让车道里时不走这两条（仍带距离门槛的）平移，改走下面带帧确认的 ABS_STEP。
-    _in_avoid = bool(nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
-                     and recommended and amap_ego_index not in recommended)
-    if (not _in_avoid and nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
         and (not math.isfinite(distance_m) or distance_m <= 0.0 or distance_m <= _rec_gate_m)):
       visual_ego = int(topology.egoLaneIndexFromLeft)
       if 0 <= visual_ego < lane_count:
         offset = amap_ego_index - visual_ego
         visual_recommended = tuple(index - offset for index in recommended if 0 <= index - offset < lane_count)
         if visual_recommended:
-          if avoid_confirm is not None:
-            avoid_confirm.update(False, None, night=is_night)
           return NavLanePlan(
             True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
             lane_count, visual_recommended,
@@ -124,7 +116,7 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
     # A confirmed absolute lane also permits one adjacent step toward a
     # recommendation outside the local window. Do not equate the local index
     # with an absolute lane or require the final destination to be visible.
-    if (not _in_avoid and nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
         and (not math.isfinite(distance_m) or distance_m <= 0.0 or distance_m <= _rec_gate_m)):
       visual_ego = int(topology.egoLaneIndexFromLeft)
       absolute_recommended = tuple(index for index in recommended if 0 <= index < amap_lane_count)
@@ -133,23 +125,17 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
         step = -1 if nearest < amap_ego_index else (1 if nearest > amap_ego_index else 0)
         adjacent = visual_ego + step
         if step and 0 <= adjacent < lane_count:
-          if avoid_confirm is not None:
-            avoid_confirm.update(False, None, night=is_night)
           return NavLanePlan(
             True, str(nav.sessionId), int(nav.routeRevision), int(nav.maneuverEventId),
             lane_count, (adjacent,),
           )
-    # ABS_STEP：已知绝对车道号且不在推荐车道里 → 按绝对号朝推荐一侧只并一条。
-    # 避让打灯不再用距离门槛，改为连续帧确认（夜里 2 帧、白天 3 帧）。
-    # _rec_gate_m 数字本身不变，仍用于上面两条推荐平移，以及显示/锁号的接近窗口。
-    _abs_rec = tuple(index for index in recommended if 0 <= index < amap_lane_count) if _in_avoid else ()
-    if _in_avoid and _abs_rec:
-      if avoid_confirm is not None:
-        _key = (str(nav.sessionId), int(nav.maneuverEventId), int(amap_ego_index), _abs_rec)
-        _ready = avoid_confirm.update(True, _key, night=is_night)
-      else:
-        _ready = math.isfinite(distance_m) and 0.0 < distance_m <= _rec_gate_m
-      if _ready:
+    # ABS_STEP：已知绝对车道号且不在推荐车道里 → 按绝对号朝推荐一侧只并一条，
+    # 不要求高德车道数 == 可见车道数，也不要求窗口 ego 有效；距离门槛沿用 _rec_gate_m。
+    if (nav_valid and amap_ego_index is not None and 0 <= amap_ego_index < amap_lane_count
+        and recommended and amap_ego_index not in recommended
+        and math.isfinite(distance_m) and 0.0 < distance_m <= _rec_gate_m):
+      _abs_rec = tuple(index for index in recommended if 0 <= index < amap_lane_count)
+      if _abs_rec:
         _nearest = min(_abs_rec, key=lambda index: (abs(index - amap_ego_index), index))
         _abs_target = amap_ego_index + (1 if _nearest > amap_ego_index else -1)
         return NavLanePlan(
@@ -157,8 +143,6 @@ def build_lane_plan(nav, topology, *, healthy: bool, settings: NavSettings | Non
           amap_lane_count, (_abs_target,), allow_unknown_crossing=True,
           relative_change_limit=1, absolute_ego_index=int(amap_ego_index),
         )
-    elif avoid_confirm is not None:
-      avoid_confirm.update(False, None, night=is_night)
     edge_recommended = bool(
       (fallback_side == "left" and 0 in recommended)
       or (fallback_side == "right" and amap_lane_count - 1 in recommended)

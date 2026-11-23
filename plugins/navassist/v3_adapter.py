@@ -6,10 +6,6 @@ def _int(v):
     return v if isinstance(v, int) and not isinstance(v, bool) else None
 
 
-def _float(v):
-    return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else None
-
-
 def frame_from_runtime(*, now_ns, nav, topology, candidate, road_total, geo, lane_offset_m,
                        lane_width_m, lane_sigma_m, speed_mps, meta, car, road_kind=""):
     lanes = list(nav.get("lanes") or ())
@@ -32,8 +28,7 @@ def frame_from_runtime(*, now_ns, nav, topology, candidate, road_total, geo, lan
         event_id=str(nav.get("maneuverEventId") or ""), road_total=road_total,
         fused_value=_int((geo or {}).get("value")), fused_conf=float((geo or {}).get("confidence") or 0.0),
         fused_err=bool(fnav.get("err")), fused_side_added=_int(fnav.get("side_added")),
-        gps_off_m=lane_offset_m, gps_hacc_m=lane_sigma_m, lane_width_m=lane_width_m,
-        dr_lat=None, lc_dr_lat=_float(fnav.get("dr_lat")),
+        gps_off_m=lane_offset_m, gps_hacc_m=lane_sigma_m, lane_width_m=lane_width_m, dr_lat=None,
         mnn_num=num, mnn_cnt=cnt,
         cam_ego=_int(topology.get("egoLaneIndexFromLeft")), cam_visible=_int(topology.get("visibleLaneCount")) or 0,
         edge_l_anc=bool(topology.get("leftCarriagewayAnchored") or topology.get("leftRoadEdge")),

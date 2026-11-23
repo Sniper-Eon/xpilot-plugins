@@ -22,8 +22,8 @@ android {
         minSdk = 26
         targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 69
-        versionName = "1.56-xpilot-tencent-destination"
+        versionCode = 74
+        versionName = "1.61-lane-ts-only"
 
         manifestPlaceholders["AMAP_API_KEY"] =
             providers.gradleProperty("AMAP_API_KEY").orNull ?: ""

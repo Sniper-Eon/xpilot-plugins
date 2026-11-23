@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from .lanenav.hmm import FilterConfig
 from .lanenav.pipeline import Pipeline
-from .rec_gate import in_approach_window
 
 LANE_WIDTH_DEFAULT_M = 3.4
 LANE_WIDTH_MIN_M = 2.4
@@ -80,8 +79,7 @@ class FusedLaneMatcher:
   def update(self, *, t, nav, topology, candidate, road_total,
              lane_offset_m, lane_width_m, lane_sigma_m, speed_mps,
              yaw_rate_dps, bearing_deg, route_bearing, lane_change_state,
-             lane_change_direction, left_line=None, right_line=None,
-             road_kind='unknown'):
+             lane_change_direction, left_line=None, right_line=None):
     width = self._set_width(lane_width_m)
     lanes = list(nav.get("lanes") or ())
     n_now = int(nav.get("laneTotalCount") or 0)
@@ -93,15 +91,8 @@ class FusedLaneMatcher:
     arrows = tuple(_allowed_actions(l.get("allowedActions")) for l in lanes)
     dist = nav.get("distanceM")
     maneuver = nav.get("maneuver")
-    # 接近窗口与规划门槛一致；此前路口拓宽列表不当作当前路编号。
-    near = n_now >= 1 and in_approach_window(dist, road_kind, maneuver)
-    road_n = road_total if isinstance(road_total, int) and road_total >= 1 else 0
-    if road_n < 1:
-      near = False
-      rec1 = None
-    # 还没到接近窗口时，路口推荐车道的编号不属于当前路，不要喂给融合。
-    if (not near) and isinstance(road_n, int) and n_now != road_n:
-      rec1 = None
+    near = isinstance(dist, (int, float)) and 0.0 <= float(dist) <= JUNCTION_SWITCH_M and n_now >= 1
+    road_n = road_total if isinstance(road_total, int) and road_total >= 1 else n_now
     jlanes = []
     if near and n_now >= 1:
       for i in range(n_now):
@@ -171,9 +162,9 @@ class FusedLaneMatcher:
               "offsetM": fr["gps_lateral_m"], "laneWidthM": width, "biasAssumed": True,
               "debug": self.debug}
 
-    lane1 = res.get("lane") if res.get("valid") else None  # 1-based or None
+    lane1 = res.get("lane")  # 1-based or None
     value = (int(lane1) - 1) if isinstance(lane1, int) and lane1 >= 1 else None
-    prob = float(res.get("prob") or 0.0) if res.get("valid") else 0.0
+    prob = float(res.get("prob") or 0.0)
     reason = str(res.get("reason") or "ok")
     if not res.get("valid"):
       reason = reason or "invalid"
@@ -182,7 +173,7 @@ class FusedLaneMatcher:
     self.debug = {
       "ver": VERSION,
       "lane1": lane1,
-      "n": res.get("n") if road_n >= 1 else 0,
+      "n": res.get("n"),
       "prob": round(prob, 3),
       "reason": reason,
       "belief": tuple(round(float(x), 3) for x in belief),

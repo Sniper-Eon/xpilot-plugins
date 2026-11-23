@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 MAX_AGE_NS = 90_000_000_000
-CONFIRM_NS = 1_000_000_000
+CONFIRM_NS = 500_000_000
 MAX_CALLBACK_AGE_MS = 10_000
 
 
@@ -32,7 +32,9 @@ class RoadTotalMemory:
         return None
     context = (nav.get('sessionId'), nav.get('routeRevision'))
     road = str(getattr(snap, 'current_road', '') or '').strip()
-    if self.context != context or (road and self.road and road != self.road):
+    # ROAD_NAME_NO_RESET：道路名切换（桥→路、匝道→主路）不再清空车道数记忆。
+    # 之前每过一次路名边界就重置，导致车道上限永远确认不下来。
+    if self.context != context:
       floor = getattr(snap, 'source_wall_time_ms', 0) if self.context is not None else 0
       self.reset()
       self.minimum_stamp = floor

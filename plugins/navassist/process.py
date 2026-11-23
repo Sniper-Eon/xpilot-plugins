@@ -349,14 +349,7 @@ def main():
                 _ll_txt = '%.6f,%.6f' % (float(lat_diag['lat']), float(lat_diag['lon']))
             except Exception:
               _yaw_txt, _hdg_txt, _rte_txt, _ll_txt = '-', '-', '-', '-'
-            try:
-              _ro = (result.get('topology') or {}).get('holdRoadRecording') or {}
-              _obs_txt = '%s/%s/%s:%s%s' % (
-                _ro.get('step', -1), _ro.get('link', -1), _ro.get('point', -1),
-                _ro.get('recommendationAction', '-'), '/chg' if _ro.get('linkChanged') else '')
-            except Exception:
-              _obs_txt = '-/-/-:-'
-            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d%s ego=%d/%d abs=%s/%s old=%s vis=%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | road=%s spd=%s edge=%s est=%s off=%s geo=%s alc=%s gps=%s | %s blk=%s lamp=%s/%s | obs=%s fnav=%s yaw=%s hdg=%s rte=%s dr=%s side=%s ll=%s v3=%s\n' % (
+            _f.write('%.1f v=%d lk=%d ra=%d %-12s ev=%d d=%6.0f ve=%4.1f lanes=%d rec=%d%s ego=%d/%d abs=%s/%s old=%s vis=%s | sig=%d %-5s %-20s tgt=%-2d | blink=%d/%d lat=%d lcs=%s | ovt=%s | road=%s spd=%s edge=%s est=%s off=%s geo=%s alc=%s gps=%s | %s blk=%s lamp=%s/%s | fnav=%s yaw=%s hdg=%s rte=%s dr=%s side=%s ll=%s v3=%s\n' % (
               _t.monotonic(), _key[0], _key[1], _key[2], _key[3], _key[4], _key[5], _key[6],
               _key[7], _key[8], _recset, _key[9], _key[10],
               '-' if _abs is None else _abs, _abs_src, _old, _vis,
@@ -364,7 +357,7 @@ def main():
               '%s/%s' % (_ovt.get('state', '-'), _ovt.get('reason', '-')),
               _road, _spd, _edge, _est, _off, _geo_txt, _alc_txt, _gps_txt,
               _flags, _blk, _lamp.get('reason', '-'), _lamp.get('framesBuilt', '-'),
-              _obs_txt, _fnav, _yaw_txt, _hdg_txt, _rte_txt, _dr, _side, _ll_txt, _v3_txt))
+              _fnav, _yaw_txt, _hdg_txt, _rte_txt, _dr, _side, _ll_txt, _v3_txt))
       except Exception:
         pass
       try:
@@ -394,10 +387,7 @@ def main():
       _uncertain = False
       _disp_src = 'geoLane'
       if _v3_on:
-        # HOLD_ROAD：优先用 v3 锁住的车道数（可能还是当前路总数），
-        # 不要用尚未进入接近窗口的高德路口拓宽列表。
-        _n_v3 = _v3.get('n') if isinstance(_v3.get('n'), int) and _v3.get('n') >= 1 else 0
-        _n_ref = _n_v3 if _n_v3 >= 1 else (_geo_n if _geo_n >= 1 else 0)
+        _n_ref = _geo_n if _geo_n >= 1 else (_v3.get('n') if isinstance(_v3.get('n'), int) and _v3.get('n') >= 1 else 0)
         _geo_v = _v3.get('value')
         _geo_c = (0.6 if _v3.get('provisional') else 0.9)
         if not (isinstance(_geo_v, int) and 0 <= _geo_v < max(_n_ref, 1) and _n_ref >= 1):
@@ -409,10 +399,6 @@ def main():
         if _v3.get('provisional'):
           _uncertain = True
         _geo_n = _n_ref
-      if _v3.get('road_layout_unknown'):
-        _geo_n = 0
-      if _v3.get('reason') in ('roadLayoutPending', 'roadLayoutUnknown'):
-        _uncertain, _disp_src = True, 'roadLayoutPending'
       if isinstance(_geo_v, int) and _geo_c >= 0.5 and (_geo_n >= 2 or _v3_on):
         publish_position(dict(version=1, valid=True, absolute_confirmed=True,
           lane_index=_geo_v + 1, lane_count=(_geo_n if _geo_n >= 1 else None), numbering='leftToRight',

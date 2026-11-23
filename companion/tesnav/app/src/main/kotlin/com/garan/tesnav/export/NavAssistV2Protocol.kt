@@ -233,7 +233,9 @@ object NavAssistV2Mapper {
         // route-bound exported lane facts may provide this stable step identity.
         val routeLanes = if (state.lanesPathId != null && state.lanesPathId == state.acceptedPathId &&
             state.guidancePathId == state.acceptedPathId && !state.routeRecalculating &&
-            state.lanesObservedAtMs?.let { sourceWallTimeMs - it in 0..10_000L } == true) lanes(state) else null
+            state.lanesObservedAtMs?.let { sourceWallTimeMs - it in 0..10_000L } == true) {
+            lanesFrom(state.lanes, sourceWallTimeMs, state.laneCount)
+        } else null
         // AMap Auto broadcast lanes are display-only facts and were previously
         // transient, so C3 never received them. Export them as a fallback when
         // the SDK path has no lane callback.
@@ -242,7 +244,7 @@ object NavAssistV2Mapper {
             state.guidancePathId == state.acceptedPathId && !state.routeRecalculating &&
             state.lanesObservedAtMs?.let { sourceWallTimeMs - it in 0..10_000L } == true) {
             // Auto primary and display projections share this driveWay callback clock.
-            lanesFrom(state.autoDisplayLanes, state.lanesObservedAtMs, state.laneCount)
+            lanesFrom(state.autoDisplayLanes, sourceWallTimeMs, state.laneCount)
         } else null
         val exportLanes = routeLanes ?: autoLanes
         val eventAction = when {

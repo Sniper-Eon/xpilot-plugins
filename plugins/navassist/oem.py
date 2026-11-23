@@ -155,13 +155,9 @@ class OemLaneSignals:
     self.reject_left_free_space: bool = False
     self.reject_right_free_space: bool = False
     self.nav_route_active: bool = False
-    self.blindspot_left_raw: int = -1    # DAS_blindSpotRearLeft (0x39B, 0..3)
-    self.blindspot_right_raw: int = -1   # DAS_blindSpotRearRight
-    self.controlled_access: bool = False # UI_controlledAccess (0x238)
     self.seen_alc: bool = False
     self.seen_map: bool = False
     self._alc_ns: int = -1
-    self._bs_ns: int = -1
     self._alc_ch_ns: int = -1
     self._map_ns: int = -1
 
@@ -185,9 +181,6 @@ class OemLaneSignals:
           continue
         if address == ADDRESS_DAS_STATUS:
           self.alc_state = _le_bits(data, 46, 5)
-          self.blindspot_left_raw = _le_bits(data, 4, 2)
-          self.blindspot_right_raw = _le_bits(data, 6, 2)
-          self._bs_ns = _mono_time
           self.ldw = _le_bits(data, 37, 3)
           self._alc_ns = _mono_time
           self.seen_alc = True
@@ -200,7 +193,6 @@ class OemLaneSignals:
           self.reject_left_free_space = bool(_le_bits(data, 44, 1))
           self.reject_right_free_space = bool(_le_bits(data, 45, 1))
           self.nav_route_active = bool(_le_bits(data, 29, 1))
-          self.controlled_access = bool(_le_bits(data, 37, 1))
           self._map_ns = _mono_time
           self.seen_map = True
 
@@ -259,7 +251,6 @@ class OemLaneSignals:
     now = time.monotonic_ns() if now_ns is None else int(now_ns)
     alc_fresh = self._fresh(self._alc_ns, ALC_STALE_NS, now)
     map_fresh = self._fresh(self._map_ns, MAP_STALE_NS, now)
-    bs_fresh = self._fresh(self._bs_ns, ALC_STALE_NS, now)
     return {
       "alcState": int(self.alc_state),
       "alcName": ALC_NAMES.get(self.alc_state, f"UNKNOWN({self.alc_state})"),
@@ -276,10 +267,6 @@ class OemLaneSignals:
       "leftCrossingAllowed": bool(alc_fresh and self.alc_state in (ALC_AVAILABLE_ONLY_L, ALC_AVAILABLE_BOTH)),
       "rightCrossingAllowed": bool(alc_fresh and self.alc_state in (ALC_AVAILABLE_ONLY_R, ALC_AVAILABLE_BOTH)),
       "solidLine": bool(alc_fresh and self.alc_state == ALC_UNAVAILABLE_SOLID_LANE_LINE),
-      "blindspotLeft": bool(bs_fresh and self.blindspot_left_raw in (1, 2)),
-      "blindspotRight": bool(bs_fresh and self.blindspot_right_raw in (1, 2)),
-      "blindspotFresh": bs_fresh,
-      "controlledAccess": bool(map_fresh and self.controlled_access),
       "ldw": int(self.ldw),
       "rejectLeftLane": self.reject_left_lane,
       "rejectRightLane": self.reject_right_lane,
