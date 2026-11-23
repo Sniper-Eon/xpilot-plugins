@@ -64,6 +64,7 @@ import com.garan.tesnav.service.NavigationDataSource
 import com.garan.tesnav.service.NavigationSourcePolicy
 import com.garan.tesnav.ui.NavigationStateDialog
 import com.garan.tesnav.ui.NavigationSourceMenu
+import com.garan.tesnav.ui.TencentMapActions
 import com.garan.tesnav.ui.AmapAutoActions
 import com.garan.tesnav.ui.SettingsDialog
 import com.garan.tesnav.config.AmapConfiguration
@@ -659,8 +660,17 @@ class MainActivity : Activity(), AddressLookupView {
 
     private fun openNavigationPage(target: LatLng? = null) {
         if (runtimeService?.navigationDataSource?.value == NavigationDataSource.TENCENT_API) {
-            val launch = packageManager.getLaunchIntentForPackage("com.tencent.map")
-            if (launch != null) startActivity(launch) else toast("请先安装腾讯导航探针")
+            if (target == null) {
+                if (!TencentMapActions.open(this)) toast("未能打开腾讯地图，请确认已安装腾讯导航探针")
+            } else if (TencentMapActions.navigate(this, destinationInput.text.toString(),
+                    target.latitude, target.longitude)) {
+                // Explicit destination handoff may arm the existing source guard;
+                // only fresh, matched real-navigation callbacks can pass it.
+                runtimeService?.startRealtime()
+                toast("已发送目的地到腾讯地图，请在腾讯确认路线")
+            } else {
+                toast("目的地未发送，请确认腾讯地图已安装且支持路线跳转")
+            }
             return
         }
         // Only the car-map source hands the route over. The SDK source keeps navigating in this app.
@@ -752,7 +762,11 @@ class MainActivity : Activity(), AddressLookupView {
             service.navigationDataSource.collect { source ->
                 sourceButton.text = NavigationSourcePolicy.buttonText(source, BuildConfig.EXTENDED_NAV_SOURCES)
                 if (BuildConfig.EXTENDED_NAV_SOURCES) {
-                    planButton.text = if (source == NavigationDataSource.AMAP_AUTO) "发送到高德车机" else "导航到这里"
+                    planButton.text = when (source) {
+                        NavigationDataSource.AMAP_AUTO -> "发送到高德车机"
+                        NavigationDataSource.TENCENT_API -> "发送到腾讯地图"
+                        else -> "导航到这里"
+                    }
                 }
             }
         }

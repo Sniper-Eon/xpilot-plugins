@@ -1,5 +1,7 @@
 # 特会开 / TesNav — xpilot companion
 
+2026-11-23 手机 v69 已安装：腾讯来源支持搜索/选点后发送目的地到腾讯地图路线页；实际页面跳转验收待手机解锁。实现、验证及密钥兼容边界见 [腾讯地址跳转记录](docs/TENCENT_DESTINATION_HANDOFF_20261123.md)。下文版本说明为历史记录。
+
 本目录迁自用户原分支，保留手机导航、原有单目侧方车辆模型和协议。双目测距/测速和自动超车项目已从应用移除。
 配对系统：[Sniper-Eon/xpilot](https://github.com/Sniper-Eon/xpilot)，`xpilot` 分支；
 设备导航和取图分别由 `navassist`、`phone_vision` 商店插件提供。

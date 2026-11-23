@@ -6,6 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NavigationDataSourceTest {
+    // Failure contract before implementation: Tencent is idle but search is rejected
+    // as if navigation had started; an existing Tencent route also blocks replanning.
+    @Test fun `Tencent destination search remains available for external route handoff`() {
+        for (mode in com.garan.tesnav.model.NavigationMode.entries) {
+            assertTrue("Tencent search blocked in $mode",
+                NavigationSourcePolicy.canSearch(NavigationDataSource.TENCENT_API, mode))
+        }
+    }
+
     @Test fun `HA toggle cannot disarm Auto or manually started API navigation`() {
         val synced = com.garan.tesnav.model.NavigationState(startedFromTeslaSync = true)
         assertFalse(NavigationSourcePolicy.syncOwnsNavigation(NavigationDataSource.AMAP_AUTO, synced))

@@ -42,7 +42,7 @@ internal object NavigationSourcePolicy {
         }.copy(navigationProvider = source.name)
 
     fun canSearch(source: NavigationDataSource, apiMode: NavigationMode): Boolean =
-        source != NavigationDataSource.TENCENT_API && (source == NavigationDataSource.AMAP_AUTO || apiMode == NavigationMode.IDLE)
+        source == NavigationDataSource.TENCENT_API || source == NavigationDataSource.AMAP_AUTO || apiMode == NavigationMode.IDLE
 
     fun syncOwnsNavigation(source: NavigationDataSource, api: NavigationState): Boolean =
         source == NavigationDataSource.AMAP_API && api.startedFromTeslaSync
