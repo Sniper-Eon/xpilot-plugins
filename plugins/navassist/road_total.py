@@ -50,7 +50,10 @@ class RoadTotalMemory:
     age_ms = source_ms - stamp + current.age_ms(now_ns)
     same_layout = (self.reference_total is None or n == self.reference_total
                    or nav.get('maneuver') in ('none', 'straight'))
-    qualified = bool(nav.get('valid') and layout_allowed and same_layout and n in range(2, 17)
+    # LANE_COUNT_INDEPENDENT：车道数和「引导是否新鲜」是两件事。
+    # 高德引导回调稀疏（实测 14 秒才来一次），行驶中 nav.valid 常为 False，
+    # 但车道列表本身是新鲜的 —— 不能因此丢掉车道数。
+    qualified = bool(layout_allowed and same_layout and n in range(2, 17)
                      and getattr(snap, 'lane_guidance_present', False)
                      and 0 < stamp <= source_ms and stamp >= self.minimum_stamp
                      and 0 <= age_ms <= MAX_CALLBACK_AGE_MS)

@@ -65,7 +65,12 @@ def is_current_road_layout(n, rec, road_total, distance_m, road_kind=None, maneu
     approaching = in_approach_window(distance_m, road_kind, maneuver)
     directional = is_directional_maneuver(maneuver)
     if approaching:
-        return road_total is not None and n == road_total
+        # BOOTSTRAP_ALL_REC：还没确认过总数时，接近窗口里的"全部车道都推荐"
+        # 说明这就是本条路的车道表，不是路口拓宽（拓宽只会推荐其中几条）。
+        # 之前这里直接 False，导致首次确认永远不可能完成 → 总数一直未知。
+        if road_total is None:
+            return all_rec
+        return n == road_total
     if road_total is not None and n == road_total:
         return True
     if road_total is not None and n != road_total:
